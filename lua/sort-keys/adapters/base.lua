@@ -37,31 +37,6 @@ function M.create(config)
         return ","
     end
 
-    adapter.get_nested_objects = config.get_nested_objects
-        or function(entry_node, source)
-            local results = {}
-            local sortable_types = adapter.get_sortable_node_types()
-            local type_set = {}
-            for _, t in ipairs(sortable_types) do
-                type_set[t] = true
-            end
-
-            local function traverse(node)
-                if type_set[node:type()] then
-                    table.insert(results, node)
-                end
-                for child in node:iter_children() do
-                    traverse(child)
-                end
-            end
-
-            for child in entry_node:iter_children() do
-                traverse(child)
-            end
-
-            return results
-        end
-
     adapter.get_comment_node_types = config.get_comment_node_types or function()
         return { "comment" }
     end

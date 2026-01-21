@@ -52,12 +52,6 @@ function SortKeysAdapter.is_sortable_entry(node) end
 ---@return string
 function SortKeysAdapter.get_separator() end
 
----Get nested sortable objects within an entry (for DeepSortKeys)
----@param entry_node TSNode
----@param source integer Buffer number
----@return TSNode[]
-function SortKeysAdapter.get_nested_objects(entry_node, source) end
-
 ---Get comment node types for this language
 ---@return string[]
 function SortKeysAdapter.get_comment_node_types() end
