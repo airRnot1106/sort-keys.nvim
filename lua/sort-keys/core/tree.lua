@@ -54,14 +54,29 @@ function M.find_sortable_node_at_position(root, row, col, sortable_types)
     return nil
 end
 
----Find all sortable nodes within a range
+---Check if node_a is an ancestor of node_b
+---@param node_a TSNode
+---@param node_b TSNode
+---@return boolean
+local function is_ancestor_of(node_a, node_b)
+    local parent = node_b:parent()
+    while parent do
+        if parent:id() == node_a:id() then
+            return true
+        end
+        parent = parent:parent()
+    end
+    return false
+end
+
+---Find all sortable nodes within a range (innermost only)
 ---@param root TSNode
 ---@param start_row integer 0-indexed start row
 ---@param end_row integer 0-indexed end row
 ---@param sortable_types string[]
 ---@return TSNode[]
 function M.find_sortable_nodes_in_range(root, start_row, end_row, sortable_types)
-    local results = {}
+    local candidates = {}
     local type_set = {}
     for _, t in ipairs(sortable_types) do
         type_set[t] = true
@@ -78,7 +93,7 @@ function M.find_sortable_nodes_in_range(root, start_row, end_row, sortable_types
 
         -- Check if this node is sortable
         if type_set[node:type()] then
-            table.insert(results, node)
+            table.insert(candidates, node)
         end
 
         -- Traverse children
@@ -88,6 +103,23 @@ function M.find_sortable_nodes_in_range(root, start_row, end_row, sortable_types
     end
 
     traverse(root)
+
+    -- Filter out nodes that are ancestors of other nodes in the list
+    -- Keep only the innermost (most nested) nodes
+    local results = {}
+    for _, node in ipairs(candidates) do
+        local is_ancestor = false
+        for _, other in ipairs(candidates) do
+            if node:id() ~= other:id() and is_ancestor_of(node, other) then
+                is_ancestor = true
+                break
+            end
+        end
+        if not is_ancestor then
+            table.insert(results, node)
+        end
+    end
+
     return results
 end
 
