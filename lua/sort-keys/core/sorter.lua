@@ -311,6 +311,48 @@ local function sort_single_object(bufnr, object_node, adapter, opts)
     vim.api.nvim_buf_set_text(bufnr, start_row, start_col, end_row, end_col, new_lines)
 end
 
+---Sort only entries within a range (partial sort)
+---@param bufnr integer
+---@param object_node TSNode
+---@param adapter SortKeysAdapter
+---@param opts SortKeysOptions
+---@param range {start_row: integer, end_row: integer}
+local function sort_partial_object(bufnr, object_node, adapter, opts, range)
+    local all_entries = extract_entries(object_node, adapter, bufnr)
+
+    -- Separate entries into: in-range (to be sorted) and out-of-range (keep position)
+    local in_range_entries = {}
+    local in_range_indices = {}
+
+    for i, entry in ipairs(all_entries) do
+        -- Entry is in range if its start row is within the selection
+        if entry.start_row >= range.start_row and entry.start_row <= range.end_row then
+            table.insert(in_range_entries, entry)
+            table.insert(in_range_indices, i)
+        end
+    end
+
+    -- Skip if less than 2 entries in range
+    if #in_range_entries < 2 then
+        return
+    end
+
+    -- Sort only the in-range entries
+    local comparator = create_comparator(opts)
+    table.sort(in_range_entries, comparator)
+
+    -- Replace in-range entries with sorted entries in the original list
+    for j, original_index in ipairs(in_range_indices) do
+        all_entries[original_index] = in_range_entries[j]
+    end
+
+    -- Reconstruct and replace
+    local new_lines = reconstruct_object(object_node, all_entries, adapter, bufnr)
+    local start_row, start_col, end_row, end_col = object_node:range()
+
+    vim.api.nvim_buf_set_text(bufnr, start_row, start_col, end_row, end_col, new_lines)
+end
+
 ---Sort with deep option (recursive)
 ---@param bufnr integer
 ---@param root_object TSNode
@@ -365,39 +407,55 @@ function M.sort(bufnr, adapter, opts, range)
     end
 
     local sortable_types = adapter.get_sortable_node_types()
-    local target_nodes = {}
 
     if range then
-        -- Find all sortable nodes in range
-        target_nodes = tree_utils.find_sortable_nodes_in_range(root, range.start_row, range.end_row, sortable_types)
+        -- Range selection: find the object containing the range start,
+        -- then sort only the entries within the range
+        local node = tree_utils.find_sortable_node_at_position(root, range.start_row, 0, sortable_types)
+        if not node then
+            vim.notify("No sortable object found", vim.log.levels.INFO)
+            return
+        end
+
+        if opts.deep then
+            -- For deep sort with range, sort all nested objects within range
+            local nested = tree_utils.find_sortable_nodes_in_range(root, range.start_row, range.end_row, sortable_types)
+            table.sort(nested, function(a, b)
+                return tree_utils.get_node_depth(a) > tree_utils.get_node_depth(b)
+            end)
+            for _, obj in ipairs(nested) do
+                local parser = tree_utils.get_parser(bufnr)
+                if parser then
+                    parser:parse()
+                end
+                local updated_root = tree_utils.get_root(bufnr)
+                if updated_root then
+                    local obj_start_row, obj_start_col = obj:range()
+                    local updated_obj =
+                        tree_utils.find_sortable_node_at_position(updated_root, obj_start_row, obj_start_col, sortable_types)
+                    if updated_obj then
+                        sort_single_object(bufnr, updated_obj, adapter, opts)
+                    end
+                end
+            end
+        else
+            sort_partial_object(bufnr, node, adapter, opts, range)
+        end
     else
-        -- Find sortable node at cursor
+        -- No range: find sortable node at cursor
         local cursor = vim.api.nvim_win_get_cursor(0)
         local row = cursor[1] - 1 -- Convert to 0-indexed
         local col = cursor[2]
         local node = tree_utils.find_sortable_node_at_position(root, row, col, sortable_types)
-        if node then
-            target_nodes = { node }
+        if not node then
+            vim.notify("No sortable object found", vim.log.levels.INFO)
+            return
         end
-    end
 
-    if #target_nodes == 0 then
-        vim.notify("No sortable object found", vim.log.levels.INFO)
-        return
-    end
-
-    -- Sort nodes from bottom to top to maintain positions
-    table.sort(target_nodes, function(a, b)
-        local a_row = a:range()
-        local b_row = b:range()
-        return a_row > b_row
-    end)
-
-    for _, target_node in ipairs(target_nodes) do
         if opts.deep then
-            sort_deep(bufnr, target_node, adapter, opts)
+            sort_deep(bufnr, node, adapter, opts)
         else
-            sort_single_object(bufnr, target_node, adapter, opts)
+            sort_single_object(bufnr, node, adapter, opts)
         end
     end
 end
