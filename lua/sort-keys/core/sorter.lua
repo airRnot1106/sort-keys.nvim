@@ -418,12 +418,28 @@ function M.sort(bufnr, adapter, opts, range)
         end
 
         if opts.deep then
-            -- For deep sort with range, sort all nested objects within range
-            local nested = tree_utils.find_sortable_nodes_in_range(root, range.start_row, range.end_row, sortable_types)
-            table.sort(nested, function(a, b)
+            -- For deep sort with range:
+            -- 1. First sort all nested objects within range (deepest first)
+            -- 2. Then sort the entries within range of the parent object
+
+            -- Find nested objects (excluding the parent node itself)
+            local nested = tree_utils.collect_nested_sortable_nodes(node, sortable_types)
+            -- Filter to only those within range
+            local nested_in_range = {}
+            for _, obj in ipairs(nested) do
+                local obj_start_row = obj:range()
+                if obj_start_row >= range.start_row and obj_start_row <= range.end_row then
+                    table.insert(nested_in_range, obj)
+                end
+            end
+
+            -- Sort deepest first
+            table.sort(nested_in_range, function(a, b)
                 return tree_utils.get_node_depth(a) > tree_utils.get_node_depth(b)
             end)
-            for _, obj in ipairs(nested) do
+
+            -- Sort each nested object
+            for _, obj in ipairs(nested_in_range) do
                 local parser = tree_utils.get_parser(bufnr)
                 if parser then
                     parser:parse()
@@ -436,6 +452,19 @@ function M.sort(bufnr, adapter, opts, range)
                     if updated_obj then
                         sort_single_object(bufnr, updated_obj, adapter, opts)
                     end
+                end
+            end
+
+            -- Re-parse and sort entries within range of the parent object
+            local parser = tree_utils.get_parser(bufnr)
+            if parser then
+                parser:parse()
+            end
+            local updated_root = tree_utils.get_root(bufnr)
+            if updated_root then
+                local updated_node = tree_utils.find_sortable_node_at_position(updated_root, range.start_row, 0, sortable_types)
+                if updated_node then
+                    sort_partial_object(bufnr, updated_node, adapter, opts, range)
                 end
             end
         else
