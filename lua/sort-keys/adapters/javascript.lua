@@ -1,5 +1,6 @@
 ---JavaScript adapter for sort-keys
 local base = require "sort-keys.adapters.base"
+local tree_utils = require "sort-keys.core.tree"
 
 local M = base.create {
     name = "javascript",
@@ -26,7 +27,7 @@ local M = base.create {
                     or child_type == "number"
                     or child_type == "computed_property_name"
                 then
-                    local text = vim.treesitter.get_node_text(child, source)
+                    local text = tree_utils.get_node_text(child, source)
                     -- Remove quotes if string key
                     if child_type == "string" then
                         -- Handle both single and double quotes
@@ -41,11 +42,11 @@ local M = base.create {
             -- method_definition -> name field
             for child in entry_node:iter_children() do
                 if child:type() == "property_identifier" then
-                    return vim.treesitter.get_node_text(child, source)
+                    return tree_utils.get_node_text(child, source)
                 end
             end
         elseif node_type == "shorthand_property_identifier" then
-            return vim.treesitter.get_node_text(entry_node, source)
+            return tree_utils.get_node_text(entry_node, source)
         end
 
         return nil

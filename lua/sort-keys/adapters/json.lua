@@ -1,5 +1,6 @@
 ---JSON adapter for sort-keys
 local base = require "sort-keys.adapters.base"
+local tree_utils = require "sort-keys.core.tree"
 
 local M = base.create {
     name = "json",
@@ -17,7 +18,7 @@ local M = base.create {
         -- JSON pair structure: pair -> [key: string, value: _value]
         for child in pair_node:iter_children() do
             if child:type() == "string" then
-                local text = vim.treesitter.get_node_text(child, source)
+                local text = tree_utils.get_node_text(child, source)
                 -- Remove quotes: "key" -> key
                 return text:sub(2, -2)
             end

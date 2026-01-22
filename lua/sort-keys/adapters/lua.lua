@@ -1,5 +1,6 @@
 ---Lua adapter for sort-keys
 local base = require "sort-keys.adapters.base"
+local tree_utils = require "sort-keys.core.tree"
 
 local M = base.create {
     name = "lua",
@@ -25,12 +26,12 @@ local M = base.create {
 
             -- Check for identifier key (name = value)
             if child_type == "identifier" then
-                return vim.treesitter.get_node_text(child, source)
+                return tree_utils.get_node_text(child, source)
             end
 
             -- Check for bracket notation [key]
             if child_type == "string" then
-                local text = vim.treesitter.get_node_text(child, source)
+                local text = tree_utils.get_node_text(child, source)
                 -- Remove brackets and quotes: ["key"] or ['key'] -> key
                 text = text:gsub("^%[?[\"']?", ""):gsub("[\"']?%]?$", "")
                 return text
