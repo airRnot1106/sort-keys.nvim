@@ -447,8 +447,12 @@ function M.sort(bufnr, adapter, opts, range)
                 local updated_root = tree_utils.get_root(bufnr)
                 if updated_root then
                     local obj_start_row, obj_start_col = obj:range()
-                    local updated_obj =
-                        tree_utils.find_sortable_node_at_position(updated_root, obj_start_row, obj_start_col, sortable_types)
+                    local updated_obj = tree_utils.find_sortable_node_at_position(
+                        updated_root,
+                        obj_start_row,
+                        obj_start_col,
+                        sortable_types
+                    )
                     if updated_obj then
                         sort_single_object(bufnr, updated_obj, adapter, opts)
                     end
@@ -462,7 +466,8 @@ function M.sort(bufnr, adapter, opts, range)
             end
             local updated_root = tree_utils.get_root(bufnr)
             if updated_root then
-                local updated_node = tree_utils.find_sortable_node_at_position(updated_root, range.start_row, 0, sortable_types)
+                local updated_node =
+                    tree_utils.find_sortable_node_at_position(updated_root, range.start_row, 0, sortable_types)
                 if updated_node then
                     sort_partial_object(bufnr, updated_node, adapter, opts, range)
                 end
