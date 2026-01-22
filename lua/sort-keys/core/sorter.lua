@@ -164,12 +164,13 @@ local function detect_indentation(object_node, bufnr)
     return base_indent, entry_indent
 end
 
----Check if entry text has trailing separator
----@param text string
+---Check if object has trailing separator before closing bracket
+---@param object_text string
 ---@param separator string
 ---@return boolean
-local function has_trailing_separator(text, separator)
-    return text:match(vim.pesc(separator) .. "%s*$") ~= nil
+local function has_trailing_separator(object_text, separator)
+    -- Match separator followed by optional whitespace/newlines and closing bracket
+    return object_text:match(vim.pesc(separator) .. "%s*[%]})]%s*$") ~= nil
 end
 
 ---Remove trailing separator from text
@@ -188,19 +189,53 @@ local function add_trailing_separator(text, separator)
     return text .. separator
 end
 
+---Reconstruct inline object (single line)
+---@param sorted_entries SortKeysEntry[]
+---@param adapter SortKeysAdapter
+---@param original_text string
+---@param preserve_trailing_separator boolean
+---@return string[]
+local function reconstruct_inline_object(sorted_entries, adapter, original_text, preserve_trailing_separator)
+    local separator = adapter.get_separator()
+
+    -- Extract opening and closing brackets
+    local opening = original_text:match "^(%s*{%s*)"
+    local closing = original_text:match "(%s*}%s*)$"
+
+    if not opening or not closing then
+        -- Fallback for other bracket types
+        opening = original_text:match "^(%s*[%[{(]%s*)" or "{ "
+        closing = original_text:match "(%s*[%]})]%s*)$" or " }"
+    end
+
+    local parts = {}
+    for i, entry in ipairs(sorted_entries) do
+        local entry_text = remove_trailing_separator(entry.text:match "^%s*(.-)%s*$", separator)
+        if i < #sorted_entries then
+            entry_text = entry_text .. separator .. " "
+        elseif preserve_trailing_separator then
+            entry_text = entry_text .. separator
+        end
+        table.insert(parts, entry_text)
+    end
+
+    return { opening .. table.concat(parts, "") .. closing }
+end
+
 ---Reconstruct the sorted object text
 ---@param object_node TSNode
 ---@param sorted_entries SortKeysEntry[]
 ---@param adapter SortKeysAdapter
 ---@param bufnr integer
+---@param preserve_trailing_separator boolean
 ---@return string[]
-local function reconstruct_object(object_node, sorted_entries, adapter, bufnr)
+local function reconstruct_object(object_node, sorted_entries, adapter, bufnr, preserve_trailing_separator)
     local original_text = tree_utils.get_node_text(object_node, bufnr)
     local lines = vim.split(original_text, "\n", { plain = true })
 
     -- Handle inline objects (single line)
     if #lines == 1 then
-        return reconstruct_inline_object(sorted_entries, adapter, original_text)
+        return reconstruct_inline_object(sorted_entries, adapter, original_text, preserve_trailing_separator)
     end
 
     local base_indent, entry_indent = detect_indentation(object_node, bufnr)
@@ -223,8 +258,8 @@ local function reconstruct_object(object_node, sorted_entries, adapter, bufnr)
         -- Normalize: remove existing trailing separator
         entry_text = remove_trailing_separator(entry_text, separator)
 
-        -- Add separator if not the last entry
-        if i < #sorted_entries then
+        -- Add separator if not the last entry, or if preserving trailing separator
+        if i < #sorted_entries or preserve_trailing_separator then
             entry_text = add_trailing_separator(entry_text, separator)
         end
 
@@ -257,36 +292,6 @@ local function reconstruct_object(object_node, sorted_entries, adapter, bufnr)
     return result
 end
 
----Reconstruct inline object (single line)
----@param sorted_entries SortKeysEntry[]
----@param adapter SortKeysAdapter
----@param original_text string
----@return string[]
-function reconstruct_inline_object(sorted_entries, adapter, original_text)
-    local separator = adapter.get_separator()
-
-    -- Extract opening and closing brackets
-    local opening = original_text:match "^(%s*{%s*)"
-    local closing = original_text:match "(%s*}%s*)$"
-
-    if not opening or not closing then
-        -- Fallback for other bracket types
-        opening = original_text:match "^(%s*[%[{(]%s*)" or "{ "
-        closing = original_text:match "(%s*[%]})]%s*)$" or " }"
-    end
-
-    local parts = {}
-    for i, entry in ipairs(sorted_entries) do
-        local entry_text = remove_trailing_separator(entry.text:match "^%s*(.-)%s*$", separator)
-        if i < #sorted_entries then
-            entry_text = entry_text .. separator .. " "
-        end
-        table.insert(parts, entry_text)
-    end
-
-    return { opening .. table.concat(parts, "") .. closing }
-end
-
 ---Sort a single object node
 ---@param bufnr integer
 ---@param object_node TSNode
@@ -300,12 +305,17 @@ local function sort_single_object(bufnr, object_node, adapter, opts)
         return
     end
 
+    -- Detect if the original object had a trailing separator
+    local separator = adapter.get_separator()
+    local object_text = tree_utils.get_node_text(object_node, bufnr)
+    local preserve_trailing_separator = has_trailing_separator(object_text, separator)
+
     -- Sort entries
     local comparator = create_comparator(opts)
     table.sort(entries, comparator)
 
     -- Reconstruct and replace
-    local new_lines = reconstruct_object(object_node, entries, adapter, bufnr)
+    local new_lines = reconstruct_object(object_node, entries, adapter, bufnr, preserve_trailing_separator)
     local start_row, start_col, end_row, end_col = object_node:range()
 
     vim.api.nvim_buf_set_text(bufnr, start_row, start_col, end_row, end_col, new_lines)
@@ -319,6 +329,11 @@ end
 ---@param range {start_row: integer, end_row: integer}
 local function sort_partial_object(bufnr, object_node, adapter, opts, range)
     local all_entries = extract_entries(object_node, adapter, bufnr)
+
+    -- Detect if the original object had a trailing separator
+    local separator = adapter.get_separator()
+    local object_text = tree_utils.get_node_text(object_node, bufnr)
+    local preserve_trailing_separator = has_trailing_separator(object_text, separator)
 
     -- Separate entries into: in-range (to be sorted) and out-of-range (keep position)
     local in_range_entries = {}
@@ -347,7 +362,7 @@ local function sort_partial_object(bufnr, object_node, adapter, opts, range)
     end
 
     -- Reconstruct and replace
-    local new_lines = reconstruct_object(object_node, all_entries, adapter, bufnr)
+    local new_lines = reconstruct_object(object_node, all_entries, adapter, bufnr, preserve_trailing_separator)
     local start_row, start_col, end_row, end_col = object_node:range()
 
     vim.api.nvim_buf_set_text(bufnr, start_row, start_col, end_row, end_col, new_lines)
