@@ -321,6 +321,68 @@ local function sort_single_object(bufnr, object_node, adapter, opts)
     vim.api.nvim_buf_set_text(bufnr, start_row, start_col, end_row, end_col, new_lines)
 end
 
+---Reconstruct only the selected entries as lines (for partial sort)
+---@param sorted_entries SortKeysEntry[]
+---@param adapter SortKeysAdapter
+---@param bufnr integer
+---@param entry_indent string
+---@param is_last_in_object boolean
+---@param preserve_trailing_separator boolean
+---@return string[]
+local function reconstruct_partial_entries(
+    sorted_entries,
+    adapter,
+    bufnr,
+    entry_indent,
+    is_last_in_object,
+    preserve_trailing_separator
+)
+    local separator = adapter.get_separator()
+    local result = {}
+
+    for i, entry in ipairs(sorted_entries) do
+        local entry_text = entry.text
+        -- Normalize: remove existing trailing separator
+        entry_text = remove_trailing_separator(entry_text, separator)
+
+        -- Add separator based on position
+        local is_last_entry = i == #sorted_entries
+        if not is_last_entry then
+            -- Not the last in sorted entries, always add separator
+            entry_text = add_trailing_separator(entry_text, separator)
+        elseif not is_last_in_object then
+            -- Last in sorted entries but not last in object, add separator
+            entry_text = add_trailing_separator(entry_text, separator)
+        elseif preserve_trailing_separator then
+            -- Last in object and preserve trailing separator
+            entry_text = add_trailing_separator(entry_text, separator)
+        end
+
+        -- Handle multi-line entries
+        local entry_lines = vim.split(entry_text, "\n", { plain = true })
+        local original_first_line_indent = string.rep(" ", entry.start_col)
+        for j, line in ipairs(entry_lines) do
+            if j == 1 then
+                table.insert(result, entry_indent .. line:match "^%s*(.-)%s*$")
+            else
+                local line_indent = line:match "^(%s*)" or ""
+                local relative_indent = ""
+                if #line_indent > #original_first_line_indent then
+                    relative_indent = line_indent:sub(#original_first_line_indent + 1)
+                end
+                local trimmed = line:match "^%s*(.-)%s*$"
+                if trimmed ~= "" then
+                    table.insert(result, entry_indent .. relative_indent .. trimmed)
+                else
+                    table.insert(result, "")
+                end
+            end
+        end
+    end
+
+    return result
+end
+
 ---Sort only entries within a range (partial sort)
 ---@param bufnr integer
 ---@param object_node TSNode
@@ -335,15 +397,12 @@ local function sort_partial_object(bufnr, object_node, adapter, opts, range)
     local object_text = tree_utils.get_node_text(object_node, bufnr)
     local preserve_trailing_separator = has_trailing_separator(object_text, separator)
 
-    -- Separate entries into: in-range (to be sorted) and out-of-range (keep position)
+    -- Collect entries within range
     local in_range_entries = {}
-    local in_range_indices = {}
 
     for i, entry in ipairs(all_entries) do
-        -- Entry is in range if its start row is within the selection
         if entry.start_row >= range.start_row and entry.start_row <= range.end_row then
             table.insert(in_range_entries, entry)
-            table.insert(in_range_indices, i)
         end
     end
 
@@ -352,20 +411,35 @@ local function sort_partial_object(bufnr, object_node, adapter, opts, range)
         return
     end
 
-    -- Sort only the in-range entries
+    -- Get the actual line range of the entries to be sorted
+    local first_entry = in_range_entries[1]
+    local last_entry = in_range_entries[#in_range_entries]
+    local replace_start_row = first_entry.start_row
+    local replace_end_row = last_entry.end_row
+
+    -- Check if the last entry in range is also the last entry in the object
+    local is_last_in_object = last_entry.start_row == all_entries[#all_entries].start_row
+
+    -- Detect indentation from the first entry
+    local lines = vim.api.nvim_buf_get_lines(bufnr, replace_start_row, replace_start_row + 1, false)
+    local entry_indent = lines[1] and lines[1]:match "^(%s*)" or "    "
+
+    -- Sort the entries
     local comparator = create_comparator(opts)
     table.sort(in_range_entries, comparator)
 
-    -- Replace in-range entries with sorted entries in the original list
-    for j, original_index in ipairs(in_range_indices) do
-        all_entries[original_index] = in_range_entries[j]
-    end
+    -- Reconstruct only the sorted entries
+    local new_lines = reconstruct_partial_entries(
+        in_range_entries,
+        adapter,
+        bufnr,
+        entry_indent,
+        is_last_in_object,
+        preserve_trailing_separator
+    )
 
-    -- Reconstruct and replace
-    local new_lines = reconstruct_object(object_node, all_entries, adapter, bufnr, preserve_trailing_separator)
-    local start_row, start_col, end_row, end_col = object_node:range()
-
-    vim.api.nvim_buf_set_text(bufnr, start_row, start_col, end_row, end_col, new_lines)
+    -- Replace only the lines within the range
+    vim.api.nvim_buf_set_lines(bufnr, replace_start_row, replace_end_row + 1, false, new_lines)
 end
 
 ---Sort with deep option (recursive)
