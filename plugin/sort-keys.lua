@@ -8,8 +8,8 @@ vim.g.loaded_sort_keys = true
 ---@return SortKeysOptions
 local function parse_args(args)
     local opts = {}
-    -- Match flags like -i, -n, or combined -in, -ni
-    for flag in args:gmatch "%-(%a+)" do
+    -- Match flags like i, n, or combined in, ni
+    for flag in args:gmatch "(%a+)" do
         if flag:match "i" then
             opts.case_sensitive = false
         end
@@ -38,7 +38,7 @@ end, {
     bang = true,
     range = true,
     nargs = "*",
-    desc = "Sort object keys alphabetically (! for reverse, -i for case-insensitive, -n for natural sort)",
+    desc = "Sort object keys alphabetically (! for reverse, i for case-insensitive, n for natural sort)",
 })
 
 vim.api.nvim_create_user_command("DeepSortKeys", function(cmd_opts)
@@ -59,5 +59,5 @@ end, {
     bang = true,
     range = true,
     nargs = "*",
-    desc = "Recursively sort nested object keys (! for reverse, -i for case-insensitive, -n for natural sort)",
+    desc = "Recursively sort nested object keys (! for reverse, i for case-insensitive, n for natural sort)",
 })
