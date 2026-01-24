@@ -72,5 +72,13 @@
           };
         }
       );
+      packages = eachSystem (
+        { pkgs, ... }:
+        {
+          default = pkgs.callPackage ./default.nix {
+            inherit (pkgs.vimUtils) buildVimPlugin;
+          };
+        }
+      );
     };
 }
