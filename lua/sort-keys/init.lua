@@ -7,9 +7,11 @@ local adapters = require "sort-keys.adapters"
 local commands = require "sort-keys.commands"
 
 ---Setup the plugin with user configuration
----@param opts? SortKeysConfig
+---@param opts? SortKeysPartialConfig
 function M.setup(opts)
+    opts = opts or {}
     config.setup(opts)
+    config.apply_custom_adapters(adapters.register)
 end
 
 ---Sort keys in the current buffer

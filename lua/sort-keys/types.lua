@@ -10,6 +10,12 @@
 ---Configuration for the plugin
 ---@class SortKeysConfig
 ---@field default_options SortKeysOptions Default sorting options
+---@field custom_adapters SortKeysAdapter[] Custom adapters to register
+
+---Partial Configuration for the plugin
+---@class SortKeysPartialConfig
+---@field default_options? SortKeysOptions Default sorting options
+---@field custom_adapters? SortKeysAdapter[] Custom adapters to register
 
 ---Entry extracted from an object node
 ---@class SortKeysEntry
