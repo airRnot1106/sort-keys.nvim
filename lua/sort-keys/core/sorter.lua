@@ -341,6 +341,11 @@ local function reconstruct_partial_entries(
     local result = {}
 
     for i, entry in ipairs(sorted_entries) do
+        -- Add leading comments
+        for _, comment in ipairs(entry.leading_comments) do
+            table.insert(result, entry_indent .. comment)
+        end
+
         local entry_text = entry.text
         -- Normalize: remove existing trailing separator
         entry_text = remove_trailing_separator(entry_text, separator)
@@ -414,7 +419,9 @@ local function sort_partial_object(bufnr, object_node, adapter, opts, range)
     -- Get the actual line range of the entries to be sorted
     local first_entry = in_range_entries[1]
     local last_entry = in_range_entries[#in_range_entries]
-    local replace_start_row = first_entry.start_row
+    -- Account for leading comments of the first entry
+    local leading_comment_lines = #first_entry.leading_comments
+    local replace_start_row = first_entry.start_row - leading_comment_lines
     local replace_end_row = last_entry.end_row
 
     -- Check if the last entry in range is also the last entry in the object
