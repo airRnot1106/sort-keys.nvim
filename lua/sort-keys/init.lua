@@ -20,14 +20,6 @@ function M.sort_keys(opts)
     commands.sort_keys(opts or {}, nil)
 end
 
----Deep sort keys in the current buffer (recursive)
----@param opts? SortKeysOptions
-function M.deep_sort_keys(opts)
-    opts = opts or {}
-    opts.deep = true
-    commands.sort_keys(opts, nil)
-end
-
 ---Register a custom adapter
 ---@param adapter SortKeysAdapter
 function M.register_adapter(adapter)
