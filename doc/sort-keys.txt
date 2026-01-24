@@ -1,0 +1,219 @@
+*sort-keys.txt*	Sort object/table keys using tree-sitter
+
+Author:   airRnot1106
+License:  MIT
+
+==============================================================================
+CONTENTS                                                  *sort-keys-contents*
+
+  1. Introduction ....................................... |sort-keys-intro|
+  2. Requirements ................................... |sort-keys-requirements|
+  3. Installation ................................... |sort-keys-installation|
+  4. Configuration ................................. |sort-keys-configuration|
+  5. Commands ........................................... |sort-keys-commands|
+  6. API ..................................................... |sort-keys-api|
+  7. Custom Adapters ................................. |sort-keys-adapters|
+
+==============================================================================
+1. INTRODUCTION                                              *sort-keys-intro*
+
+sort-keys.nvim is a Neovim plugin that sorts object/table keys alphabetically
+using tree-sitter, similar to the built-in |:sort| command.
+
+Features:
+  - Alphabetical sorting (A-Z or Z-A)
+  - Deep sorting (recursively sort nested objects)
+  - Comment preservation (keep comments attached to their entries)
+  - Natural sort (sort `item1, item2, item10` correctly)
+  - Case-insensitive sorting
+  - Partial sorting (sort only selected lines within an object)
+  - Extensible (register custom adapters for additional languages)
+
+==============================================================================
+2. REQUIREMENTS                                       *sort-keys-requirements*
+
+  - Neovim >= 0.9.0
+  - Tree-sitter parsers for target languages
+
+Supported languages:
+  See |sort-keys-adapters| or `lua/sort-keys/adapters/` directory.
+
+==============================================================================
+3. INSTALLATION                                       *sort-keys-installation*
+
+Using lazy.nvim: >lua
+  {
+      "airRnot1106/sort-keys.nvim",
+      config = function()
+          require("sort-keys").setup()
+      end,
+  }
+<
+Using packer.nvim: >lua
+  use {
+      "airRnot1106/sort-keys.nvim",
+      config = function()
+          require("sort-keys").setup()
+      end,
+  }
+<
+Using vim-plug: >vim
+  Plug 'airRnot1106/sort-keys.nvim'
+<
+>lua
+  -- In your init.lua
+  require("sort-keys").setup()
+<
+==============================================================================
+4. CONFIGURATION                                     *sort-keys-configuration*
+
+Call `require("sort-keys").setup()` to initialize the plugin with optional
+configuration.
+
+Default configuration: >lua
+  require("sort-keys").setup({
+      default_options = {
+          reverse = false,        -- Sort in reverse order (Z-A)
+          deep = false,           -- Recursively sort nested objects
+          case_sensitive = true,  -- Case-sensitive sorting
+          natural_sort = false,   -- Natural number sorting
+      },
+      custom_adapters = {},       -- Custom language adapters
+  })
+<
+                                                      *sort-keys-options*
+Options ~
+
+`reverse`       boolean (default: false)
+                Sort in reverse order (Z-A instead of A-Z).
+
+`deep`          boolean (default: false)
+                Recursively sort all nested objects.
+
+`case_sensitive` boolean (default: true)
+                Case-sensitive sorting. When false, "Apple" and "apple"
+                are treated as equal for sorting purposes.
+
+`natural_sort`  boolean (default: false)
+                Natural number sorting. When true, "item2" comes before
+                "item10". When false, lexical ordering is used.
+
+==============================================================================
+5. COMMANDS                                               *sort-keys-commands*
+
+                                                                    *:SortKeys*
+:[range]SortKeys[!] [flags]
+                Sort object keys at cursor position.
+                With [!], sort in reverse order.
+
+                Flags:
+                  `i`   Case-insensitive sorting
+                  `n`   Natural number sorting
+
+                Examples: >vim
+                  :SortKeys          " Sort alphabetically
+                  :SortKeys!         " Sort in reverse (Z-A)
+                  :SortKeys i        " Case-insensitive
+                  :SortKeys in       " Case-insensitive + natural sort
+                  :10,20SortKeys     " Sort only lines 10-20
+<
+                                                                *:DeepSortKeys*
+:[range]DeepSortKeys[!] [flags]
+                Recursively sort all nested objects.
+                Accepts the same flags and range as |:SortKeys|.
+
+                Examples: >vim
+                  :DeepSortKeys      " Sort recursively
+                  :DeepSortKeys!     " Sort recursively in reverse
+                  :DeepSortKeys i    " Sort recursively, case-insensitive
+                  :10,20DeepSortKeys " Sort recursively, lines 10-20 only
+<
+==============================================================================
+6. API                                                         *sort-keys-api*
+
+                                              *sort-keys.setup()*
+require("sort-keys").setup({opts})
+                Initialize the plugin with optional configuration.
+                See |sort-keys-configuration| for available options.
+
+                                              *sort-keys.sort_keys()*
+require("sort-keys").sort_keys({opts})
+                Sort keys at cursor position.
+
+                Parameters: ~
+                  {opts}  (optional) Table with sorting options:
+                          - `reverse`: boolean
+                          - `deep`: boolean
+                          - `case_sensitive`: boolean
+                          - `natural_sort`: boolean
+
+                Example: >lua
+                  require("sort-keys").sort_keys({
+                      reverse = false,
+                      deep = true,
+                      case_sensitive = true,
+                      natural_sort = false,
+                  })
+<
+                                              *sort-keys.register_adapter()*
+require("sort-keys").register_adapter({adapter})
+                Register a custom adapter for additional language support.
+                See |sort-keys-adapters| for details.
+
+                                              *sort-keys.get_supported_filetypes()*
+require("sort-keys").get_supported_filetypes()
+                Get list of supported filetypes.
+
+                Returns: ~
+                  string[] List of supported filetype names.
+
+==============================================================================
+7. CUSTOM ADAPTERS                                        *sort-keys-adapters*
+
+You can register custom adapters for additional languages using the
+`custom_adapters` option in setup or `register_adapter()` function.
+
+Example: >lua
+  local base = require("sort-keys.adapters.base")
+
+  require("sort-keys").setup({
+      custom_adapters = {
+          base.create({
+              name = "yaml",
+              filetypes = { "yaml", "yml" },
+              get_sortable_node_types = function()
+                  return { "block_mapping" }
+              end,
+              get_entry_node_type = function()
+                  return "block_mapping_pair"
+              end,
+              extract_key = function(node, source)
+                  local key_node = node:named_child(0)
+                  if key_node then
+                      return vim.treesitter.get_node_text(key_node, source)
+                  end
+                  return nil
+              end,
+          }),
+      },
+  })
+<
+                                                  *sort-keys-adapter-interface*
+Adapter Interface ~
+
+Required fields:
+  `name`                      Adapter name (e.g., "yaml")
+  `filetypes`                 List of supported filetypes
+
+Required methods:
+  `get_sortable_node_types()` Returns list of sortable object node types
+  `get_entry_node_type()`     Returns entry node type(s)
+  `extract_key(node, source)` Extracts key string from entry node
+
+Optional methods:
+  `is_sortable_entry(node)`   Checks if node is sortable entry
+  `get_separator()`           Returns separator (default: ",")
+  `get_comment_node_types()`  Returns comment node types
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
