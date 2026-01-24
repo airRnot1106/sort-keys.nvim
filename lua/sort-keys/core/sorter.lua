@@ -127,7 +127,6 @@ local function extract_entries(object_node, adapter, bufnr)
                     end_row = end_row,
                     end_col = end_col,
                     leading_comments = pending_comments,
-                    trailing_comment = nil,
                 }
                 table.insert(entries, entry)
                 pending_comments = {}

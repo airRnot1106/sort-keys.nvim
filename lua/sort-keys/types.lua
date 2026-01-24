@@ -21,7 +21,6 @@
 ---@field end_row integer 0-indexed end row
 ---@field end_col integer 0-indexed end column
 ---@field leading_comments string[] Comments before this entry
----@field trailing_comment string? Inline comment after this entry
 
 ---Adapter interface for language-specific implementations
 ---@class SortKeysAdapter
