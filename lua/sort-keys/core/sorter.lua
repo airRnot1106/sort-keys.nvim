@@ -30,8 +30,9 @@ end
 --- @param flags ParsedFlags
 --- @param reverse boolean
 --- @param bufnr number
+--- @param range? { [1]: number, [2]: number } Optional range filter (0-indexed)
 --- @return boolean success
-local function sort_container(container, adapter, flags, reverse, bufnr)
+local function sort_container(container, adapter, flags, reverse, bufnr, range)
     local container_info = get_container_info(container)
 
     -- Extract elements
@@ -41,17 +42,55 @@ local function sort_container(container, adapter, flags, reverse, bufnr)
         return true -- Nothing to sort
     end
 
+    -- Check if the original last element had a trailing separator
+    local had_trailing_separator = elements[#elements].separator ~= nil
+
+    -- Filter elements by range if specified
+    local elements_to_sort = {}
+    local elements_before = {}
+    local elements_after = {}
+
+    if range then
+        for _, elem in ipairs(elements) do
+            if elem.end_row < range[1] then
+                table.insert(elements_before, elem)
+            elseif elem.start_row > range[2] then
+                table.insert(elements_after, elem)
+            else
+                table.insert(elements_to_sort, elem)
+            end
+        end
+    else
+        elements_to_sort = elements
+    end
+
+    if #elements_to_sort == 0 then
+        return true -- Nothing to sort in range
+    end
+
     -- Remove duplicates if requested
     if flags.unique then
-        elements = comparator.remove_duplicates(elements, flags.case_insensitive)
+        elements_to_sort = comparator.remove_duplicates(elements_to_sort, flags.case_insensitive)
     end
 
     -- Create comparator and sort
     local compare_fn = comparator.create_comparator(flags, reverse)
-    elements = comparator.sort_with_exclusions(elements, compare_fn)
+    elements_to_sort = comparator.sort_with_exclusions(elements_to_sort, compare_fn)
+
+    -- Reconstruct full element list
+    local sorted_elements = {}
+    for _, elem in ipairs(elements_before) do
+        table.insert(sorted_elements, elem)
+    end
+    for _, elem in ipairs(elements_to_sort) do
+        table.insert(sorted_elements, elem)
+    end
+    for _, elem in ipairs(elements_after) do
+        table.insert(sorted_elements, elem)
+    end
 
     -- Format output
-    local output_lines = adapter.format_output(elements, container_info, bufnr)
+    local output_lines = adapter.format_output(sorted_elements, container_info, bufnr, had_trailing_separator)
 
     if #output_lines == 0 then
         return true
@@ -137,11 +176,13 @@ function M.sort(opts)
     -- Find containers to sort
     local containers = {}
     local container_types = adapter.get_container_types()
+    local range_filter = nil -- 0-indexed range for filtering elements
 
     if opts.range then
         -- Sort all containers in range
         local start_row = opts.range[1] - 1 -- Convert to 0-indexed
         local end_row = opts.range[2] - 1
+        range_filter = { start_row, end_row }
         containers = ts_utils.find_containers_in_range(bufnr, start_row, end_row, container_types)
 
         -- Filter to only top-level containers (not nested within other found containers)
@@ -203,10 +244,10 @@ function M.sort(opts)
             end)
 
             for _, nested_container in ipairs(nested) do
-                sort_container(nested_container, adapter, flags, opts.reverse or false, bufnr)
+                sort_container(nested_container, adapter, flags, opts.reverse or false, bufnr, range_filter)
             end
         else
-            sort_container(container, adapter, flags, opts.reverse or false, bufnr)
+            sort_container(container, adapter, flags, opts.reverse or false, bufnr, range_filter)
         end
     end
 

@@ -161,8 +161,9 @@ function M.create(config)
     --- @param elements ElementInfo[]
     --- @param container ContainerInfo
     --- @param bufnr number
+    --- @param had_trailing_separator boolean Whether the original last element had a trailing separator
     --- @return string[]
-    function adapter.format_output(elements, container, _bufnr)
+    function adapter.format_output(elements, container, _bufnr, had_trailing_separator)
         if #elements == 0 then
             return {}
         end
@@ -188,8 +189,8 @@ function M.create(config)
                     -- Remove any existing trailing separator
                     elem_text = text_utils.remove_trailing_separator(elem_text, separator)
 
-                    -- Add separator except for last element (preserve original trailing comma behavior)
-                    if not is_last or elem.separator then
+                    -- Add separator: always for non-last, for last only if original had trailing separator
+                    if not is_last or had_trailing_separator then
                         elem_text = elem_text .. separator
                     end
                 end
@@ -214,7 +215,7 @@ function M.create(config)
 
                 if separator ~= "" then
                     part = text_utils.remove_trailing_separator(part, separator)
-                    if not is_last or elem.separator then
+                    if not is_last or had_trailing_separator then
                         part = part .. separator
                     end
                 end
