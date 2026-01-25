@@ -7,17 +7,15 @@ local registered_adapters = {}
 --- List of known adapter module names to try
 local known_adapters = { "json", "lua", "javascript", "nix" }
 
---- Register an adapter for a language
+--- Register an adapter for a language (overrides existing adapters)
 --- @param lang string Language name
 --- @param adapter AdapterInterface
 function M.register(lang, adapter)
     registered_adapters[lang] = adapter
-    -- Also register for all filetypes the adapter handles
+    -- Also register for all filetypes the adapter handles (override existing)
     if adapter.get_filetypes then
         for _, ft in ipairs(adapter.get_filetypes()) do
-            if not registered_adapters[ft] then
-                registered_adapters[ft] = adapter
-            end
+            registered_adapters[ft] = adapter
         end
     end
 end
