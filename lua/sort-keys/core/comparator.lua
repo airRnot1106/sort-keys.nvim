@@ -48,20 +48,14 @@ function M.create_comparator(flags, reverse)
         local result
 
         if flags.numeric_mode then
-            -- Numeric comparison
-            local num_a = extract_number(key_a, flags.numeric_mode)
-            local num_b = extract_number(key_b, flags.numeric_mode)
+            -- Numeric comparison (keys without numbers are treated as 0)
+            local num_a = extract_number(key_a, flags.numeric_mode) or 0
+            local num_b = extract_number(key_b, flags.numeric_mode) or 0
 
-            if num_a and num_b then
+            if num_a ~= num_b then
                 result = num_a < num_b
-            elseif num_a then
-                -- a has number, b doesn't - a comes first
-                result = true
-            elseif num_b then
-                -- b has number, a doesn't - b comes first
-                result = false
             else
-                -- Neither has number, fall back to string comparison
+                -- Numbers are equal, fall back to string comparison
                 if flags.case_insensitive then
                     result = key_a:lower() < key_b:lower()
                 else
