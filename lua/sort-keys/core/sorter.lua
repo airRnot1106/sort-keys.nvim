@@ -183,27 +183,27 @@ function M.sort(opts)
         local start_row = opts.range[1] - 1 -- Convert to 0-indexed
         local end_row = opts.range[2] - 1
         range_filter = { start_row, end_row }
-        containers = ts_utils.find_containers_in_range(bufnr, start_row, end_row, container_types)
+        local all_containers = ts_utils.find_containers_in_range(bufnr, start_row, end_row, container_types)
 
-        -- Filter to only top-level containers (not nested within other found containers)
-        local top_level = {}
-        for _, container in ipairs(containers) do
-            local is_nested = false
-            for _, other in ipairs(containers) do
-                if container ~= other then
-                    local c_start, _, c_end, _ = container:range()
-                    local o_start, _, o_end, _ = other:range()
-                    if c_start >= o_start and c_end <= o_end then
-                        is_nested = true
-                        break
-                    end
+        -- Find the smallest container that fully contains the range
+        -- This is the innermost container that contains all selected lines
+        local smallest = nil
+        local smallest_size = math.huge
+        for _, container in ipairs(all_containers) do
+            local c_start, _, c_end, _ = container:range()
+            -- Container must contain the entire range
+            if c_start <= start_row and c_end >= end_row then
+                local size = c_end - c_start
+                if size < smallest_size then
+                    smallest = container
+                    smallest_size = size
                 end
             end
-            if not is_nested then
-                table.insert(top_level, container)
-            end
         end
-        containers = top_level
+
+        if smallest then
+            containers = { smallest }
+        end
     else
         -- Find container at cursor
         local cursor = vim.api.nvim_win_get_cursor(0)
