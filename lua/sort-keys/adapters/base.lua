@@ -128,11 +128,20 @@ function M.create(config)
                 local value_text = node_text
                 local trailing_sep = nil
 
-                -- Check for separator after the element
+                -- Check for separator after the element (as a sibling node)
                 local next_sibling = child:next_sibling()
                 if next_sibling and not next_sibling:named() then
                     local sib_text = ts_utils.get_node_text(next_sibling, bufnr)
-                    if text_utils.trim(sib_text) == separator then
+                    local trimmed = text_utils.trim(sib_text)
+                    -- Check if the sibling is the separator (possibly with surrounding whitespace)
+                    if trimmed == separator or trimmed:find(vim.pesc(separator), 1, true) then
+                        trailing_sep = separator
+                    end
+                end
+
+                -- Also check if the value_text itself ends with the separator
+                if not trailing_sep and separator ~= "" then
+                    if text_utils.has_trailing_separator(value_text, separator) then
                         trailing_sep = separator
                     end
                 end
