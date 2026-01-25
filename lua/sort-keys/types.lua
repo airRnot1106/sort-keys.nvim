@@ -54,11 +54,18 @@ function SortKeysAdapter.extract_key(entry_node, source) end
 function SortKeysAdapter.is_sortable_entry(node) end
 
 ---Get the separator between entries
+---@param object_node? TSNode The parent object node for context-aware separator selection
 ---@return string
-function SortKeysAdapter.get_separator() end
+function SortKeysAdapter.get_separator(object_node) end
 
 ---Get comment node types for this language
 ---@return string[]
 function SortKeysAdapter.get_comment_node_types() end
+
+---Get intermediate container types (optional)
+---Some languages have intermediate container nodes between the object and entries
+---(e.g., binding_set in Nix between attrset_expression and binding)
+---@return string[]|nil
+function SortKeysAdapter.get_entry_container_types() end
 
 return {}

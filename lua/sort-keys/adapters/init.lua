@@ -14,6 +14,7 @@ local builtin_adapters = {
     typescript = "sort-keys.adapters.typescript",
     typescriptreact = "sort-keys.adapters.typescript",
     lua = "sort-keys.adapters.lua",
+    nix = "sort-keys.adapters.nix",
 }
 
 ---Register a new adapter

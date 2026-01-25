@@ -33,13 +33,18 @@ function M.create(config)
             end
         end
 
-    adapter.get_separator = config.get_separator or function()
+    -- get_separator can optionally receive the object_node to determine separator based on context
+    adapter.get_separator = config.get_separator or function(_object_node)
         return ","
     end
 
     adapter.get_comment_node_types = config.get_comment_node_types or function()
         return { "comment" }
     end
+
+    -- Optional: intermediate container types (e.g., binding_set in Nix)
+    -- If provided, entries are searched inside these containers instead of direct children
+    adapter.get_entry_container_types = config.get_entry_container_types or nil
 
     return adapter
 end

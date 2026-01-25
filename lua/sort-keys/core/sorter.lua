@@ -97,44 +97,73 @@ end
 ---@param object_node TSNode
 ---@param adapter SortKeysAdapter
 ---@param bufnr integer
----@return SortKeysEntry[]
+---@return SortKeysEntry[] entries
+---@return string[] trailing_elements Non-sortable elements after the last sortable entry
 local function extract_entries(object_node, adapter, bufnr)
     local entries = {}
+    local trailing_elements = {}
     local comment_types = adapter.get_comment_node_types()
     local comment_type_set = {}
     for _, t in ipairs(comment_types) do
         comment_type_set[t] = true
     end
 
+    -- Build container type set if adapter specifies intermediate containers
+    local container_types = adapter.get_entry_container_types and adapter.get_entry_container_types() or nil
+    local container_type_set = {}
+    if container_types then
+        for _, t in ipairs(container_types) do
+            container_type_set[t] = true
+        end
+    end
+
     local pending_comments = {}
+    local pending_non_sortable = {}
 
-    for child in object_node:iter_children() do
-        local child_type = child:type()
+    -- Recursive function to process children, diving into containers if needed
+    local function process_children(node)
+        for child in node:iter_children() do
+            local child_type = child:type()
 
-        -- Collect comments
-        if comment_type_set[child_type] then
-            table.insert(pending_comments, tree_utils.get_node_text(child, bufnr))
-        elseif adapter.is_sortable_entry(child) then
-            local key = adapter.extract_key(child, bufnr)
-            if key then
-                local start_row, start_col, end_row, end_col = child:range()
-                local entry = {
-                    node = child,
-                    key = key,
-                    text = tree_utils.get_node_text(child, bufnr),
-                    start_row = start_row,
-                    start_col = start_col,
-                    end_row = end_row,
-                    end_col = end_col,
-                    leading_comments = pending_comments,
-                }
-                table.insert(entries, entry)
-                pending_comments = {}
+            -- If this is an intermediate container, recurse into it
+            if container_type_set[child_type] then
+                process_children(child)
+            elseif comment_type_set[child_type] then
+                -- Collect comments
+                table.insert(pending_comments, tree_utils.get_node_text(child, bufnr))
+                table.insert(pending_non_sortable, tree_utils.get_node_text(child, bufnr))
+            elseif adapter.is_sortable_entry(child) then
+                local key = adapter.extract_key(child, bufnr)
+                if key then
+                    local start_row, start_col, end_row, end_col = child:range()
+                    local entry = {
+                        node = child,
+                        key = key,
+                        text = tree_utils.get_node_text(child, bufnr),
+                        start_row = start_row,
+                        start_col = start_col,
+                        end_row = end_row,
+                        end_col = end_col,
+                        leading_comments = pending_comments,
+                    }
+                    table.insert(entries, entry)
+                    pending_comments = {}
+                    pending_non_sortable = {}
+                end
+            elseif child:named() then
+                -- Non-sortable named element (e.g., ellipsis)
+                -- Skip anonymous nodes like punctuation ({, }, ,)
+                local text = tree_utils.get_node_text(child, bufnr)
+                if text and text ~= "" then
+                    table.insert(pending_non_sortable, text)
+                end
             end
         end
     end
 
-    return entries
+    process_children(object_node)
+    trailing_elements = pending_non_sortable
+    return entries, trailing_elements
 end
 
 ---Detect indentation from object node
@@ -193,9 +222,18 @@ end
 ---@param adapter SortKeysAdapter
 ---@param original_text string
 ---@param preserve_trailing_separator boolean
+---@param object_node TSNode
+---@param trailing_elements string[]
 ---@return string[]
-local function reconstruct_inline_object(sorted_entries, adapter, original_text, preserve_trailing_separator)
-    local separator = adapter.get_separator()
+local function reconstruct_inline_object(
+    sorted_entries,
+    adapter,
+    original_text,
+    preserve_trailing_separator,
+    object_node,
+    trailing_elements
+)
+    local separator = adapter.get_separator(object_node)
 
     -- Extract opening and closing brackets
     local opening = original_text:match "^(%s*{%s*)"
@@ -208,14 +246,22 @@ local function reconstruct_inline_object(sorted_entries, adapter, original_text,
     end
 
     local parts = {}
+    local has_trailing = trailing_elements and #trailing_elements > 0
     for i, entry in ipairs(sorted_entries) do
         local entry_text = remove_trailing_separator(entry.text:match "^%s*(.-)%s*$", separator)
-        if i < #sorted_entries then
+        if i < #sorted_entries or has_trailing then
             entry_text = entry_text .. separator .. " "
         elseif preserve_trailing_separator then
             entry_text = entry_text .. separator
         end
         table.insert(parts, entry_text)
+    end
+
+    -- Add trailing elements (e.g., ellipsis)
+    if has_trailing then
+        for _, elem in ipairs(trailing_elements) do
+            table.insert(parts, elem)
+        end
     end
 
     return { opening .. table.concat(parts, "") .. closing }
@@ -227,18 +273,34 @@ end
 ---@param adapter SortKeysAdapter
 ---@param bufnr integer
 ---@param preserve_trailing_separator boolean
+---@param trailing_elements string[]
 ---@return string[]
-local function reconstruct_object(object_node, sorted_entries, adapter, bufnr, preserve_trailing_separator)
+local function reconstruct_object(
+    object_node,
+    sorted_entries,
+    adapter,
+    bufnr,
+    preserve_trailing_separator,
+    trailing_elements
+)
     local original_text = tree_utils.get_node_text(object_node, bufnr)
     local lines = vim.split(original_text, "\n", { plain = true })
 
     -- Handle inline objects (single line)
     if #lines == 1 then
-        return reconstruct_inline_object(sorted_entries, adapter, original_text, preserve_trailing_separator)
+        return reconstruct_inline_object(
+            sorted_entries,
+            adapter,
+            original_text,
+            preserve_trailing_separator,
+            object_node,
+            trailing_elements
+        )
     end
 
     local base_indent, entry_indent = detect_indentation(object_node, bufnr)
-    local separator = adapter.get_separator()
+    local separator = adapter.get_separator(object_node)
+    local has_trailing = trailing_elements and #trailing_elements > 0
 
     -- Extract opening and closing brackets
     local opening = lines[1]:match "^%s*(.-)%s*$"
@@ -257,8 +319,8 @@ local function reconstruct_object(object_node, sorted_entries, adapter, bufnr, p
         -- Normalize: remove existing trailing separator
         entry_text = remove_trailing_separator(entry_text, separator)
 
-        -- Add separator if not the last entry, or if preserving trailing separator
-        if i < #sorted_entries or preserve_trailing_separator then
+        -- Add separator if not the last entry, or if there are trailing elements, or if preserving trailing separator
+        if i < #sorted_entries or has_trailing or preserve_trailing_separator then
             entry_text = add_trailing_separator(entry_text, separator)
         end
 
@@ -287,6 +349,13 @@ local function reconstruct_object(object_node, sorted_entries, adapter, bufnr, p
         end
     end
 
+    -- Add trailing elements (e.g., ellipsis in Nix formals)
+    if has_trailing then
+        for _, elem in ipairs(trailing_elements) do
+            table.insert(result, entry_indent .. elem)
+        end
+    end
+
     table.insert(result, base_indent .. closing)
     return result
 end
@@ -297,7 +366,7 @@ end
 ---@param adapter SortKeysAdapter
 ---@param opts SortKeysOptions
 local function sort_single_object(bufnr, object_node, adapter, opts)
-    local entries = extract_entries(object_node, adapter, bufnr)
+    local entries, trailing_elements = extract_entries(object_node, adapter, bufnr)
 
     -- Skip if less than 2 entries
     if #entries < 2 then
@@ -305,7 +374,7 @@ local function sort_single_object(bufnr, object_node, adapter, opts)
     end
 
     -- Detect if the original object had a trailing separator
-    local separator = adapter.get_separator()
+    local separator = adapter.get_separator(object_node)
     local object_text = tree_utils.get_node_text(object_node, bufnr)
     local preserve_trailing_separator = has_trailing_separator(object_text, separator)
 
@@ -314,7 +383,8 @@ local function sort_single_object(bufnr, object_node, adapter, opts)
     table.sort(entries, comparator)
 
     -- Reconstruct and replace
-    local new_lines = reconstruct_object(object_node, entries, adapter, bufnr, preserve_trailing_separator)
+    local new_lines =
+        reconstruct_object(object_node, entries, adapter, bufnr, preserve_trailing_separator, trailing_elements)
     local start_row, start_col, end_row, end_col = object_node:range()
 
     vim.api.nvim_buf_set_text(bufnr, start_row, start_col, end_row, end_col, new_lines)
@@ -327,6 +397,7 @@ end
 ---@param entry_indent string
 ---@param is_last_in_object boolean
 ---@param preserve_trailing_separator boolean
+---@param object_node TSNode
 ---@return string[]
 local function reconstruct_partial_entries(
     sorted_entries,
@@ -334,9 +405,10 @@ local function reconstruct_partial_entries(
     bufnr,
     entry_indent,
     is_last_in_object,
-    preserve_trailing_separator
+    preserve_trailing_separator,
+    object_node
 )
-    local separator = adapter.get_separator()
+    local separator = adapter.get_separator(object_node)
     local result = {}
 
     for i, entry in ipairs(sorted_entries) do
@@ -394,17 +466,17 @@ end
 ---@param opts SortKeysOptions
 ---@param range {start_row: integer, end_row: integer}
 local function sort_partial_object(bufnr, object_node, adapter, opts, range)
-    local all_entries = extract_entries(object_node, adapter, bufnr)
+    local all_entries, trailing_elements = extract_entries(object_node, adapter, bufnr)
 
     -- Detect if the original object had a trailing separator
-    local separator = adapter.get_separator()
+    local separator = adapter.get_separator(object_node)
     local object_text = tree_utils.get_node_text(object_node, bufnr)
     local preserve_trailing_separator = has_trailing_separator(object_text, separator)
 
     -- Collect entries within range
     local in_range_entries = {}
 
-    for i, entry in ipairs(all_entries) do
+    for _, entry in ipairs(all_entries) do
         if entry.start_row >= range.start_row and entry.start_row <= range.end_row then
             table.insert(in_range_entries, entry)
         end
@@ -424,7 +496,9 @@ local function sort_partial_object(bufnr, object_node, adapter, opts, range)
     local replace_end_row = last_entry.end_row
 
     -- Check if the last entry in range is also the last entry in the object
-    local is_last_in_object = last_entry.start_row == all_entries[#all_entries].start_row
+    -- Also consider trailing elements (like ellipsis) - if present, the last entry is not truly last
+    local has_trailing = trailing_elements and #trailing_elements > 0
+    local is_last_in_object = last_entry.start_row == all_entries[#all_entries].start_row and not has_trailing
 
     -- Detect indentation from the first entry
     local lines = vim.api.nvim_buf_get_lines(bufnr, replace_start_row, replace_start_row + 1, false)
@@ -441,7 +515,8 @@ local function sort_partial_object(bufnr, object_node, adapter, opts, range)
         bufnr,
         entry_indent,
         is_last_in_object,
-        preserve_trailing_separator
+        preserve_trailing_separator,
+        object_node
     )
 
     -- Replace only the lines within the range
