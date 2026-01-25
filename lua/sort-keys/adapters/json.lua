@@ -2,6 +2,9 @@
 local base = require "sort-keys.adapters.base"
 
 return base.create {
+    -- Filetypes this adapter handles
+    filetypes = { "json", "jsonc", "json5" },
+
     -- Container types
     container_types = { "object", "array" },
 

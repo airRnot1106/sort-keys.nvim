@@ -2,6 +2,9 @@
 local base = require "sort-keys.adapters.base"
 
 return base.create {
+    -- Filetypes this adapter handles
+    filetypes = { "nix" },
+
     -- Container types
     container_types = { "attrset_expression", "list_expression", "formals" },
 

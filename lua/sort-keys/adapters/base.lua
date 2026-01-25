@@ -11,6 +11,12 @@ local M = {}
 function M.create(config)
     local adapter = {}
 
+    --- Get filetypes that this adapter handles
+    --- @return string[]
+    function adapter.get_filetypes()
+        return config.filetypes or {}
+    end
+
     --- Get container types for this language
     --- @return string[]
     function adapter.get_container_types()
