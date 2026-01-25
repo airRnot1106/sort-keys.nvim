@@ -7,19 +7,19 @@ local adapters = require "sort-keys.adapters"
 local M = {}
 
 --- @class SortKeysConfig
---- @field notify_on_success? boolean Show notification on successful sort (default: false)
---- @field notify_on_error? boolean Show notification on error (default: true)
-
---- @type SortKeysConfig
-local config = {
-    notify_on_success = false,
-    notify_on_error = true,
-}
+--- @field custom_adapters? table<string, AdapterInterface> Custom adapters for languages
 
 --- Setup the plugin
 --- @param opts? SortKeysConfig
 function M.setup(opts)
-    config = vim.tbl_deep_extend("force", config, opts or {})
+    opts = opts or {}
+
+    -- Register custom adapters
+    if opts.custom_adapters then
+        for lang, adapter in pairs(opts.custom_adapters) do
+            adapters.register(lang, adapter)
+        end
+    end
 end
 
 --- Sort keys in the current buffer
@@ -31,10 +31,8 @@ function M.sort_keys(opts)
 
     local success, err = sorter.sort(opts)
 
-    if not success and config.notify_on_error then
+    if not success then
         vim.notify("SortKeys: " .. (err or "Unknown error"), vim.log.levels.ERROR)
-    elseif success and config.notify_on_success then
-        vim.notify("SortKeys: Sorted successfully", vim.log.levels.INFO)
     end
 
     return success
@@ -49,10 +47,8 @@ function M.deep_sort_keys(opts)
 
     local success, err = sorter.sort(opts)
 
-    if not success and config.notify_on_error then
+    if not success then
         vim.notify("DeepSortKeys: " .. (err or "Unknown error"), vim.log.levels.ERROR)
-    elseif success and config.notify_on_success then
-        vim.notify("DeepSortKeys: Sorted successfully", vim.log.levels.INFO)
     end
 
     return success
