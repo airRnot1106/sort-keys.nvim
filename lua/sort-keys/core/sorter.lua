@@ -139,7 +139,7 @@ local function sort_container(container, adapter, flags, reverse, bufnr, range)
 
             -- Join output for single line
             local content = output_lines[1] or ""
-            local new_line = prefix .. " " .. content .. " " .. suffix
+            local new_line = prefix .. content .. suffix
 
             text_utils.set_lines(bufnr, container_info.start_row, container_info.start_row, { new_line })
         end
@@ -230,12 +230,8 @@ function M.sort(opts)
     for _, container in ipairs(containers) do
         if opts.deep then
             -- Deep sort: sort nested containers first (bottom-up)
-            local nested = ts_utils.find_containers_in_range(
-                bufnr,
-                container:range(),
-                select(3, container:range()),
-                container_types
-            )
+            local c_start_row, _, c_end_row, _ = container:range()
+            local nested = ts_utils.find_containers_in_range(bufnr, c_start_row, c_end_row, container_types)
             -- Sort by depth (deepest first)
             table.sort(nested, function(a, b)
                 local a_start = a:range()
