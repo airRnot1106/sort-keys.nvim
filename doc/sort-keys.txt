@@ -1,0 +1,376 @@
+*sort-keys.txt*	Sort object/table keys using tree-sitter
+
+Author:  airRnot1106
+License: MIT
+Repository: https://github.com/airRnot1106/sort-keys.nvim
+
+==============================================================================
+CONTENTS                                                  *sort-keys-contents*
+
+  1. Introduction ..................................... |sort-keys-introduction|
+  2. Requirements ..................................... |sort-keys-requirements|
+  3. Installation ..................................... |sort-keys-installation|
+  4. Configuration .................................... |sort-keys-configuration|
+  5. Commands ......................................... |sort-keys-commands|
+  6. Flags ............................................ |sort-keys-flags|
+  7. Lua API .......................................... |sort-keys-api|
+  8. Custom Adapters .................................. |sort-keys-adapters|
+  9. Supported Languages .............................. |sort-keys-languages|
+
+==============================================================================
+1. INTRODUCTION                                       *sort-keys-introduction*
+
+sort-keys.nvim is a Neovim plugin that sorts object/table keys using
+tree-sitter, similar to the built-in |:sort| command but for structured data.
+
+Features:
+- Alphabetical sorting (A-Z or Z-A)
+- Deep sorting (recursively sort nested objects)
+- Comment preservation (keep comments attached to their entries)
+- Natural sort (sort `item1, item2, item10` correctly)
+- Case-insensitive sorting
+- Partial sorting (sort only selected lines within an object)
+- Extensible (register custom adapters for additional languages)
+
+==============================================================================
+2. REQUIREMENTS                                       *sort-keys-requirements*
+
+- Neovim >= 0.9.0
+- Tree-sitter parsers for target languages
+
+==============================================================================
+3. INSTALLATION                                       *sort-keys-installation*
+
+Using lazy.nvim: ~
+>lua
+    {
+        "airRnot1106/sort-keys.nvim",
+        config = function()
+            require("sort-keys").setup()
+        end,
+    }
+<
+
+Using packer.nvim: ~
+>lua
+    use {
+        "airRnot1106/sort-keys.nvim",
+        config = function()
+            require("sort-keys").setup()
+        end,
+    }
+<
+
+Using vim-plug: ~
+>vim
+    Plug 'airRnot1106/sort-keys.nvim'
+<
+>lua
+    -- In your init.lua
+    require("sort-keys").setup()
+<
+
+==============================================================================
+4. CONFIGURATION                                     *sort-keys-configuration*
+
+                                                            *sort-keys.setup()*
+sort-keys.setup({opts})
+
+    Setup function to initialize the plugin with optional configuration.
+
+    Parameters: ~
+        {opts}  (table|nil)  Optional configuration table
+
+    Options: ~
+        {custom_adapters}  (table)  Custom adapter definitions
+                                    Keys are language names, values are
+                                    adapter interfaces created with
+                                    |sort-keys.adapters.base.create()|
+
+    Example: ~
+>lua
+        require("sort-keys").setup({
+            custom_adapters = {
+                -- Override or add language adapters
+            },
+        })
+<
+
+==============================================================================
+5. COMMANDS                                               *sort-keys-commands*
+
+                                                                    *:SortKeys*
+:[range]SortKeys[!] [flags]
+
+    Sort keys in the container at cursor position or within the specified
+    range.
+
+    When [!] is given, sort in reverse order (Z-A).
+
+    When [range] is given, only elements within the specified lines are
+    sorted. Elements outside the range remain in their original positions.
+
+    See |sort-keys-flags| for available flags.
+
+    Examples: ~
+>vim
+        :SortKeys           " Sort container at cursor
+        :SortKeys!          " Sort in reverse order
+        :SortKeys i         " Case-insensitive sort
+        :SortKeys in        " Case-insensitive numeric sort
+        :'<,'>SortKeys      " Sort within visual selection
+<
+
+                                                                *:DeepSortKeys*
+:[range]DeepSortKeys[!] [flags]
+
+    Recursively sort all nested containers, starting from the deepest level.
+
+    When [!] is given, sort in reverse order.
+
+    When [range] is given, only containers within the range are processed.
+
+    Examples: ~
+>vim
+        :DeepSortKeys       " Sort all nested containers
+        :DeepSortKeys!      " Sort all nested containers in reverse
+<
+
+==============================================================================
+6. FLAGS                                                     *sort-keys-flags*
+
+Flags can be passed to |:SortKeys| and |:DeepSortKeys| commands to modify
+the sorting behavior. Multiple flags can be combined.
+
+    Flag    Description ~
+    `i`       Case-insensitive sorting
+    `n`       Numeric sorting (decimal)
+    `f`       Numeric sorting (floating point)
+    `x`       Numeric sorting (hexadecimal)
+    `o`       Numeric sorting (octal)
+    `b`       Numeric sorting (binary)
+    `u`       Remove duplicate keys (keep first occurrence)
+
+Examples: ~
+>vim
+    :SortKeys i         " Case-insensitive
+    :SortKeys n         " Numeric (decimal)
+    :SortKeys in        " Case-insensitive + numeric
+    :SortKeys inu       " Case-insensitive + numeric + unique
+<
+
+Numeric Sorting Behavior: ~
+
+When a numeric flag is specified, keys are sorted by the first number found
+in the key string. Keys without numbers are treated as having a value of 0.
+
+Example with `:SortKeys n`: ~
+>
+    Before:              After:
+    item10: ...          item1: ...
+    item2: ...           item2: ...
+    item1: ...           item10: ...
+<
+
+==============================================================================
+7. LUA API                                                     *sort-keys-api*
+
+                                                         *sort-keys.sort_keys()*
+sort_keys.sort_keys({opts})
+
+    Sort keys programmatically.
+
+    Parameters: ~
+        {opts}  (table|nil)  Optional configuration table
+
+    Options: ~
+        {flags}    (string)   Sort flags (see |sort-keys-flags|)
+        {reverse}  (boolean)  Reverse sort order (default: false)
+        {deep}     (boolean)  Recursively sort nested containers
+                              (default: false)
+        {range}    (table)    Line range as {start_line, end_line}
+                              (1-indexed, optional)
+
+    Returns: ~
+        {success}  (boolean)       Whether the sort succeeded
+        {error}    (string|nil)    Error message if failed
+
+    Example: ~
+>lua
+        local sort_keys = require("sort-keys")
+
+        -- Sort at cursor with case-insensitive flag
+        sort_keys.sort_keys({ flags = "i" })
+
+        -- Reverse sort
+        sort_keys.sort_keys({ reverse = true })
+
+        -- Deep sort
+        sort_keys.sort_keys({ deep = true })
+
+        -- Sort within a specific range
+        sort_keys.sort_keys({ range = { 10, 20 } })
+
+        -- Combine options
+        sort_keys.sort_keys({
+            flags = "in",
+            reverse = true,
+            deep = true,
+        })
+<
+
+                                                   *sort-keys.register_adapter()*
+sort_keys.register_adapter({lang}, {adapter})
+
+    Register a custom adapter at runtime.
+
+    Parameters: ~
+        {lang}     (string)  Language name or filetype
+        {adapter}  (table)   Adapter interface created with
+                             |sort-keys.adapters.base.create()|
+
+    Example: ~
+>lua
+        local base = require("sort-keys.adapters.base")
+        local my_adapter = base.create({ ... })
+        require("sort-keys").register_adapter("mylang", my_adapter)
+<
+
+                                             *sort-keys.get_supported_languages()*
+sort_keys.get_supported_languages()
+
+    Get a list of all supported language names.
+
+    Returns: ~
+        (string[])  Array of supported language names
+
+    Example: ~
+>lua
+        local languages = require("sort-keys").get_supported_languages()
+        -- { "json", "jsonc", "json5", "lua", "javascript", ... }
+<
+
+==============================================================================
+8. CUSTOM ADAPTERS                                        *sort-keys-adapters*
+
+Custom adapters allow you to add support for additional languages or override
+the behavior for existing ones.
+
+                                              *sort-keys.adapters.base.create()*
+base.create({config})
+
+    Create an adapter from a configuration table.
+
+    Parameters: ~
+        {config}  (table)  Adapter configuration
+
+    Configuration Fields: ~
+        {filetypes}           (string[])
+            Filetypes this adapter handles.
+            Example: `{ "json", "jsonc", "json5" }`
+
+        {container_types}     (string[])
+            Tree-sitter node types that can be sorted.
+            Example: `{ "object", "array" }`
+
+        {element_wrappers}    (table<string, string>)  Optional
+            Mapping of container type to wrapper node type.
+            Used when elements are nested inside an intermediate node.
+            Example: `{ attrset_expression = "binding_set" }`
+
+        {element_types}       (table<string, string|nil>)
+            Mapping of container type to expected child element type.
+            Use `nil` for direct children (e.g., array elements).
+            Example: `{ object = "pair", array = nil }`
+
+        {separators}          (table<string, string>)
+            Mapping of container type to separator character.
+            Example: `{ object = ",", array = "," }`
+
+        {exclude_types}       (string[])  Optional
+            Node types that should not be sorted (kept in place).
+            Example: `{ "spread_element" }`
+
+        {get_key_from_element}  (function(node, bufnr): string|nil)
+            Function to extract the sort key from an element node.
+
+    Returns: ~
+        (table)  AdapterInterface
+
+    Example: ~
+>lua
+        local base = require("sort-keys.adapters.base")
+
+        local my_adapter = base.create({
+            filetypes = { "mylang" },
+            container_types = { "object", "array" },
+            element_wrappers = {},
+            element_types = {
+                object = "pair",
+                array = nil,
+            },
+            separators = {
+                object = ",",
+                array = ",",
+            },
+            exclude_types = { "spread_element" },
+            get_key_from_element = function(element, bufnr)
+                local key_node = element:field("key")[1]
+                if key_node then
+                    return vim.treesitter.get_node_text(key_node, bufnr)
+                end
+                return vim.treesitter.get_node_text(element, bufnr)
+            end,
+        })
+
+        require("sort-keys").setup({
+            custom_adapters = {
+                mylang = my_adapter,
+            },
+        })
+<
+
+                                                     *sort-keys-adapter-interface*
+Adapter Interface ~
+
+    The adapter interface provides methods for extracting and formatting
+    elements from a container node.
+
+    Methods: ~
+        get_filetypes()                           Get handled filetypes
+        get_container_types()                     Get sortable container types
+        get_separator(container_type)             Get separator for container
+        get_element_wrapper(container_type)       Get wrapper node type
+        get_element_type(container_type)          Get element node type
+        is_excluded_element(node)                 Check if element is excluded
+        extract_elements(container, bufnr)        Extract elements from container
+        format_output(elements, container, bufnr, had_trailing_separator)
+                                                  Format sorted elements
+
+==============================================================================
+9. SUPPORTED LANGUAGES                                   *sort-keys-languages*
+
+The following languages are supported out of the box:
+
+    Language            Filetypes                    Containers ~
+    JSON                json, jsonc, json5           object, array
+    Lua                 lua                          table_constructor
+    JavaScript          javascript, jsx,             object, array
+                        javascriptreact
+    TypeScript          typescript, tsx,             object, array
+                        typescriptreact
+    Nix                 nix                          attrset_expression,
+                                                     list_expression,
+                                                     formals
+
+Special Handling: ~
+
+- JavaScript/TypeScript: Spread elements (`...obj`) are preserved in place
+- Nix: Function parameter ellipsis (`...`) is preserved in place
+- Comments: Comments immediately preceding an element are kept with that
+  element when sorting
+
+To add support for additional languages, see |sort-keys-adapters|.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
