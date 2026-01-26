@@ -40,11 +40,7 @@ local function sort_command_handler(opts, deep)
         sort_opts.range = { opts.line1, opts.line2 }
     end
 
-    if deep then
-        sort_keys.deep_sort_keys(sort_opts)
-    else
-        sort_keys.sort_keys(sort_opts)
-    end
+    sort_keys.sort_keys(sort_opts)
 end
 
 -- Register commands

@@ -27,28 +27,11 @@ end
 --- @return boolean success
 function M.sort_keys(opts)
     opts = opts or {}
-    opts.deep = false
 
     local success, err = sorter.sort(opts)
 
     if not success then
         vim.notify("SortKeys: " .. (err or "Unknown error"), vim.log.levels.ERROR)
-    end
-
-    return success
-end
-
---- Recursively sort keys in nested containers
---- @param opts? SortKeysOptions
---- @return boolean success
-function M.deep_sort_keys(opts)
-    opts = opts or {}
-    opts.deep = true
-
-    local success, err = sorter.sort(opts)
-
-    if not success then
-        vim.notify("DeepSortKeys: " .. (err or "Unknown error"), vim.log.levels.ERROR)
     end
 
     return success
