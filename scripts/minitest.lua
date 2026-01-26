@@ -24,6 +24,27 @@ vim.opt.rtp:prepend(ts_path)
 local site_path = vim.fn.stdpath "data" .. "/site"
 vim.opt.rtp:prepend(site_path)
 
+-- Check if parser is available using Neovim's built-in API
+local function has_parser(lang)
+    local ok = pcall(vim.treesitter.language.inspect, lang)
+    return ok
+end
+
+-- Install tree-sitter parsers if not available
+local parsers_to_install = { "lua", "json", "javascript", "typescript" }
+local ts_install = require "nvim-treesitter.install"
+
+for _, lang in ipairs(parsers_to_install) do
+    if not has_parser(lang) then
+        print("Installing tree-sitter parser for: " .. lang)
+        ts_install.install(lang)
+        -- Wait for installation to complete
+        vim.wait(60000, function()
+            return has_parser(lang)
+        end, 500)
+    end
+end
+
 -- Set up mini.test
 local MiniTest = require "mini.test"
 MiniTest.setup()

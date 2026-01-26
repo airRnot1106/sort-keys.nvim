@@ -28,10 +28,6 @@ jobs:
           git clone --depth=1 https://github.com/echasnovski/mini.nvim ~/.local/share/nvim/site/pack/deps/start/mini.nvim
           git clone --depth=1 https://github.com/nvim-treesitter/nvim-treesitter ~/.local/share/nvim/site/pack/deps/start/nvim-treesitter
 
-      - name: Install tree-sitter parsers
-        run: |
-          nvim --headless -c "TSInstallSync! lua json javascript typescript" -c "q"
-
       - name: Run tests
         run: |
           nvim --headless -l scripts/minitest.lua
