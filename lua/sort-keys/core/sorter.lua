@@ -104,9 +104,9 @@ local function sort_container(container, adapter, flags, reverse, bufnr, range)
         local first_line = original_lines[1]
         local last_line = original_lines[#original_lines]
 
-        -- Find the opening bracket position
-        local open_bracket_col = first_line:find "[%{%[%(]"
-        local close_bracket_col = last_line:find "[%}%]%)]"
+        -- Use container position to find the correct bracket (0-indexed to 1-indexed)
+        local open_bracket_col = container_info.start_col + 1
+        local close_bracket_col = container_info.end_col -- end_col points to the closing bracket
 
         if open_bracket_col and close_bracket_col then
             -- Preserve the opening bracket and content before it
@@ -130,8 +130,9 @@ local function sort_container(container, adapter, flags, reverse, bufnr, range)
     else
         -- For single-line containers, reconstruct the whole line
         local line = original_lines[1]
-        local open_bracket_col = line:find "[%{%[%(]"
-        local close_bracket_col = line:find "[%}%]%)]"
+        -- Use container position to find the correct bracket (0-indexed to 1-indexed)
+        local open_bracket_col = container_info.start_col + 1
+        local close_bracket_col = container_info.end_col
 
         if open_bracket_col and close_bracket_col then
             local prefix = line:sub(1, open_bracket_col)

@@ -113,8 +113,12 @@ function M.create(config)
         for _, child in ipairs(children) do
             -- Skip if we have a specific element type and this doesn't match
             local should_process = true
-            if element_type and child:type() ~= element_type then
-                -- Skip comments and non-matching types
+
+            -- Always skip comment nodes (they are handled via leading_comments)
+            if ts_utils.is_comment(child) then
+                should_process = false
+            elseif element_type and child:type() ~= element_type then
+                -- Skip non-matching types
                 should_process = false
             end
 
