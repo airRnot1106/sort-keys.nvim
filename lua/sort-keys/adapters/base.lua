@@ -206,17 +206,25 @@ function M.create(config)
                     end
                 end
 
+                -- Get key from element
+                local key_text = adapter.get_key_from_element(child, bufnr)
+
+                -- Element is excluded if:
+                -- 1. It's in the exclude_types list, OR
+                -- 2. The key extraction returned nil (e.g., vararg, spread)
+                local is_excluded = adapter.is_excluded_element(child) or (key_text == nil)
+
                 --- @type ElementInfo
                 local element_info = {
                     node = child,
-                    key_text = adapter.get_key_from_element(child, bufnr),
+                    key_text = key_text,
                     value_text = value_text,
                     start_row = start_row,
                     end_row = end_row,
                     leading_comments = leading_comments,
                     trailing_comment = trailing_comment,
                     separator = trailing_sep,
-                    is_excluded = adapter.is_excluded_element(child),
+                    is_excluded = is_excluded,
                     indent = indent,
                 }
 

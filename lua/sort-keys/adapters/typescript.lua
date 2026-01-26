@@ -7,7 +7,7 @@ return base.create {
     filetypes = { "typescript", "typescriptreact" },
 
     -- Container types
-    container_types = { "object", "array", "object_type", "formal_parameters", "object_pattern" },
+    container_types = { "object", "array", "object_type", "interface_body", "formal_parameters", "object_pattern" },
 
     -- No element wrappers
     element_wrappers = {},
@@ -17,6 +17,7 @@ return base.create {
         object = nil, -- Objects can have pair, shorthand_property_identifier, spread_element, etc.
         array = nil, -- Arrays use direct children
         object_type = nil, -- TypeScript object types can have property_signature, index_signature, etc.
+        interface_body = nil, -- Interface body can have property_signature, method_signature, etc.
         formal_parameters = nil, -- Function parameters
         object_pattern = nil, -- Destructuring patterns
     },
@@ -26,6 +27,7 @@ return base.create {
         object = ",",
         array = ",",
         object_type = ";",
+        interface_body = ";",
         formal_parameters = ",",
         object_pattern = ",",
     },

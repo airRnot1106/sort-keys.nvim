@@ -13,6 +13,17 @@ if vim.fn.isdirectory(mini_path) == 0 then
 end
 vim.opt.rtp:prepend(mini_path)
 
+-- Add nvim-treesitter to runtimepath (for parsers)
+local ts_path = vim.fn.stdpath "data" .. "/site/pack/deps/start/nvim-treesitter"
+if vim.fn.isdirectory(ts_path) == 0 then
+    vim.fn.system { "git", "clone", "--depth=1", "https://github.com/nvim-treesitter/nvim-treesitter", ts_path }
+end
+vim.opt.rtp:prepend(ts_path)
+
+-- Add site path for locally installed parsers
+local site_path = vim.fn.stdpath "data" .. "/site"
+vim.opt.rtp:prepend(site_path)
+
 -- Set up mini.test
 local MiniTest = require "mini.test"
 MiniTest.setup()

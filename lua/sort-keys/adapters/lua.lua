@@ -28,6 +28,12 @@ return base.create {
     -- Key extraction
     get_key_from_element = function(element, bufnr)
         if element:type() == "field" then
+            -- Check if this is a vararg expression (...) - should stay in place
+            local value_node = element:field("value")[1]
+            if value_node and value_node:type() == "vararg_expression" then
+                return nil -- Exclude from sorting
+            end
+
             -- Lua fields can have different forms:
             -- { key = value }  -- named field
             -- { ["key"] = value }  -- bracket field
