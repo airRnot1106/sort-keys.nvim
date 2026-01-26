@@ -1,6 +1,6 @@
 local MiniTest = require "mini.test"
 local expect = MiniTest.expect
-local helpers = require "tests.sort-keys.helpers"
+local helpers = require "tests.helpers"
 
 local T = MiniTest.new_set()
 
