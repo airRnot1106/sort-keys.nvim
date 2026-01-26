@@ -27,17 +27,6 @@ function M.get_root(bufnr)
     return tree:root()
 end
 
---- Get the language of the buffer
---- @param bufnr number Buffer number
---- @return string|nil
-function M.get_language(bufnr)
-    local parser = M.get_parser(bufnr)
-    if not parser then
-        return nil
-    end
-    return parser:lang()
-end
-
 --- Find the smallest container node at the given position
 --- @param bufnr number Buffer number
 --- @param row number 0-indexed row

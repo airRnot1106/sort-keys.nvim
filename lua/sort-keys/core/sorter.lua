@@ -156,15 +156,20 @@ function M.sort(opts)
     opts = opts or {}
     local bufnr = vim.api.nvim_get_current_buf()
 
-    -- Get the language and adapter
-    local lang = ts_utils.get_language(bufnr)
-    if not lang then
+    -- Get the filetype and adapter
+    local filetype = vim.bo[bufnr].filetype
+    if filetype == "" then
+        return false, "No filetype detected for this buffer"
+    end
+
+    -- Check tree-sitter parser is available
+    if not ts_utils.get_parser(bufnr) then
         return false, "No tree-sitter parser available for this buffer"
     end
 
-    local adapter = adapters.get_adapter(lang)
+    local adapter = adapters.get_adapter(filetype)
     if not adapter then
-        return false, string.format("No adapter available for language: %s", lang)
+        return false, string.format("No adapter available for filetype: %s", filetype)
     end
 
     -- Parse flags
