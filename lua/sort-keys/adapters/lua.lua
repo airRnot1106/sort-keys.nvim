@@ -44,7 +44,7 @@ return base.create {
                     if next and next:named() then
                         local text = vim.treesitter.get_node_text(next, bufnr)
                         -- Remove quotes if present
-                        return text:gsub("^[\"']", ""):gsub("[\"']$", "")
+                        return (text:gsub("^[\"']", ""):gsub("[\"']$", ""))
                     end
                 end
             end

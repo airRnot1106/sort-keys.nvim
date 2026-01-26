@@ -30,7 +30,7 @@ end
 --- @param str string
 --- @return string
 function M.strip_quotes(str)
-    return str:gsub("^[\"']", ""):gsub("[\"']$", "")
+    return (str:gsub("^[\"']", ""):gsub("[\"']$", ""))
 end
 
 --- Trim whitespace from both ends of a string

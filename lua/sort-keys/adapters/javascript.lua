@@ -36,7 +36,7 @@ return base.create {
             if key_node then
                 local text = vim.treesitter.get_node_text(key_node, bufnr)
                 -- Remove quotes if present
-                return text:gsub("^[\"']", ""):gsub("[\"']$", "")
+                return (text:gsub("^[\"']", ""):gsub("[\"']$", ""))
             end
         elseif elem_type == "shorthand_property_identifier" then
             -- { key } shorthand
