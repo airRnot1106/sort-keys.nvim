@@ -1,9 +1,0 @@
-{
-  "zebra": 1,
-  "apple": 2,
-  "banana": {
-    "inner_zebra": "z",
-    "inner_apple": "a"
-  },
-  "cherry": 3
-}
