@@ -7,7 +7,7 @@ return base.create {
     filetypes = { "javascript", "javascriptreact" },
 
     -- Container types
-    container_types = { "object", "array" },
+    container_types = { "object", "array", "object_pattern" },
 
     -- No element wrappers
     element_wrappers = {},
@@ -16,16 +16,18 @@ return base.create {
     element_types = {
         object = nil, -- Objects can have pair, shorthand_property_identifier, spread_element, etc.
         array = nil, -- Arrays use direct children
+        object_pattern = nil, -- Destructuring patterns
     },
 
     -- Separators
     separators = {
         object = ",",
         array = ",",
+        object_pattern = ",",
     },
 
-    -- Excluded types (spread elements stay in place)
-    exclude_types = { "spread_element" },
+    -- Excluded types (spread elements and rest patterns stay in place)
+    exclude_types = { "spread_element", "rest_pattern" },
 
     -- Key extraction
     get_key_from_element = function(element, bufnr)
@@ -39,8 +41,8 @@ return base.create {
                 -- Remove quotes if present
                 return (text:gsub("^[\"']", ""):gsub("[\"']$", ""))
             end
-        elseif elem_type == "shorthand_property_identifier" then
-            -- { key } shorthand
+        elseif elem_type == "shorthand_property_identifier" or elem_type == "shorthand_property_identifier_pattern" then
+            -- { key } shorthand or destructuring pattern
             return ts_utils.get_node_text(element, bufnr)
         elseif elem_type == "method_definition" then
             -- { method() {} }
@@ -48,8 +50,8 @@ return base.create {
             if name_node then
                 return ts_utils.get_node_text(name_node, bufnr)
             end
-        elseif elem_type == "spread_element" then
-            -- { ...obj } - keep original position, return nil for key
+        elseif elem_type == "spread_element" or elem_type == "rest_pattern" then
+            -- { ...obj } or { ...rest } - keep original position, return nil for key
             return nil
         end
 
