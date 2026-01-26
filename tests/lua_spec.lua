@@ -1,10 +1,20 @@
-local MiniTest = require "mini.test"
-local expect = MiniTest.expect
+local new_set = MiniTest.new_set
+local expect, eq = MiniTest.expect, MiniTest.expect.equality
 local helpers = require "tests.helpers"
 
-local T = MiniTest.new_set()
+-- Create child neovim instance
+local child = helpers.new_child_neovim()
 
-T["lua"] = MiniTest.new_set()
+local T = new_set {
+    hooks = {
+        pre_case = function()
+            child.setup()
+        end,
+        post_once = child.stop,
+    },
+}
+
+T["lua"] = new_set()
 
 -- Basic SortKeys
 T["lua"]["SortKeys sorts table keys alphabetically"] = function()
@@ -18,8 +28,8 @@ T["lua"]["SortKeys sorts table keys alphabetically"] = function()
     mango = 3,
     zebra = 1,
 }]]
-    local result = helpers.run_sort(input, "lua", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "SortKeys")
+    eq(result, expected)
 end
 
 T["lua"]["SortKeys sorts string keys"] = function()
@@ -33,8 +43,8 @@ T["lua"]["SortKeys sorts string keys"] = function()
     ["mango"] = 3,
     ["zebra"] = 1,
 }]]
-    local result = helpers.run_sort(input, "lua", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "SortKeys")
+    eq(result, expected)
 end
 
 -- SortKeys! (reverse)
@@ -49,8 +59,8 @@ T["lua"]["SortKeys! sorts in reverse order"] = function()
     mango = 2,
     apple = 1,
 }]]
-    local result = helpers.run_sort(input, "lua", "SortKeys!")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "SortKeys!")
+    eq(result, expected)
 end
 
 -- DeepSortKeys
@@ -75,8 +85,8 @@ T["lua"]["DeepSortKeys sorts nested tables"] = function()
         inner_z = 1,
     },
 }]]
-    local result = helpers.run_sort(input, "lua", "DeepSortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "DeepSortKeys")
+    eq(result, expected)
 end
 
 -- DeepSortKeys!
@@ -101,8 +111,8 @@ T["lua"]["DeepSortKeys! sorts nested tables in reverse"] = function()
         inner_a = 1,
     },
 }]]
-    local result = helpers.run_sort(input, "lua", "DeepSortKeys!")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "DeepSortKeys!")
+    eq(result, expected)
 end
 
 -- With comments
@@ -119,8 +129,8 @@ T["lua"]["SortKeys preserves leading comments"] = function()
     -- zebra comment
     zebra = 1,
 }]]
-    local result = helpers.run_sort(input, "lua", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "SortKeys")
+    eq(result, expected)
 end
 
 T["lua"]["SortKeys preserves trailing comments"] = function()
@@ -132,8 +142,8 @@ T["lua"]["SortKeys preserves trailing comments"] = function()
     apple = 2, -- apple comment
     zebra = 1, -- zebra comment
 }]]
-    local result = helpers.run_sort(input, "lua", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "SortKeys")
+    eq(result, expected)
 end
 
 -- Exclude (spread/ellipsis)
@@ -148,8 +158,8 @@ T["lua"]["SortKeys keeps ellipsis in place"] = function()
     ...,
     zebra = 1,
 }]]
-    local result = helpers.run_sort(input, "lua", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "SortKeys")
+    eq(result, expected)
 end
 
 -- Numeric sort
@@ -164,8 +174,8 @@ T["lua"]["SortKeys with numeric flag"] = function()
     item2 = 2,
     item10 = 1,
 }]]
-    local result = helpers.run_sort(input, "lua", "SortKeys n")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "lua", "SortKeys n")
+    eq(result, expected)
 end
 
 return T

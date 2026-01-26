@@ -1,10 +1,20 @@
-local MiniTest = require "mini.test"
-local expect = MiniTest.expect
+local new_set = MiniTest.new_set
+local expect, eq = MiniTest.expect, MiniTest.expect.equality
 local helpers = require "tests.helpers"
 
-local T = MiniTest.new_set()
+-- Create child neovim instance
+local child = helpers.new_child_neovim()
 
-T["javascript"] = MiniTest.new_set()
+local T = new_set {
+    hooks = {
+        pre_case = function()
+            child.setup()
+        end,
+        post_once = child.stop,
+    },
+}
+
+T["javascript"] = new_set()
 
 -- Basic SortKeys
 T["javascript"]["SortKeys sorts object keys alphabetically"] = function()
@@ -18,15 +28,15 @@ T["javascript"]["SortKeys sorts object keys alphabetically"] = function()
     mango: 3,
     zebra: 1,
 };]]
-    local result = helpers.run_sort(input, "javascript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys")
+    eq(result, expected)
 end
 
 T["javascript"]["SortKeys sorts array elements alphabetically"] = function()
     local input = 'const arr = ["zebra", "apple", "mango"];'
     local expected = 'const arr = ["apple", "mango", "zebra"];'
-    local result = helpers.run_sort(input, "javascript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys")
+    eq(result, expected)
 end
 
 -- SortKeys! (reverse)
@@ -41,8 +51,8 @@ T["javascript"]["SortKeys! sorts in reverse order"] = function()
     mango: 2,
     apple: 1,
 };]]
-    local result = helpers.run_sort(input, "javascript", "SortKeys!")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys!")
+    eq(result, expected)
 end
 
 -- DeepSortKeys
@@ -67,8 +77,8 @@ T["javascript"]["DeepSortKeys sorts nested objects"] = function()
         inner_z: 1,
     },
 };]]
-    local result = helpers.run_sort(input, "javascript", "DeepSortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "DeepSortKeys")
+    eq(result, expected)
 end
 
 -- DeepSortKeys!
@@ -93,8 +103,8 @@ T["javascript"]["DeepSortKeys! sorts nested objects in reverse"] = function()
         inner_a: 1,
     },
 };]]
-    local result = helpers.run_sort(input, "javascript", "DeepSortKeys!")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "DeepSortKeys!")
+    eq(result, expected)
 end
 
 -- With comments
@@ -111,8 +121,8 @@ T["javascript"]["SortKeys preserves leading comments"] = function()
     // zebra comment
     zebra: 1,
 };]]
-    local result = helpers.run_sort(input, "javascript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys")
+    eq(result, expected)
 end
 
 T["javascript"]["SortKeys preserves trailing comments"] = function()
@@ -124,8 +134,8 @@ T["javascript"]["SortKeys preserves trailing comments"] = function()
     apple: 2, // apple comment
     zebra: 1, // zebra comment
 };]]
-    local result = helpers.run_sort(input, "javascript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys")
+    eq(result, expected)
 end
 
 -- Exclude (spread_element)
@@ -140,16 +150,16 @@ T["javascript"]["SortKeys keeps spread element in place"] = function()
     ...other,
     zebra: 1,
 };]]
-    local result = helpers.run_sort(input, "javascript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys")
+    eq(result, expected)
 end
 
 -- Exclude (rest_pattern in destructuring)
 T["javascript"]["SortKeys keeps rest pattern in place"] = function()
     local input = [[const { zebra, ...rest, apple } = obj;]]
     local expected = [[const {apple, ...rest, zebra} = obj;]]
-    local result = helpers.run_sort(input, "javascript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys")
+    eq(result, expected)
 end
 
 -- Numeric sort
@@ -164,8 +174,8 @@ T["javascript"]["SortKeys with numeric flag"] = function()
     item2: 2,
     item10: 1,
 };]]
-    local result = helpers.run_sort(input, "javascript", "SortKeys n")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "javascript", "SortKeys n")
+    eq(result, expected)
 end
 
 return T

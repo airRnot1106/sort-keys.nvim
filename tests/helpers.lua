@@ -1,82 +1,85 @@
-local M = {}
+-- Test helpers for sort-keys.nvim
+-- Uses child process approach as recommended by mini.test
 
--- Initialize sort-keys plugin (load commands)
-vim.cmd "runtime plugin/sort-keys.lua"
+local Helpers = {}
 
--- Map filetype to tree-sitter language
-local filetype_to_lang = {
-    javascript = "javascript",
-    typescript = "typescript",
-    json = "json",
-    jsonc = "json", -- jsonc uses json parser
-    lua = "lua",
-}
+--- Create a new child neovim instance with sort-keys setup
+---@return table child The child neovim instance
+function Helpers.new_child_neovim()
+    local child = MiniTest.new_child_neovim()
 
---- Create a buffer with content and filetype, run command, return result
+    --- Setup the child process with sort-keys plugin loaded
+    child.setup = function()
+        child.restart { "-u", "scripts/minimal_init.lua" }
+
+        -- Load sort-keys plugin
+        child.lua [[vim.cmd('runtime plugin/sort-keys.lua')]]
+    end
+
+    return child
+end
+
+--- Run sort command in child process and return result
+---@param child table The child neovim instance
 ---@param content string The initial buffer content
 ---@param filetype string The filetype to set
 ---@param command string The command to execute (e.g., "SortKeys", "SortKeys!", "DeepSortKeys")
----@param range? {start_line: number, end_line: number} Optional range for the command
----@return string[] lines The resulting buffer lines
-function M.run_sort(content, filetype, command, range)
-    -- Create a new buffer
-    local buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_set_current_buf(buf)
+---@return string result The resulting buffer content as a single string
+function Helpers.run_sort(child, content, filetype, command)
+    -- Map filetype to tree-sitter language
+    local filetype_to_lang = {
+        javascript = "javascript",
+        typescript = "typescript",
+        json = "json",
+        jsonc = "json",
+        lua = "lua",
+    }
 
-    -- Set content
-    local lines = vim.split(content, "\n", { plain = true })
-    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-
-    -- Set filetype
-    vim.bo[buf].filetype = filetype
-
-    -- Get tree-sitter language
     local lang = filetype_to_lang[filetype] or filetype
 
-    -- Start tree-sitter explicitly
-    vim.treesitter.start(buf, lang)
+    -- Create buffer with content in child process
+    child.lua(
+        [[
+        local content, filetype, lang = ...
+        local buf = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_set_current_buf(buf)
 
-    -- Parse the buffer
-    local ok, parser = pcall(vim.treesitter.get_parser, buf, lang)
-    if ok and parser then
-        parser:parse()
-    end
+        -- Set content
+        local lines = vim.split(content, "\n", { plain = true })
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
-    -- Move cursor inside the container
-    local line_count = vim.api.nvim_buf_line_count(buf)
-    if line_count > 1 then
-        -- Multi-line: position cursor on line 2 (typically inside container)
-        vim.api.nvim_win_set_cursor(0, { 2, 0 })
-    else
-        -- Single-line: position cursor after the first bracket/brace
-        local first_line = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
-        local col = first_line:find "[%[%{%(]"
-        vim.api.nvim_win_set_cursor(0, { 1, col or 1 })
-    end
+        -- Set filetype
+        vim.bo[buf].filetype = filetype
 
-    -- Build and execute command
-    local cmd
-    if range then
-        cmd = string.format("%d,%d%s", range.start_line, range.end_line, command)
-    else
-        cmd = command
-    end
-    vim.cmd(cmd)
+        -- Start tree-sitter
+        vim.treesitter.start(buf, lang)
+
+        -- Parse the buffer
+        local ok, parser = pcall(vim.treesitter.get_parser, buf, lang)
+        if ok and parser then
+            parser:parse()
+        end
+
+        -- Position cursor inside the container
+        local line_count = vim.api.nvim_buf_line_count(buf)
+        if line_count > 1 then
+            vim.api.nvim_win_set_cursor(0, { 2, 0 })
+        else
+            local first_line = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
+            local col = first_line:find("[%[%{%(]")
+            vim.api.nvim_win_set_cursor(0, { 1, col or 1 })
+        end
+    ]],
+        { content, filetype, lang }
+    )
+
+    -- Execute sort command
+    child.cmd(command)
 
     -- Get result
-    local result = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    local lines = child.lua_get [[vim.api.nvim_buf_get_lines(0, 0, -1, false)]]
 
-    -- Cleanup
-    vim.api.nvim_buf_delete(buf, { force = true })
-
-    return result
-end
-
---- Join lines into a single string
----@param lines string[]
----@return string
-function M.join_lines(lines)
     return table.concat(lines, "\n")
 end
 
-return M
+return Helpers

@@ -1,10 +1,20 @@
-local MiniTest = require "mini.test"
-local expect = MiniTest.expect
+local new_set = MiniTest.new_set
+local expect, eq = MiniTest.expect, MiniTest.expect.equality
 local helpers = require "tests.helpers"
 
-local T = MiniTest.new_set()
+-- Create child neovim instance
+local child = helpers.new_child_neovim()
 
-T["typescript"] = MiniTest.new_set()
+local T = new_set {
+    hooks = {
+        pre_case = function()
+            child.setup()
+        end,
+        post_once = child.stop,
+    },
+}
+
+T["typescript"] = new_set()
 
 -- Basic SortKeys (object)
 T["typescript"]["SortKeys sorts object keys alphabetically"] = function()
@@ -18,8 +28,8 @@ T["typescript"]["SortKeys sorts object keys alphabetically"] = function()
     mango: 3,
     zebra: 1,
 };]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 -- SortKeys! (reverse)
@@ -34,8 +44,8 @@ T["typescript"]["SortKeys! sorts in reverse order"] = function()
     mango: 2,
     apple: 1,
 };]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys!")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys!")
+    eq(result, expected)
 end
 
 -- DeepSortKeys
@@ -60,8 +70,8 @@ T["typescript"]["DeepSortKeys sorts nested objects"] = function()
         inner_z: 1,
     },
 };]]
-    local result = helpers.run_sort(input, "typescript", "DeepSortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "DeepSortKeys")
+    eq(result, expected)
 end
 
 -- object_type (interface/type properties)
@@ -76,8 +86,8 @@ T["typescript"]["SortKeys sorts interface properties"] = function()
     mango: boolean;
     zebra: string;
 }]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 T["typescript"]["SortKeys sorts type alias properties"] = function()
@@ -91,31 +101,31 @@ T["typescript"]["SortKeys sorts type alias properties"] = function()
     mango: boolean;
     zebra: string;
 };]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 -- formal_parameters (function parameters)
 T["typescript"]["SortKeys sorts function parameters"] = function()
     local input = [[function foo(zebra: string, apple: number, mango: boolean) {}]]
     local expected = [[function foo(apple: number, mango: boolean, zebra: string) {}]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 T["typescript"]["SortKeys sorts optional parameters"] = function()
     local input = [[function foo(zebra?: string, apple?: number, mango?: boolean) {}]]
     local expected = [[function foo(apple?: number, mango?: boolean, zebra?: string) {}]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 -- object_pattern (destructuring)
 T["typescript"]["SortKeys sorts destructuring pattern"] = function()
     local input = [[const { zebra, apple, mango } = obj;]]
     local expected = [[const {apple, mango, zebra} = obj;]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 -- With comments
@@ -132,8 +142,8 @@ T["typescript"]["SortKeys preserves leading comments"] = function()
     // zebra comment
     zebra: 1,
 };]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 T["typescript"]["SortKeys preserves trailing comments"] = function()
@@ -145,8 +155,8 @@ T["typescript"]["SortKeys preserves trailing comments"] = function()
     apple: 2, // apple comment
     zebra: 1, // zebra comment
 };]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 -- Exclude (spread_element)
@@ -161,16 +171,16 @@ T["typescript"]["SortKeys keeps spread element in place"] = function()
     ...other,
     zebra: 1,
 };]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 -- Exclude (rest_pattern in destructuring)
 T["typescript"]["SortKeys keeps rest pattern in place"] = function()
     local input = [[const { zebra, ...rest, apple } = obj;]]
     local expected = [[const {apple, ...rest, zebra} = obj;]]
-    local result = helpers.run_sort(input, "typescript", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "typescript", "SortKeys")
+    eq(result, expected)
 end
 
 return T

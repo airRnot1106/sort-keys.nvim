@@ -1,68 +1,11 @@
-#!/usr/bin/env -S nvim -l
+-- Custom test runner for sort-keys.nvim
+-- Usage: nvim --headless --noplugin -u ./scripts/minimal_init.lua -c "lua dofile('scripts/minitest.lua')"
 
--- Test runner script for mini.test
--- Usage: nvim --headless -l scripts/minitest.lua
-
--- Add current directory to runtimepath
-vim.opt.rtp:prepend "."
-
--- Add mini.nvim to runtimepath (for mini.test)
-local mini_path = vim.fn.stdpath "data" .. "/site/pack/deps/start/mini.nvim"
-if vim.fn.isdirectory(mini_path) == 0 then
-    vim.fn.system { "git", "clone", "--depth=1", "https://github.com/echasnovski/mini.nvim", mini_path }
-end
-vim.opt.rtp:prepend(mini_path)
-
--- Add nvim-treesitter to runtimepath (for parsers)
-local ts_path = vim.fn.stdpath "data" .. "/site/pack/deps/start/nvim-treesitter"
-if vim.fn.isdirectory(ts_path) == 0 then
-    vim.fn.system { "git", "clone", "--depth=1", "https://github.com/nvim-treesitter/nvim-treesitter", ts_path }
-end
-vim.opt.rtp:prepend(ts_path)
-
--- Add site path for locally installed parsers
-local site_path = vim.fn.stdpath "data" .. "/site"
-vim.opt.rtp:prepend(site_path)
-
--- Check if parser is available using Neovim's built-in API
-local function has_parser(lang)
-    local ok = pcall(vim.treesitter.language.inspect, lang)
-    return ok
-end
-
--- Install tree-sitter parsers if not available
-local parsers_to_install = { "lua", "json", "javascript", "typescript" }
-local ts_install = require "nvim-treesitter.install"
-
-for _, lang in ipairs(parsers_to_install) do
-    if not has_parser(lang) then
-        print("Installing tree-sitter parser for: " .. lang)
-        ts_install.install(lang)
-        -- Wait for installation to complete
-        vim.wait(60000, function()
-            return has_parser(lang)
-        end, 500)
-    end
-end
-
--- Set up mini.test
-local MiniTest = require "mini.test"
-MiniTest.setup()
-
--- Run tests
-local test_dir = "tests"
-if vim.fn.isdirectory(test_dir) == 1 then
-    MiniTest.run {
-        collect = {
-            find_files = function()
-                return vim.fn.globpath(test_dir, "**/*_spec.lua", true, true)
-            end,
-        },
-        execute = {
-            reporter = MiniTest.gen_reporter.stdout { group_depth = 2 },
-        },
-    }
-else
-    print("Test directory not found: " .. test_dir)
-    vim.cmd "cquit 1"
-end
+-- Run tests with custom file pattern (*_spec.lua instead of test_*.lua)
+MiniTest.run {
+    collect = {
+        find_files = function()
+            return vim.fn.globpath("tests", "**/*_spec.lua", true, true)
+        end,
+    },
+}

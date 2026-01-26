@@ -1,10 +1,20 @@
-local MiniTest = require "mini.test"
-local expect = MiniTest.expect
+local new_set = MiniTest.new_set
+local expect, eq = MiniTest.expect, MiniTest.expect.equality
 local helpers = require "tests.helpers"
 
-local T = MiniTest.new_set()
+-- Create child neovim instance
+local child = helpers.new_child_neovim()
 
-T["json"] = MiniTest.new_set()
+local T = new_set {
+    hooks = {
+        pre_case = function()
+            child.setup()
+        end,
+        post_once = child.stop,
+    },
+}
+
+T["json"] = new_set()
 
 -- Basic SortKeys
 T["json"]["SortKeys sorts object keys alphabetically"] = function()
@@ -18,15 +28,15 @@ T["json"]["SortKeys sorts object keys alphabetically"] = function()
     "mango": 3,
     "zebra": 1
 }]]
-    local result = helpers.run_sort(input, "json", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "SortKeys")
+    eq(result, expected)
 end
 
 T["json"]["SortKeys sorts array elements alphabetically"] = function()
     local input = '["zebra", "apple", "mango"]'
     local expected = '["apple", "mango", "zebra"]'
-    local result = helpers.run_sort(input, "json", "SortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "SortKeys")
+    eq(result, expected)
 end
 
 -- SortKeys! (reverse)
@@ -41,8 +51,8 @@ T["json"]["SortKeys! sorts in reverse order"] = function()
     "mango": 2,
     "apple": 1
 }]]
-    local result = helpers.run_sort(input, "json", "SortKeys!")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "SortKeys!")
+    eq(result, expected)
 end
 
 -- DeepSortKeys
@@ -67,8 +77,8 @@ T["json"]["DeepSortKeys sorts nested objects"] = function()
         "inner_z": 1
     }
 }]]
-    local result = helpers.run_sort(input, "json", "DeepSortKeys")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "DeepSortKeys")
+    eq(result, expected)
 end
 
 -- DeepSortKeys!
@@ -93,8 +103,8 @@ T["json"]["DeepSortKeys! sorts nested objects in reverse"] = function()
         "inner_a": 1
     }
 }]]
-    local result = helpers.run_sort(input, "json", "DeepSortKeys!")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "DeepSortKeys!")
+    eq(result, expected)
 end
 
 -- Comment tests moved to javascript_spec.lua (JSON doesn't support comments)
@@ -111,8 +121,8 @@ T["json"]["SortKeys with numeric flag"] = function()
     "item2": 2,
     "item10": 1
 }]]
-    local result = helpers.run_sort(input, "json", "SortKeys n")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "SortKeys n")
+    eq(result, expected)
 end
 
 -- Case insensitive sort
@@ -127,8 +137,8 @@ T["json"]["SortKeys with case insensitive flag"] = function()
     "Mango": 3,
     "Zebra": 1
 }]]
-    local result = helpers.run_sort(input, "json", "SortKeys i")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "SortKeys i")
+    eq(result, expected)
 end
 
 -- Unique flag
@@ -142,8 +152,8 @@ T["json"]["SortKeys with unique flag removes duplicates"] = function()
     "apple": 1,
     "banana": 3
 }]]
-    local result = helpers.run_sort(input, "json", "SortKeys u")
-    expect.equality(helpers.join_lines(result), expected)
+    local result = helpers.run_sort(child, input, "json", "SortKeys u")
+    eq(result, expected)
 end
 
 return T

@@ -1,3 +1,6 @@
 .direnv
 .pre-commit-config.yaml
 result
+
+# Test dependencies (installed by `make deps`)
+deps/mini.nvim
