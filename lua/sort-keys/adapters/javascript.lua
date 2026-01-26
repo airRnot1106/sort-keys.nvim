@@ -1,9 +1,9 @@
---- JavaScript/TypeScript adapter for sort-keys.nvim
+--- JavaScript adapter for sort-keys.nvim
 local base = require "sort-keys.adapters.base"
 
 return base.create {
     -- Filetypes this adapter handles
-    filetypes = { "javascript", "typescript", "jsx", "tsx", "javascriptreact", "typescriptreact" },
+    filetypes = { "javascript", "javascriptreact" },
 
     -- Container types
     container_types = { "object", "array" },
