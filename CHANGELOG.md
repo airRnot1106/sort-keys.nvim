@@ -34,7 +34,7 @@
 - [`cb9a1ce`](https://github.com/airRnot1106/sort-keys.nvim/commit/cb9a1ce351492d275c7588fc1ff71844f3c3509c) - release v0.2.0 *(commit by [@airRnot1106](https://github.com/airRnot1106))*
 
 
-## v0.1.0 (2025-01-24)
+## [v0.1.0] - 2026-01-24
 
 Initial release of sort-keys.nvim.
 
