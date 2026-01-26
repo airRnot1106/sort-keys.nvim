@@ -131,6 +131,7 @@ sort_keys.get_supported_languages()
 
 ```lua
 local base = require("sort-keys.adapters.base")
+local ts_utils = require("sort-keys.utils.treesitter")
 
 local my_adapter = base.create({
     filetypes = { "mylang" },
@@ -148,9 +149,9 @@ local my_adapter = base.create({
     get_key_from_element = function(element, bufnr)
         local key_node = element:field("key")[1]
         if key_node then
-            return vim.treesitter.get_node_text(key_node, bufnr)
+            return ts_utils.get_node_text(key_node, bufnr)
         end
-        return vim.treesitter.get_node_text(element, bufnr)
+        return ts_utils.get_node_text(element, bufnr)
     end,
 })
 

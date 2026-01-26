@@ -1,5 +1,6 @@
 --- Lua adapter for sort-keys.nvim
 local base = require "sort-keys.adapters.base"
+local ts_utils = require "sort-keys.utils.treesitter"
 
 return base.create {
     -- Filetypes this adapter handles
@@ -34,7 +35,7 @@ return base.create {
 
             local name_node = element:field("name")[1]
             if name_node then
-                return vim.treesitter.get_node_text(name_node, bufnr)
+                return ts_utils.get_node_text(name_node, bufnr)
             end
 
             -- Check for bracket notation [key]
@@ -42,7 +43,7 @@ return base.create {
                 if child:type() == "[" then
                     local next = child:next_sibling()
                     if next and next:named() then
-                        local text = vim.treesitter.get_node_text(next, bufnr)
+                        local text = ts_utils.get_node_text(next, bufnr)
                         -- Remove quotes if present
                         return (text:gsub("^[\"']", ""):gsub("[\"']$", ""))
                     end
@@ -50,6 +51,6 @@ return base.create {
             end
         end
         -- For array-like entries, use the text itself
-        return vim.treesitter.get_node_text(element, bufnr)
+        return ts_utils.get_node_text(element, bufnr)
     end,
 }

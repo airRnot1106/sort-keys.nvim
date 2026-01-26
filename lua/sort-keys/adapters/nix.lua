@@ -1,5 +1,6 @@
 --- Nix adapter for sort-keys.nvim
 local base = require "sort-keys.adapters.base"
+local ts_utils = require "sort-keys.utils.treesitter"
 
 return base.create {
     -- Filetypes this adapter handles
@@ -42,18 +43,18 @@ return base.create {
                 -- Get the first identifier
                 for child in attrpath:iter_children() do
                     if child:type() == "identifier" or child:type() == "string_expression" then
-                        local text = vim.treesitter.get_node_text(child, bufnr)
+                        local text = ts_utils.get_node_text(child, bufnr)
                         -- Remove quotes if present
                         return text:gsub('^"', ""):gsub('"$', "")
                     end
                 end
-                return vim.treesitter.get_node_text(attrpath, bufnr)
+                return ts_utils.get_node_text(attrpath, bufnr)
             end
         elseif elem_type == "formal" then
             -- Function argument: { name ? default }
             local name_node = element:field("name")[1]
             if name_node then
-                return vim.treesitter.get_node_text(name_node, bufnr)
+                return ts_utils.get_node_text(name_node, bufnr)
             end
         elseif elem_type == "ellipses" then
             -- ... in function args - keep in place
@@ -61,6 +62,6 @@ return base.create {
         end
 
         -- For list elements, use the text itself
-        return vim.treesitter.get_node_text(element, bufnr)
+        return ts_utils.get_node_text(element, bufnr)
     end,
 }

@@ -1,5 +1,6 @@
 --- JSON adapter for sort-keys.nvim
 local base = require "sort-keys.adapters.base"
+local ts_utils = require "sort-keys.utils.treesitter"
 
 return base.create {
     -- Filetypes this adapter handles
@@ -31,12 +32,12 @@ return base.create {
         if element:type() == "pair" then
             local key_node = element:field("key")[1]
             if key_node then
-                local text = vim.treesitter.get_node_text(key_node, bufnr)
+                local text = ts_utils.get_node_text(key_node, bufnr)
                 -- Remove quotes from string keys
                 return text:gsub('^"', ""):gsub('"$', "")
             end
         end
         -- For array elements, use the text itself as the key
-        return vim.treesitter.get_node_text(element, bufnr)
+        return ts_utils.get_node_text(element, bufnr)
     end,
 }

@@ -1,5 +1,6 @@
 --- JavaScript adapter for sort-keys.nvim
 local base = require "sort-keys.adapters.base"
+local ts_utils = require "sort-keys.utils.treesitter"
 
 return base.create {
     -- Filetypes this adapter handles
@@ -34,18 +35,18 @@ return base.create {
             -- { key: value } or { "key": value }
             local key_node = element:field("key")[1]
             if key_node then
-                local text = vim.treesitter.get_node_text(key_node, bufnr)
+                local text = ts_utils.get_node_text(key_node, bufnr)
                 -- Remove quotes if present
                 return (text:gsub("^[\"']", ""):gsub("[\"']$", ""))
             end
         elseif elem_type == "shorthand_property_identifier" then
             -- { key } shorthand
-            return vim.treesitter.get_node_text(element, bufnr)
+            return ts_utils.get_node_text(element, bufnr)
         elseif elem_type == "method_definition" then
             -- { method() {} }
             local name_node = element:field("name")[1]
             if name_node then
-                return vim.treesitter.get_node_text(name_node, bufnr)
+                return ts_utils.get_node_text(name_node, bufnr)
             end
         elseif elem_type == "spread_element" then
             -- { ...obj } - keep original position, return nil for key
@@ -53,6 +54,6 @@ return base.create {
         end
 
         -- For array elements or other types, use the text itself
-        return vim.treesitter.get_node_text(element, bufnr)
+        return ts_utils.get_node_text(element, bufnr)
     end,
 }
