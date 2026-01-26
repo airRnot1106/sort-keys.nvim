@@ -14,6 +14,7 @@
 --- @field start_row number
 --- @field end_row number
 --- @field leading_comments string[]
+--- @field trailing_comment string|nil Inline comment on the same line
 --- @field separator string|nil
 --- @field is_excluded boolean
 --- @field indent string

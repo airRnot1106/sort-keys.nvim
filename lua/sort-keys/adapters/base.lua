@@ -72,11 +72,60 @@ function M.create(config)
         local prev = node:prev_sibling()
 
         while prev and ts_utils.is_comment(prev) do
+            local comment_start_row = prev:range()
+
+            -- Check if this comment might be a trailing comment for another element
+            local prev_prev = prev:prev_sibling()
+            -- Skip separators and other unnamed nodes
+            while prev_prev and not prev_prev:named() do
+                prev_prev = prev_prev:prev_sibling()
+            end
+
+            -- If there's a previous element and the comment is on the same line,
+            -- this is a trailing comment for that element, not our leading comment
+            if prev_prev and not ts_utils.is_comment(prev_prev) then
+                local _, _, prev_elem_end_row, _ = prev_prev:range()
+                if comment_start_row == prev_elem_end_row then
+                    break
+                end
+            end
+
             table.insert(comments, 1, ts_utils.get_node_text(prev, bufnr))
             prev = prev:prev_sibling()
         end
 
         return comments
+    end
+
+    --- Collect trailing comment on the same line as the node
+    --- @param node TSNode
+    --- @param bufnr number
+    --- @param separator string
+    --- @return string|nil
+    local function collect_trailing_comment(node, bufnr, separator)
+        local _, _, end_row, _ = node:range()
+
+        -- Look for comment after the element (possibly after separator)
+        local next_sib = node:next_sibling()
+
+        -- Skip separator if present
+        if next_sib and not next_sib:named() then
+            local sib_text = ts_utils.get_node_text(next_sib, bufnr)
+            local trimmed = text_utils.trim(sib_text)
+            if separator ~= "" and (trimmed == separator or trimmed:find(vim.pesc(separator), 1, true)) then
+                next_sib = next_sib:next_sibling()
+            end
+        end
+
+        -- Check if next sibling is a comment on the same line
+        if next_sib and ts_utils.is_comment(next_sib) then
+            local comment_start_row = next_sib:range()
+            if comment_start_row == end_row then
+                return ts_utils.get_node_text(next_sib, bufnr)
+            end
+        end
+
+        return nil
     end
 
     --- Extract elements from a container
@@ -126,6 +175,7 @@ function M.create(config)
                 local start_row, _, end_row, _ = child:range()
                 local node_text = ts_utils.get_node_text(child, bufnr)
                 local leading_comments = collect_leading_comments(child, bufnr)
+                local trailing_comment = collect_trailing_comment(child, bufnr, separator)
 
                 -- Get the line to extract indentation
                 local lines = text_utils.get_lines(bufnr, start_row, start_row)
@@ -164,6 +214,7 @@ function M.create(config)
                     start_row = start_row,
                     end_row = end_row,
                     leading_comments = leading_comments,
+                    trailing_comment = trailing_comment,
                     separator = trailing_sep,
                     is_excluded = adapter.is_excluded_element(child),
                     indent = indent,
@@ -214,6 +265,11 @@ function M.create(config)
                     end
                 end
 
+                -- Add trailing comment if present
+                if elem.trailing_comment then
+                    elem_text = elem_text .. " " .. elem.trailing_comment
+                end
+
                 -- Handle multi-line elements
                 local elem_lines = vim.split(elem_text, "\n", { plain = true })
                 for j, line in ipairs(elem_lines) do
@@ -237,6 +293,11 @@ function M.create(config)
                     if not is_last or had_trailing_separator then
                         part = part .. separator
                     end
+                end
+
+                -- Add trailing comment if present
+                if elem.trailing_comment then
+                    part = part .. " " .. elem.trailing_comment
                 end
 
                 table.insert(parts, part)
