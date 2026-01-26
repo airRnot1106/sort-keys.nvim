@@ -33,6 +33,7 @@ function Helpers.run_sort(child, content, filetype, command)
         json = "json",
         jsonc = "json",
         lua = "lua",
+        nix = "nix",
     }
 
     local lang = filetype_to_lang[filetype] or filetype
