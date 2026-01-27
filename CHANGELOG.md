@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.2.1] - 2026-01-27
+### :sparkles: New Features
+- [`a4be696`](https://github.com/airRnot1106/sort-keys.nvim/commit/a4be69687fec6e78842ea24f11ac0d81e3160ea9) - add TypeScript adapter with type-specific container support *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`3246714`](https://github.com/airRnot1106/sort-keys.nvim/commit/3246714eb56854a80bfaabd00769b60b369f6ca8) - preserve trailing comments on the same line *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`862a41f`](https://github.com/airRnot1106/sort-keys.nvim/commit/862a41f991d4f066db170883d9ae37b5eea60415) - **javascript**: add object_pattern and rest_pattern support *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :bug: Bug Fixes
+- [`bd0ca0c`](https://github.com/airRnot1106/sort-keys.nvim/commit/bd0ca0ce7dfd45d304407ca57f63658614b0faef) - typo *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`3eb895d`](https://github.com/airRnot1106/sort-keys.nvim/commit/3eb895d25ddab1a0278927c0e4823f5271b1f800) - correct bracket detection and skip comments in element extraction *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`4d13e8b`](https://github.com/airRnot1106/sort-keys.nvim/commit/4d13e8b76b527bb596bb310a881dcf0e0b622a7c) - wrap gsub return values to return single value *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`8c0d53d`](https://github.com/airRnot1106/sort-keys.nvim/commit/8c0d53d84ea67619d739aa859d7abcda35d38556) - **ci**: install tree-sitter parsers in test runner script *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :recycle: Refactors
+- [`103947c`](https://github.com/airRnot1106/sort-keys.nvim/commit/103947cfcf1f92c6a81525d5a75242e963901dcb) - use filetype instead of tree-sitter language for adapter lookup *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`1a0c742`](https://github.com/airRnot1106/sort-keys.nvim/commit/1a0c7422ed94a4efd2669f152b6f7a7e44e6b6ee) - use ts_utils.get_node_text in all adapters *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`3be25d2`](https://github.com/airRnot1106/sort-keys.nvim/commit/3be25d276c3d8601e5cea08693d5e5b8bd6f81ae) - flatten tests directory structure *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`10c9a6c`](https://github.com/airRnot1106/sort-keys.nvim/commit/10c9a6c89c427da1c63abce25e7927c658f53245) - **test**: rebuild test infrastructure following mini.test best practices *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :white_check_mark: Tests
+- [`68ff834`](https://github.com/airRnot1106/sort-keys.nvim/commit/68ff8347ce83af461e770b35f12fb71eca8ec87c) - add mini.test framework and CI workflow *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`0e2c0bf`](https://github.com/airRnot1106/sort-keys.nvim/commit/0e2c0bf505062310ded6a16279cff5eff98e6e62) - add integration tests for all language adapters *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`98ae596`](https://github.com/airRnot1106/sort-keys.nvim/commit/98ae596b1a07611fd65c21caf6241f209b7feb1d) - **nix**: add integration tests for Nix adapter *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :wrench: Chores
+- [`4aed1c9`](https://github.com/airRnot1106/sort-keys.nvim/commit/4aed1c9599e250b481114e84da607a277820308c) - remove unit tests *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`94d82b2`](https://github.com/airRnot1106/sort-keys.nvim/commit/94d82b29bf7201f5449c1188bed37472d7f3d003) - release v0.2.1 *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+
 ## [v0.2.0] - 2026-01-26
 ### :sparkles: New Features
 - [`2859c6c`](https://github.com/airRnot1106/sort-keys.nvim/commit/2859c6c8000963a3f23e87bfd7027cab7e805352) - add Nix language support with context-aware separators *(commit by [@airRnot1106](https://github.com/airRnot1106))*
@@ -60,3 +88,4 @@ Initial release of sort-keys.nvim.
 - Custom adapter support for additional languages via `custom_adapters` option
 - `register_adapter()` API for runtime adapter registration
 [v0.2.0]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.1.0...v0.2.0
+[v0.2.1]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.0...v0.2.1
