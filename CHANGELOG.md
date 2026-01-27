@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.2.2] - 2026-01-27
+### :sparkles: New Features
+- [`96af609`](https://github.com/airRnot1106/sort-keys.nvim/commit/96af609648845f58109e674bc4bd025c6159513b) - **adapters**: add brackets configuration for container types *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`5e6cae8`](https://github.com/airRnot1106/sort-keys.nvim/commit/5e6cae8808c285048d56594c7f8924dc24a3243c) - **yaml**: add YAML adapter support *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :bug: Bug Fixes
+- [`254b9c8`](https://github.com/airRnot1106/sort-keys.nvim/commit/254b9c8d9b3965bd0302fbb68714217b8fcb74a5) - **deep-sort**: re-parse tree-sitter after each container sort *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :wrench: Chores
+- [`9f77c4e`](https://github.com/airRnot1106/sort-keys.nvim/commit/9f77c4e8ec59f16c96a7a4b22b94dfb9caebc42d) - add luarc config and update type definitions *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+- [`d5c6122`](https://github.com/airRnot1106/sort-keys.nvim/commit/d5c612258049fb0c3b73b02a1a656f2559bd1d6b) - release v0.2.2 *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+
 ## [v0.2.1] - 2026-01-27
 ### :sparkles: New Features
 - [`a4be696`](https://github.com/airRnot1106/sort-keys.nvim/commit/a4be69687fec6e78842ea24f11ac0d81e3160ea9) - add TypeScript adapter with type-specific container support *(commit by [@airRnot1106](https://github.com/airRnot1106))*
@@ -89,3 +102,4 @@ Initial release of sort-keys.nvim.
 - `register_adapter()` API for runtime adapter registration
 [v0.2.0]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.1.0...v0.2.0
 [v0.2.1]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.0...v0.2.1
+[v0.2.2]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.1...v0.2.2
