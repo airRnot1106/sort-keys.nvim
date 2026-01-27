@@ -69,9 +69,7 @@ function M.create(config)
     end
 
     --- Get the sort key from an element
-    --- @param element TSNode
-    --- @param bufnr number
-    --- @return string|nil
+    --- @type fun(element: TSNode, bufnr: number): string|nil
     adapter.get_key_from_element = config.get_key_from_element
 
     --- Collect leading comments for a node
@@ -249,7 +247,7 @@ function M.create(config)
     --- Format sorted elements back into text
     --- @param elements ElementInfo[]
     --- @param container ContainerInfo
-    --- @param bufnr number
+    --- @param _bufnr number
     --- @param had_trailing_separator boolean Whether the original last element had a trailing separator
     --- @return string[]
     function adapter.format_output(elements, container, _bufnr, had_trailing_separator)

@@ -29,20 +29,24 @@
 --- @field is_multiline boolean
 
 --- @class AdapterInterface
+--- @field get_filetypes fun(): string[]
 --- @field get_container_types fun(): string[]
 --- @field get_element_wrapper fun(container_type: string): string|nil
 --- @field get_element_type fun(container_type: string): string|nil
 --- @field get_separator fun(container_type: string): string
+--- @field get_brackets fun(container_type: string): string|nil, string|nil
 --- @field get_key_from_element fun(element: TSNode, bufnr: number): string|nil
 --- @field is_excluded_element fun(node: TSNode): boolean
 --- @field extract_elements fun(container: TSNode, bufnr: number): ElementInfo[]
 --- @field format_output fun(elements: ElementInfo[], container: ContainerInfo, bufnr: number): string[]
 
 --- @class AdapterConfig
+--- @field filetypes? string[]
 --- @field container_types string[]
 --- @field element_wrappers? table<string, string>
 --- @field element_types table<string, string|nil>
 --- @field separators table<string, string>
+--- @field brackets? table<string, string[]>
 --- @field exclude_types? string[]
 --- @field get_key_from_element fun(element: TSNode, bufnr: number): string|nil
 
