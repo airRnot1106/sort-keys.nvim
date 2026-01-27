@@ -24,6 +24,46 @@ local function get_container_info(node)
     }
 end
 
+--- Check if a container's elements are already sorted
+--- @param container TSNode
+--- @param adapter AdapterInterface
+--- @param flags ParsedFlags
+--- @param reverse boolean
+--- @param bufnr number
+--- @return boolean is_sorted
+local function is_container_sorted(container, adapter, flags, reverse, bufnr)
+    local elements = adapter.extract_elements(container, bufnr)
+
+    if #elements <= 1 then
+        return true -- 0 or 1 element is already sorted
+    end
+
+    -- Filter out excluded elements for comparison
+    local sortable_elements = {}
+    for _, elem in ipairs(elements) do
+        if not elem.is_excluded then
+            table.insert(sortable_elements, elem)
+        end
+    end
+
+    if #sortable_elements <= 1 then
+        return true
+    end
+
+    -- Check if elements are in sorted order
+    local compare_fn = comparator.create_comparator(flags, reverse)
+    for i = 1, #sortable_elements - 1 do
+        local a = sortable_elements[i]
+        local b = sortable_elements[i + 1]
+        -- If a should come after b, then it's not sorted
+        if compare_fn(b, a) then
+            return false
+        end
+    end
+
+    return true
+end
+
 --- Sort a single container
 --- @param container TSNode
 --- @param adapter AdapterInterface
@@ -242,18 +282,52 @@ function M.sort(opts)
     -- Process each container
     for _, container in ipairs(containers) do
         if opts.deep then
-            -- Deep sort: sort nested containers first (bottom-up)
+            -- Deep sort: sort nested containers one at a time, re-parsing after each sort
+            -- This is necessary because after sorting a container, the tree-sitter nodes
+            -- for other containers become invalid (they reference old buffer positions)
             local c_start_row, _, c_end_row, _ = container:range()
-            local nested = ts_utils.find_containers_in_range(bufnr, c_start_row, c_end_row, container_types)
-            -- Sort by depth (deepest first)
-            table.sort(nested, function(a, b)
-                local a_start = a:range()
-                local b_start = b:range()
-                return a_start > b_start
-            end)
+            local max_iterations = 1000 -- Safety limit to prevent infinite loops
+            local iterations = 0
 
-            for _, nested_container in ipairs(nested) do
-                sort_container(nested_container, adapter, flags, opts.reverse or false, bufnr, range_filter)
+            while iterations < max_iterations do
+                iterations = iterations + 1
+
+                -- Re-parse to get fresh container nodes after each sort
+                local all_containers = ts_utils.find_containers_in_range(bufnr, c_start_row, c_end_row, container_types)
+
+                -- Filter to only include containers fully contained within the original range
+                -- This prevents sorting parent containers that merely overlap with the range
+                local nested = {}
+                for _, c in ipairs(all_containers) do
+                    local cs, _, ce, _ = c:range()
+                    if cs >= c_start_row and ce <= c_end_row then
+                        table.insert(nested, c)
+                    end
+                end
+
+                -- Sort by depth (deepest first - higher start row means deeper nesting)
+                table.sort(nested, function(a, b)
+                    local a_start = a:range()
+                    local b_start = b:range()
+                    return a_start > b_start
+                end)
+
+                -- Find the first unsorted container
+                local unsorted_container = nil
+                for _, nested_container in ipairs(nested) do
+                    if not is_container_sorted(nested_container, adapter, flags, opts.reverse or false, bufnr) then
+                        unsorted_container = nested_container
+                        break
+                    end
+                end
+
+                if not unsorted_container then
+                    -- All containers are sorted, we're done
+                    break
+                end
+
+                -- Sort this container
+                sort_container(unsorted_container, adapter, flags, opts.reverse or false, bufnr, range_filter)
             end
         else
             sort_container(container, adapter, flags, opts.reverse or false, bufnr, range_filter)
