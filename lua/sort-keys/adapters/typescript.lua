@@ -32,6 +32,16 @@ return base.create {
         object_pattern = ",",
     },
 
+    -- Brackets
+    brackets = {
+        object = { "{", "}" },
+        array = { "[", "]" },
+        object_type = { "{", "}" },
+        interface_body = { "{", "}" },
+        formal_parameters = { "(", ")" },
+        object_pattern = { "{", "}" },
+    },
+
     -- Excluded types (spread elements and rest patterns stay in place)
     exclude_types = { "spread_element", "rest_pattern" },
 

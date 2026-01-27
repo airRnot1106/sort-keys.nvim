@@ -30,6 +30,17 @@ function M.create(config)
         return config.separators[container_type] or ","
     end
 
+    --- Get the brackets for a container type
+    --- @param container_type string
+    --- @return string|nil open_bracket, string|nil close_bracket
+    function adapter.get_brackets(container_type)
+        if config.brackets and config.brackets[container_type] then
+            local b = config.brackets[container_type]
+            return b[1], b[2]
+        end
+        return nil, nil
+    end
+
     --- Get the element wrapper node type (intermediate node between container and elements)
     --- @param container_type string
     --- @return string|nil

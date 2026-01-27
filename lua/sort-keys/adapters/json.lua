@@ -24,6 +24,12 @@ return base.create {
         array = ",",
     },
 
+    -- Brackets
+    brackets = {
+        object = { "{", "}" },
+        array = { "[", "]" },
+    },
+
     -- No excluded types
     exclude_types = {},
 

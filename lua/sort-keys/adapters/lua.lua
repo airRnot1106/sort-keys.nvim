@@ -22,6 +22,11 @@ return base.create {
         table_constructor = ",",
     },
 
+    -- Brackets
+    brackets = {
+        table_constructor = { "{", "}" },
+    },
+
     -- No excluded types
     exclude_types = {},
 

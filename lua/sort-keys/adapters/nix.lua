@@ -28,6 +28,13 @@ return base.create {
         formals = ",",
     },
 
+    -- Brackets
+    brackets = {
+        attrset_expression = { "{", "}" },
+        list_expression = { "[", "]" },
+        formals = { "{", "}" },
+    },
+
     -- Excluded types (ellipses in function args)
     exclude_types = { "ellipses" },
 

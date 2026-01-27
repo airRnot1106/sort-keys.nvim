@@ -99,16 +99,21 @@ local function sort_container(container, adapter, flags, reverse, bufnr, range)
     -- Get the content area (inside the brackets/braces)
     local original_lines = text_utils.get_lines(bufnr, container_info.start_row, container_info.end_row)
 
-    if container_info.is_multiline then
-        -- For multi-line containers, replace the content between first and last lines
-        local first_line = original_lines[1]
-        local last_line = original_lines[#original_lines]
+    -- Check if this container type has brackets
+    local open_bracket, close_bracket = adapter.get_brackets(container_info.type)
+    local has_brackets = open_bracket ~= nil and close_bracket ~= nil
 
-        -- Use container position to find the correct bracket (0-indexed to 1-indexed)
-        local open_bracket_col = container_info.start_col + 1
-        local close_bracket_col = container_info.end_col -- end_col points to the closing bracket
+    if has_brackets then
+        -- Container with brackets (e.g., {}, [], ())
+        if container_info.is_multiline then
+            -- For multi-line containers, replace the content between first and last lines
+            local first_line = original_lines[1]
+            local last_line = original_lines[#original_lines]
 
-        if open_bracket_col and close_bracket_col then
+            -- Use container position to find the correct bracket (0-indexed to 1-indexed)
+            local open_bracket_col = container_info.start_col + 1
+            local close_bracket_col = container_info.end_col -- end_col points to the closing bracket
+
             -- Preserve the opening bracket and content before it
             local prefix = first_line:sub(1, open_bracket_col)
 
@@ -126,15 +131,13 @@ local function sort_container(container, adapter, flags, reverse, bufnr, range)
 
             -- Replace the container content
             text_utils.set_lines(bufnr, container_info.start_row, container_info.end_row, new_lines)
-        end
-    else
-        -- For single-line containers, reconstruct the whole line
-        local line = original_lines[1]
-        -- Use container position to find the correct bracket (0-indexed to 1-indexed)
-        local open_bracket_col = container_info.start_col + 1
-        local close_bracket_col = container_info.end_col
+        else
+            -- For single-line containers, reconstruct the whole line
+            local line = original_lines[1]
+            -- Use container position to find the correct bracket (0-indexed to 1-indexed)
+            local open_bracket_col = container_info.start_col + 1
+            local close_bracket_col = container_info.end_col
 
-        if open_bracket_col and close_bracket_col then
             local prefix = line:sub(1, open_bracket_col)
             local suffix = line:sub(close_bracket_col)
 
@@ -144,6 +147,10 @@ local function sort_container(container, adapter, flags, reverse, bufnr, range)
 
             text_utils.set_lines(bufnr, container_info.start_row, container_info.start_row, { new_line })
         end
+    else
+        -- Container without brackets (e.g., YAML block_mapping, block_sequence)
+        -- Replace the entire container range with the output
+        text_utils.set_lines(bufnr, container_info.start_row, container_info.end_row, output_lines)
     end
 
     return true
