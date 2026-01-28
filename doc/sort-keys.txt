@@ -287,6 +287,10 @@ base.create({config})
             Mapping of container type to separator character.
             Example: `{ object = ",", array = "," }`
 
+        {brackets}            (table<string, string[]>)  Optional
+            Mapping of container type to bracket characters.
+            Example: `{ object = { "{", "}" }, array = { "[", "]" } }`
+
         {exclude_types}       (string[])  Optional
             Node types that should not be sorted (kept in place).
             Example: `{ "spread_element" }`
@@ -313,6 +317,10 @@ base.create({config})
             separators = {
                 object = ",",
                 array = ",",
+            },
+            brackets = {
+                object = { "{", "}" },
+                array = { "[", "]" },
             },
             exclude_types = { "spread_element" },
             get_key_from_element = function(element, bufnr)
@@ -341,6 +349,7 @@ Adapter Interface ~
         get_filetypes()                           Get handled filetypes
         get_container_types()                     Get sortable container types
         get_separator(container_type)             Get separator for container
+        get_brackets(container_type)              Get bracket characters
         get_element_wrapper(container_type)       Get wrapper node type
         get_element_type(container_type)          Get element node type
         is_excluded_element(node)                 Check if element is excluded
@@ -363,11 +372,19 @@ The following languages are supported out of the box:
     Nix                 nix                          attrset_expression,
                                                      list_expression,
                                                      formals
+    YAML                yaml                         flow_mapping,
+                                                     block_mapping,
+                                                     flow_sequence,
+                                                     block_sequence
+    TOML                toml                         table,
+                                                     table_array_element,
+                                                     inline_table, array
 
 Special Handling: ~
 
 - JavaScript/TypeScript: Spread elements (`...obj`) are preserved in place
 - Nix: Function parameter ellipsis (`...`) is preserved in place
+- TOML: Table headers (`[section]`, `[[array]]`) are preserved
 - Comments: Comments immediately preceding an element are kept with that
   element when sorting
 

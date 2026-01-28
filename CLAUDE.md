@@ -50,8 +50,10 @@ lua/sort-keys/utils/
 Each language adapter is created via `base.create(config)` with:
 - `filetypes`: Handled filetypes (e.g., `{"json", "jsonc", "json5"}`)
 - `container_types`: AST node types to sort (e.g., `{"object", "array"}`)
+- `element_wrappers`: Intermediate nodes between container and elements (e.g., Nix's `binding_set`)
 - `element_types`: Child element types per container
 - `separators`: Separator characters per container type
+- `brackets`: Opening/closing bracket characters per container type (e.g., `{ "{", "}" }`)
 - `exclude_types`: Elements to keep in place (e.g., spread operators)
 - `get_key_from_element`: Language-specific key extraction function
 

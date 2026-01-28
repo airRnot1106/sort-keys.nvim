@@ -145,6 +145,10 @@ local my_adapter = base.create({
         object = ",",
         array = ",",
     },
+    brackets = {
+        object = { "{", "}" },
+        array = { "[", "]" },
+    },
     exclude_types = { "spread_element" },  -- Elements to keep in place
     get_key_from_element = function(element, bufnr)
         local key_node = element:field("key")[1]
@@ -171,6 +175,7 @@ require("sort-keys").setup({
 | `element_wrappers` | `table<string, string>` | Container type → wrapper node type mapping |
 | `element_types` | `table<string, string\|nil>` | Container type → element node type mapping |
 | `separators` | `table<string, string>` | Container type → separator character mapping |
+| `brackets` | `table<string, string[]>` | Container type → bracket characters (e.g., `{ "{", "}" }`) |
 | `exclude_types` | `string[]` | Node types to exclude from sorting |
 | `get_key_from_element` | `function(node, bufnr): string\|nil` | Extract sort key from element |
 
