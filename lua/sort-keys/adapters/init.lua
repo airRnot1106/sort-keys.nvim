@@ -5,7 +5,7 @@ local M = {}
 local registered_adapters = {}
 
 --- List of known adapter module names to try
-local known_adapters = { "json", "lua", "javascript", "typescript", "nix", "yaml" }
+local known_adapters = { "json", "lua", "javascript", "typescript", "nix", "yaml", "toml" }
 
 --- Register an adapter for a language (overrides existing adapters)
 --- @param lang string Language name

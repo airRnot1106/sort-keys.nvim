@@ -35,6 +35,7 @@ function Helpers.run_sort(child, content, filetype, command)
         lua = "lua",
         nix = "nix",
         yaml = "yaml",
+        toml = "toml",
     }
 
     local lang = filetype_to_lang[filetype] or filetype

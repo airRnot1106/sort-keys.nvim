@@ -12,15 +12,24 @@ local M = {}
 --- @return ContainerInfo
 local function get_container_info(node)
     local start_row, start_col, end_row, end_col = node:range()
+
+    -- Tree-sitter uses exclusive end position
+    -- If end_col is 0, the node ends at the beginning of end_row (doesn't include end_row)
+    -- Convert to inclusive end_row for our text utilities
+    local inclusive_end_row = end_row
+    if end_col == 0 and end_row > start_row then
+        inclusive_end_row = end_row - 1
+    end
+
     --- @type ContainerInfo
     return {
         node = node,
         type = node:type(),
         start_row = start_row,
-        end_row = end_row,
+        end_row = inclusive_end_row,
         start_col = start_col,
         end_col = end_col,
-        is_multiline = start_row ~= end_row,
+        is_multiline = start_row ~= inclusive_end_row,
     }
 end
 
