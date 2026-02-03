@@ -138,4 +138,35 @@ T["nix"]["SortKeys with numeric flag"] = function()
     eq(result, expected)
 end
 
+-- Dotted key sorting (e.g., inputs.foo.bar)
+T["nix"]["SortKeys sorts dotted keys correctly"] = function()
+    local input = [[{
+  inputs.flake-parts.follows = "flake-parts";
+  inputs.git-hooks.follows = "git-hooks";
+  inputs.nixpkgs.follows = "nixpkgs";
+}]]
+    local expected = [[{
+  inputs.flake-parts.follows = "flake-parts";
+  inputs.git-hooks.follows = "git-hooks";
+  inputs.nixpkgs.follows = "nixpkgs";
+}]]
+    local result = helpers.run_sort(child, input, "nix", "SortKeys")
+    eq(result, expected)
+end
+
+T["nix"]["SortKeys! sorts dotted keys in reverse"] = function()
+    local input = [[{
+  inputs.flake-parts.follows = "flake-parts";
+  inputs.git-hooks.follows = "git-hooks";
+  inputs.nixpkgs.follows = "nixpkgs";
+}]]
+    local expected = [[{
+  inputs.nixpkgs.follows = "nixpkgs";
+  inputs.git-hooks.follows = "git-hooks";
+  inputs.flake-parts.follows = "flake-parts";
+}]]
+    local result = helpers.run_sort(child, input, "nix", "SortKeys!")
+    eq(result, expected)
+end
+
 return T

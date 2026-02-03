@@ -46,15 +46,7 @@ return base.create {
             -- { name = value; }
             local attrpath = element:field("attrpath")[1]
             if attrpath then
-                -- attrpath can be nested like a.b.c
-                -- Get the first identifier
-                for child in attrpath:iter_children() do
-                    if child:type() == "identifier" or child:type() == "string_expression" then
-                        local text = ts_utils.get_node_text(child, bufnr)
-                        -- Remove quotes if present
-                        return text:gsub('^"', ""):gsub('"$', "")
-                    end
-                end
+                -- Use full attrpath as key (e.g., "inputs.flake-parts.follows")
                 return ts_utils.get_node_text(attrpath, bufnr)
             end
         elseif elem_type == "formal" then
