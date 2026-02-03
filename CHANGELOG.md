@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.2.3] - 2026-02-03
+### :sparkles: New Features
+- [`5d62e6b`](https://github.com/airRnot1106/sort-keys.nvim/commit/5d62e6baa493859ad56b4cfb7894a4cb70f2a2f4) - **toml**: add TOML adapter support *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :bug: Bug Fixes
+- [`6e2db8e`](https://github.com/airRnot1106/sort-keys.nvim/commit/6e2db8e3fb6adca3b0d0cc463b89a04cfce18fd0) - **nix**: use full attrpath for sorting dotted keys *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+### :wrench: Chores
+- [`beb4ec2`](https://github.com/airRnot1106/sort-keys.nvim/commit/beb4ec22fcc36794c4311ee5949784aa5607b66f) - release v0.2.3 *(commit by [@airRnot1106](https://github.com/airRnot1106))*
+
+
 ## [v0.2.2] - 2026-01-27
 ### :sparkles: New Features
 - [`96af609`](https://github.com/airRnot1106/sort-keys.nvim/commit/96af609648845f58109e674bc4bd025c6159513b) - **adapters**: add brackets configuration for container types *(commit by [@airRnot1106](https://github.com/airRnot1106))*
@@ -103,3 +114,4 @@ Initial release of sort-keys.nvim.
 [v0.2.0]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.1.0...v0.2.0
 [v0.2.1]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.0...v0.2.1
 [v0.2.2]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.1...v0.2.2
+[v0.2.3]: https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.2...v0.2.3
