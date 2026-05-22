@@ -18,3 +18,8 @@ tmp/
 # Local Neovim caches
 .luac
 *.luac
+
+# Nix
+result
+result-*
+.direnv/
