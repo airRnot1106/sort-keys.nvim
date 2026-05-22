@@ -1,0 +1,20 @@
+# Editor swap/backup
+*.swp
+*.swo
+*~
+
+# Generated help tags
+doc/tags
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Test scratch / plenary clone
+tmp/
+/tests/.deps/
+/tests/plenary.nvim/
+
+# Local Neovim caches
+.luac
+*.luac

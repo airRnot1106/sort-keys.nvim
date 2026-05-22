@@ -1,0 +1,55 @@
+*sort-keys.txt*  Sort keys in the current buffer or range.
+
+Author:  airRnot
+License: MIT
+
+==============================================================================
+CONTENTS                                                  *sort-keys-contents*
+
+  1. Introduction ............................. |sort-keys-introduction|
+  2. Setup .................................... |sort-keys-setup|
+  3. Configuration ............................ |sort-keys-configuration|
+  4. Commands ................................. |sort-keys-commands|
+  5. Health ................................... |sort-keys-health|
+
+==============================================================================
+1. INTRODUCTION                                       *sort-keys-introduction*
+
+sort-keys.nvim is a Neovim plugin that sorts keys in structured data
+(JSON objects, Lua tables, etc.) within the current buffer or a given range.
+
+==============================================================================
+2. SETUP                                                     *sort-keys-setup*
+
+Call |sort-keys.setup()| once during your Neovim initialization. The function
+accepts a table of options, which is merged on top of the defaults.
+
+>lua
+    require("sort-keys").setup({})
+<
+
+==============================================================================
+3. CONFIGURATION                                     *sort-keys-configuration*
+
+Default options:
+
+>lua
+    {
+      -- options will be added as features land.
+    }
+<
+
+==============================================================================
+4. COMMANDS                                               *sort-keys-commands*
+
+                                                                    *:SortKeys*
+:[range]SortKeys        Sort keys within the current buffer or the given
+                        |[range]|.
+
+==============================================================================
+5. HEALTH                                                   *sort-keys-health*
+
+Run `:checkhealth sort-keys` to verify the plugin is loaded correctly.
+
+==============================================================================
+vim:tw=78:ts=8:noet:ft=help:norl:
