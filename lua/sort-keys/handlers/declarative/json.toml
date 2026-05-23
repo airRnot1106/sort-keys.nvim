@@ -6,13 +6,15 @@ can_deep = true
 key_quoting = "logical"
 
 comment_aware = false
-comment_strategy = "none"
-
-# ", " is the conventional JSON separator and what every e2e fixture uses;
-# emitting the same string keeps formatter-style diffs minimal.
-default_separator_object = ", "
-default_separator_array = ", "
 
 mixed_key_types = false
+
+# Inter-entry separator as a literal character; languages like Lua / Nix
+# that use `;` declare their own here.
+structural_separator = ","
+
+# Strict JSON forbids a trailing comma on the last entry; the applier strips
+# one if the source happens to have it after a reorder.
+trailing_separator_allowed = false
 
 query_file = "sort-keys.scm"

@@ -106,4 +106,151 @@ describe("sort-keys.core.applier", function()
     applier.apply(bufnr, outline)
     assert.equals('[ "a", "b", "c" ]', get_lines(bufnr)[1])
   end)
+
+  describe("delegation to separator_normalize", function()
+    -- These cases pin that the applier honors outline.structural_separator
+    -- and outline.trailing_separator_allowed without re-deriving them from
+    -- anything language-specific. Buffers are crafted to deliberately put a
+    -- gap into a state separator_normalize must repair.
+
+    it("inserts the structural separator when the gap is missing it", function()
+      -- Buffer:        [ "a" "b" ]   (no comma in the gap)
+      --                0123456789012
+      local bufnr = make_buf({ '[ "a" "b" ]' })
+
+      local outline = {
+        kind = "array",
+        range = { 0, 0, 0, 11 },
+        separator = ", ",
+        structural_separator = ",",
+        trailing_separator_allowed = true,
+        entries = {
+          {
+            kind = "element",
+            sort_key = "a",
+            range = { 0, 2, 0, 5 },
+            movable = true,
+            anchor = 1,
+            attached = {},
+          },
+          {
+            kind = "element",
+            sort_key = "b",
+            range = { 0, 6, 0, 9 },
+            movable = true,
+            anchor = 2,
+            attached = {},
+          },
+        },
+      }
+
+      applier.apply(bufnr, outline)
+      assert.equals('[ "a", "b" ]', get_lines(bufnr)[1])
+    end)
+
+    it("strips a trailing separator from the last piece when forbidden", function()
+      -- Buffer:        [ "a", "b", ]   (trailing comma included in last piece)
+      --                0123456789012345
+      local bufnr = make_buf({ '[ "a", "b", ]' })
+
+      local outline = {
+        kind = "array",
+        range = { 0, 0, 0, 13 },
+        separator = ", ",
+        structural_separator = ",",
+        trailing_separator_allowed = false,
+        entries = {
+          {
+            kind = "element",
+            sort_key = "a",
+            range = { 0, 2, 0, 5 },
+            movable = true,
+            anchor = 1,
+            attached = {},
+          },
+          {
+            kind = "element",
+            sort_key = "b",
+            -- Include the trailing comma at col 10 inside this piece so the
+            -- "strip last separator" path is exercised.
+            range = { 0, 7, 0, 11 },
+            movable = true,
+            anchor = 2,
+            attached = {},
+          },
+        },
+      }
+
+      applier.apply(bufnr, outline)
+      assert.equals('[ "a", "b" ]', get_lines(bufnr)[1])
+    end)
+
+    it("keeps a trailing separator on the last piece when the language allows it", function()
+      -- Same buffer / outline as the strip case but trailing_separator_allowed = true.
+      local bufnr = make_buf({ '[ "a", "b", ]' })
+
+      local outline = {
+        kind = "array",
+        range = { 0, 0, 0, 13 },
+        separator = ", ",
+        structural_separator = ",",
+        trailing_separator_allowed = true,
+        entries = {
+          {
+            kind = "element",
+            sort_key = "a",
+            range = { 0, 2, 0, 5 },
+            movable = true,
+            anchor = 1,
+            attached = {},
+          },
+          {
+            kind = "element",
+            sort_key = "b",
+            range = { 0, 7, 0, 11 },
+            movable = true,
+            anchor = 2,
+            attached = {},
+          },
+        },
+      }
+
+      applier.apply(bufnr, outline)
+      assert.equals('[ "a", "b", ]', get_lines(bufnr)[1])
+    end)
+
+    it("is a no-op when structural_separator is absent (backward compat)", function()
+      -- Same buffer, no structural_separator declared: the applier must not
+      -- invoke any normalization and the result should match the original
+      -- pieces/gaps preservation behavior.
+      local bufnr = make_buf({ '[ "a" "b" ]' })
+
+      local outline = {
+        kind = "array",
+        range = { 0, 0, 0, 11 },
+        separator = ", ",
+        entries = {
+          {
+            kind = "element",
+            sort_key = "a",
+            range = { 0, 2, 0, 5 },
+            movable = true,
+            anchor = 1,
+            attached = {},
+          },
+          {
+            kind = "element",
+            sort_key = "b",
+            range = { 0, 6, 0, 9 },
+            movable = true,
+            anchor = 2,
+            attached = {},
+          },
+        },
+      }
+
+      applier.apply(bufnr, outline)
+      assert.equals('[ "a" "b" ]', get_lines(bufnr)[1])
+    end)
+  end)
 end)

@@ -45,37 +45,37 @@ describe("sort-keys.handlers.declarative.json_builder", function()
     can_deep = true,
     key_quoting = "logical",
     comment_aware = false,
-    comment_strategy = "none",
-    default_separator_object = ",",
-    default_separator_array = ",",
     mixed_key_types = false,
     query_file = "sort-keys.scm",
   }
 
   describe("build — cursor target on a JSON object", function()
-    it("returns an Outline whose kind is 'object' with entry sort_keys matching the source", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = make_buf({ '{ "c": 3, "a": 1, "b": 2 }' }, "json")
-      local target = { kind = "cursor", pos = { 0, 4 } }
-      local outline = builder.build(bufnr, target, {
-        filetype = "json",
-        query_text = json_query,
-        toml = json_toml,
-      })
-      assert.is_not_nil(outline)
-      assert.equals("object", outline.kind)
+    it(
+      "returns an Outline whose kind is 'object' with entry sort_keys matching the source",
+      function()
+        if not has_json then
+          pending("JSON treesitter parser not available")
+          return
+        end
+        local bufnr = make_buf({ '{ "c": 3, "a": 1, "b": 2 }' }, "json")
+        local target = { kind = "cursor", pos = { 0, 4 } }
+        local outline = builder.build(bufnr, target, {
+          filetype = "json",
+          query_text = json_query,
+          toml = json_toml,
+        })
+        assert.is_not_nil(outline)
+        assert.equals("object", outline.kind)
 
-      local got = {}
-      for _, e in ipairs(outline.entries) do
-        got[e.sort_key] = true
+        local got = {}
+        for _, e in ipairs(outline.entries) do
+          got[e.sort_key] = true
+        end
+        assert.is_true(got["a"])
+        assert.is_true(got["b"])
+        assert.is_true(got["c"])
       end
-      assert.is_true(got["a"])
-      assert.is_true(got["b"])
-      assert.is_true(got["c"])
-    end)
+    )
 
     it("marks every entry movable=true under a cursor target", function()
       if not has_json then
@@ -163,6 +163,66 @@ describe("sort-keys.handlers.declarative.json_builder", function()
         toml = clashing_toml,
       })
       assert.is_nil(outline)
+    end)
+  end)
+
+  describe("delegation to comment_attach", function()
+    -- The detail layer's job is to feed entries + (comment) nodes to the
+    -- pure policy module. We pin the wiring by inspecting the observable
+    -- consequence: when comment_aware is true, an entry's range should
+    -- expand to swallow its leading comment; when false, the range must
+    -- stay anchored at the pair node.
+
+    local jsonc_query = json_query .. "\n((comment) @sortkeys.comment)\n"
+
+    local function make_jsonc_buf()
+      return make_buf({
+        "{",
+        "  // leading for a",
+        '  "a": 1',
+        "}",
+      }, "json")
+    end
+
+    it(
+      "expands an entry's range to swallow a leading comment when comment_aware is true",
+      function()
+        if not has_json then
+          pending("JSON treesitter parser not available")
+          return
+        end
+        local aware_toml = vim.tbl_deep_extend("force", {}, json_toml, { comment_aware = true })
+        local outline = builder.build(make_jsonc_buf(), { kind = "cursor", pos = { 0, 0 } }, {
+          filetype = "json",
+          query_text = jsonc_query,
+          toml = aware_toml,
+        })
+        assert.is_not_nil(outline)
+        assert.equals(1, #outline.entries)
+        -- Comment "// leading for a" starts at (row 1, col 2); after attach
+        -- the entry's range must start there, not at the pair on row 2.
+        assert.equals(1, outline.entries[1].range[1])
+        assert.equals(2, outline.entries[1].range[2])
+      end
+    )
+
+    it("leaves entry ranges untouched when comment_aware is false", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      -- json_toml.comment_aware is false (the JSON default).
+      local outline = builder.build(make_jsonc_buf(), { kind = "cursor", pos = { 0, 0 } }, {
+        filetype = "json",
+        query_text = jsonc_query,
+        toml = json_toml,
+      })
+      assert.is_not_nil(outline)
+      assert.equals(1, #outline.entries)
+      -- Pair node "a" begins at (row 2, col 2); the range must NOT have
+      -- absorbed the leading comment on row 1.
+      assert.equals(2, outline.entries[1].range[1])
+      assert.equals(2, outline.entries[1].range[2])
     end)
   end)
 end)

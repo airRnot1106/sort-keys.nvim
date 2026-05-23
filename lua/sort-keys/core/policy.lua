@@ -150,7 +150,8 @@ local function shallow_copy_outline(o, entries)
   return {
     kind = o.kind,
     range = o.range,
-    separator = o.separator,
+    structural_separator = o.structural_separator,
+    trailing_separator_allowed = o.trailing_separator_allowed,
     entries = entries,
   }
 end

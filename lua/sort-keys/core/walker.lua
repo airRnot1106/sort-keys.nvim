@@ -29,7 +29,8 @@ local function recurse_children(outline, opts)
   return {
     kind = outline.kind,
     range = outline.range,
-    separator = outline.separator,
+    structural_separator = outline.structural_separator,
+    trailing_separator_allowed = outline.trailing_separator_allowed,
     entries = new_entries,
   }
 end

@@ -1,4 +1,5 @@
 local key_normalize = require("sort-keys.strategies.key_normalize")
+local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
 
@@ -7,6 +8,7 @@ local CAPTURE = {
   entry = "sortkeys.entry",
   key = "sortkeys.key",
   value = "sortkeys.value",
+  comment = "sortkeys.comment",
 }
 
 local META = {
@@ -88,6 +90,7 @@ local function collect_matches(bufnr, root, query)
 
   local containers = {}
   local entries = {}
+  local comments = {}
 
   local function first_node(match, capture_name)
     local id = cap_id[capture_name]
@@ -128,19 +131,27 @@ local function collect_matches(bufnr, root, query)
         }
       end
     end
+
+    local comment_node = first_node(match, CAPTURE.comment)
+    if comment_node then
+      comments[#comments + 1] = {
+        node = comment_node,
+        range = node_range(comment_node),
+      }
+    end
   end
 
-  return containers, entries
+  return containers, entries, comments
 end
 
-local function index_entries_by_parent(entries)
+local function index_by_parent(items)
   local by_parent = {}
-  for _, e in ipairs(entries) do
-    local parent = e.node:parent()
+  for _, item in ipairs(items) do
+    local parent = item.node:parent()
     if parent then
       local pk = node_id_key(parent)
       by_parent[pk] = by_parent[pk] or {}
-      by_parent[pk][#by_parent[pk] + 1] = e
+      by_parent[pk][#by_parent[pk] + 1] = item
     end
   end
   return by_parent
@@ -160,13 +171,6 @@ local function capability_allows(kind, toml)
     return toml.can_sort_array == true
   end
   return false
-end
-
-local function separator_for(kind, toml)
-  if kind == "object" then
-    return toml.default_separator_object
-  end
-  return toml.default_separator_array
 end
 
 -- ─── outline construction ──────────────────────────────────────────────
@@ -224,10 +228,16 @@ local function build_outline(container, ctx)
     outline_entries[#outline_entries + 1] = entry
   end
 
+  if ctx.toml.comment_aware then
+    local container_comments = ctx.comments_by_parent[container.node_key] or {}
+    outline_entries = comment_attach.attach(outline_entries, container_comments)
+  end
+
   return {
     kind = container.kind,
     range = container.range,
-    separator = separator_for(container.kind, ctx.toml),
+    structural_separator = ctx.toml.structural_separator,
+    trailing_separator_allowed = ctx.toml.trailing_separator_allowed == true,
     entries = outline_entries,
   }
 end
@@ -240,8 +250,6 @@ local function validate_toml(toml)
     "can_sort_array",
     "can_deep",
     "key_quoting",
-    "default_separator_object",
-    "default_separator_array",
   }
   for _, k in ipairs(required) do
     if toml[k] == nil then
@@ -264,16 +272,21 @@ function M.build(bufnr, target, config)
   -- bug, so we surface it via the same `nil Outline → notify` path the rest
   -- of the build uses. Query syntax errors below are plugin/user bugs and
   -- are intentionally allowed to propagate.
-  local parser_ok, parser = pcall(vim.treesitter.get_parser, bufnr, config.filetype)
+  --
+  -- `toml.parser_lang` lets a filetype reuse another language's parser when
+  -- its own grammar is a superset (e.g. jsonc reuses the json parser, which
+  -- accepts JSON-with-comments as a `(comment)` node).
+  local lang = config.toml.parser_lang or config.filetype
+  local parser_ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
   if not parser_ok or parser == nil then
     return nil
   end
   local tree = parser:parse()[1]
   local root = tree:root()
 
-  local query = vim.treesitter.query.parse(config.filetype, config.query_text)
+  local query = vim.treesitter.query.parse(lang, config.query_text)
 
-  local containers, entries = collect_matches(bufnr, root, query)
+  local containers, entries, comments = collect_matches(bufnr, root, query)
   if #containers == 0 then
     return nil
   end
@@ -292,7 +305,8 @@ function M.build(bufnr, target, config)
     bufnr = bufnr,
     toml = config.toml,
     containers_by_key = containers_by_key,
-    entries_by_parent = index_entries_by_parent(entries),
+    entries_by_parent = index_by_parent(entries),
+    comments_by_parent = index_by_parent(comments),
   }
 
   return build_outline(chosen, ctx)

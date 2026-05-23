@@ -1,3 +1,5 @@
+local separator_normalize = require("sort-keys.core.separator_normalize")
+
 local M = {}
 
 ---@param bufnr integer
@@ -52,6 +54,17 @@ local function render_outline(bufnr, outline)
   local pieces = {}
   for _, e in ipairs(outline.entries) do
     pieces[#pieces + 1] = render_entry(bufnr, e, render_outline)
+  end
+
+  -- `structural_separator` is declared verbatim by each language's .toml so
+  -- the applier never has to know which character a language uses. If the
+  -- field is absent or empty the language has no inter-entry separator
+  -- (e.g., newline-based formats) and normalization is skipped.
+  if outline.structural_separator and #outline.structural_separator > 0 then
+    pieces, gaps = separator_normalize.normalize(pieces, gaps, {
+      separator = outline.structural_separator,
+      trailing_separator_allowed = outline.trailing_separator_allowed == true,
+    })
   end
 
   local result = prefix .. pieces[1]

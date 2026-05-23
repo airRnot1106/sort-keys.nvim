@@ -23,7 +23,7 @@ describe("sort-keys.core.toml_loader", function()
   end)
 
   describe("parse(text)", function()
-    it("reads a `key = \"value\"` string pair", function()
+    it('reads a `key = "value"` string pair', function()
       local t = loader.parse('description = "JSON declarative handler"\n')
       assert.equals("JSON declarative handler", t.description)
     end)
@@ -47,9 +47,10 @@ describe("sort-keys.core.toml_loader", function()
     end)
 
     it("preserves the contents of a string value verbatim (no escape collapse)", function()
-      -- Schema covers JSON's separators which include `, ` / `,` literally.
-      local t = loader.parse('default_separator_object = ", "\n')
-      assert.equals(", ", t.default_separator_object)
+      -- Whitespace and punctuation in string values must round-trip; this is
+      -- how `structural_separator = ", "` style declarations stay intact.
+      local t = loader.parse('structural_separator = ", "\n')
+      assert.equals(", ", t.structural_separator)
     end)
 
     it("errors on malformed input (no `=`)", function()
