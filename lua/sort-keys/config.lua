@@ -1,6 +1,9 @@
 local M = {}
 
-M.defaults = {}
+M.defaults = {
+  normalize_keys = true,
+  comparator = nil,
+}
 
 M.options = vim.deepcopy(M.defaults)
 
