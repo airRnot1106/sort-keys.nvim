@@ -52,4 +52,51 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("", key_normalize.json('""'))
     end)
   end)
+
+  describe("yaml(text)", function()
+    it("returns a bare scalar unchanged", function()
+      assert.equals("foo", key_normalize.yaml("foo"))
+    end)
+
+    it("trims surrounding whitespace from a bare scalar", function()
+      -- The treesitter node text for a YAML bare key sometimes carries a
+      -- leading space when the node range starts after the indent; the
+      -- normalizer should produce a canonical key regardless.
+      assert.equals("foo", key_normalize.yaml("  foo  "))
+    end)
+
+    it("strips single quotes around a quoted bare scalar", function()
+      assert.equals("foo", key_normalize.yaml("'foo'"))
+    end)
+
+    it("unescapes `''` inside a single-quoted key to a literal `'`", function()
+      -- YAML's only escape inside single quotes: double the quote.
+      assert.equals("a'b", key_normalize.yaml("'a''b'"))
+    end)
+
+    it("strips double quotes around a double-quoted scalar", function()
+      assert.equals("foo", key_normalize.yaml('"foo"'))
+    end)
+
+    it('unescapes JSON-style `\\"` inside a double-quoted key', function()
+      assert.equals('a"b', key_normalize.yaml([["a\"b"]]))
+    end)
+
+    it("unescapes `\\n` inside a double-quoted key to a literal LF byte", function()
+      assert.equals("a\nb", key_normalize.yaml([["a\nb"]]))
+    end)
+
+    it("decodes a `\\u00E9` escape inside a double-quoted key to UTF-8", function()
+      assert.equals("\xC3\xA9", key_normalize.yaml('"\\u00E9"'))
+    end)
+
+    it("decodes a surrogate pair inside a double-quoted key", function()
+      assert.equals("\xF0\x9F\x98\x80", key_normalize.yaml('"\\uD83D\\uDE00"'))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.yaml('""'))
+      assert.equals("", key_normalize.yaml("''"))
+    end)
+  end)
 end)

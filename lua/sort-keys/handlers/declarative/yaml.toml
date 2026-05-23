@@ -1,0 +1,17 @@
+description = "YAML declarative handler"
+
+can_sort_object = true
+can_sort_array = true
+can_deep = true
+key_quoting = "logical"
+
+comment_aware = true
+
+mixed_key_types = false
+
+# YAML's block and flow styles want different inter-entry separators, so the
+# builder sets `structural_separator` / `trailing_separator_allowed` per
+# container by inspecting the underlying treesitter node type rather than
+# declaring them once here.
+
+query_file = "sort-keys.scm"

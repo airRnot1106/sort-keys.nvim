@@ -1,11 +1,14 @@
 local toml_loader = require("sort-keys.core.toml_loader")
 local json_builder = require("sort-keys.handlers.declarative.json_builder")
+local yaml_builder = require("sort-keys.handlers.declarative.yaml_builder")
 
 local M = {}
 
 local DECLARATIVE_BUILDERS = {
   json = json_builder,
   jsonc = json_builder,
+  yaml = yaml_builder,
+  yml = yaml_builder,
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/handlers/declarative/%s.toml"

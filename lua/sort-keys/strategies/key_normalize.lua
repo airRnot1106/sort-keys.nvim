@@ -106,4 +106,23 @@ function M.json(text)
   return unescape_json(strip_double_quotes(text))
 end
 
+local function unescape_single_quoted(body)
+  -- The only escape inside YAML single-quoted scalars is `''` for a literal
+  -- `'`. Everything else is taken verbatim, so a simple gsub suffices.
+  return (body:gsub("''", "'"))
+end
+
+---@param text string  -- raw node text; bare, single-quoted, or double-quoted YAML scalar
+---@return string
+function M.yaml(text)
+  local trimmed = text:match("^%s*(.-)%s*$") or text
+  if #trimmed >= 2 and trimmed:sub(1, 1) == '"' and trimmed:sub(-1) == '"' then
+    return unescape_json(trimmed:sub(2, -2))
+  end
+  if #trimmed >= 2 and trimmed:sub(1, 1) == "'" and trimmed:sub(-1) == "'" then
+    return unescape_single_quoted(trimmed:sub(2, -2))
+  end
+  return trimmed
+end
+
 return M
