@@ -3,10 +3,9 @@ local json_builder = require("sort-keys.handlers.declarative.json_builder")
 
 local M = {}
 
--- JSON is the only handler in scope; other filetypes must implement and
--- register their own builder before being added to this table.
 local DECLARATIVE_BUILDERS = {
   json = json_builder,
+  jsonc = json_builder,
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/handlers/declarative/%s.toml"
