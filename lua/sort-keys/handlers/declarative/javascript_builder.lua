@@ -1,3 +1,11 @@
+-- JavaScript declarative builder.
+--
+-- JS objects mix several entry kinds (regular pairs, shorthand identifiers,
+-- spreads, methods, computed-key pairs); some are sortable, some must stay
+-- in place. The query captures every direct child of `object` as an entry
+-- and this module decides each entry's `sort_key` + `movable` according to
+-- its AST shape.
+
 local key_normalize = require("sort-keys.strategies.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 local container_pick = require("sort-keys.core.container_pick")
@@ -7,8 +15,6 @@ local M = {}
 local CAPTURE = {
   container = "sortkeys.container",
   entry = "sortkeys.entry",
-  key = "sortkeys.key",
-  value = "sortkeys.value",
   comment = "sortkeys.comment",
 }
 
@@ -16,6 +22,8 @@ local META = {
   kind = "sortkeys.kind",
   entry_kind = "sortkeys.entry_kind",
 }
+
+-- ─── range / node helpers (duplicated from json_builder / yaml_builder) ──
 
 local function node_range(node)
   local sr, sc, er, ec = node:range()
@@ -26,8 +34,6 @@ local function node_id_key(node)
   local sr, sc, er, ec = node:range()
   return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
 end
-
--- ─── range geometry ────────────────────────────────────────────────────
 
 local function pos_inside(range, row, col)
   local sr, sc, er, ec = range[1], range[2], range[3], range[4]
@@ -48,7 +54,6 @@ local function contains_range(outer, inner)
 end
 
 local function range_area(r)
-  -- Lexicographic "size" suitable for picking innermost.
   return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
 end
 
@@ -71,14 +76,12 @@ local function pick_innermost(containers, target)
   return candidates[1]
 end
 
--- ─── element sort_key normalization ──────────────────────────────────────
-
 local function normalize_element_text(text)
   local trimmed = text:gsub("^%s+", ""):gsub("%s+$", "")
   return (trimmed:gsub("%s+", " "))
 end
 
--- ─── query traversal ───────────────────────────────────────────────────
+-- ─── query traversal ──────────────────────────────────────────────────────────
 
 local function collect_matches(bufnr, root, query)
   local cap_id = {}
@@ -124,8 +127,6 @@ local function collect_matches(bufnr, root, query)
           node = entry_node,
           range = node_range(entry_node),
           entry_kind = entry_kind,
-          key_node = first_node(match, CAPTURE.key),
-          value_node = first_node(match, CAPTURE.value),
         }
       end
     end
@@ -159,7 +160,61 @@ local function find_container_for_node(containers_by_key, node)
   return containers_by_key[node_id_key(node)]
 end
 
--- ─── capability validation ─────────────────────────────────────────────
+-- ─── JS-specific entry classification ─────────────────────────────────────────
+
+-- Sort decisions per entry shape:
+--   pair                          → key from named_child(0); movable depends on key node type
+--   shorthand_property_identifier → identifier text as sort_key; movable
+--   method_definition             → method's property_identifier as sort_key; movable
+--   spread_element                → movable=false (spread order is semantically significant)
+-- A pair whose key is a computed_property_name is also pinned (the key is a
+-- runtime expression; reordering it past sibling pairs may change semantics).
+local function classify_entry(entry_node, bufnr)
+  local t = entry_node:type()
+
+  if t == "shorthand_property_identifier" then
+    return { sort_key = vim.treesitter.get_node_text(entry_node, bufnr), movable = true }
+  end
+
+  if t == "spread_element" then
+    return { sort_key = "", movable = false }
+  end
+
+  if t == "method_definition" then
+    for child in entry_node:iter_children() do
+      if child:type() == "property_identifier" then
+        return { sort_key = vim.treesitter.get_node_text(child, bufnr), movable = true }
+      end
+    end
+    return { sort_key = "", movable = false }
+  end
+
+  if t == "pair" then
+    local key_node = entry_node:named_child(0)
+    if not key_node then
+      return { sort_key = "", movable = false }
+    end
+    local key_type = key_node:type()
+    if key_type == "computed_property_name" then
+      return { sort_key = "", movable = false }
+    end
+    if key_type == "property_identifier" or key_type == "number" then
+      return { sort_key = vim.treesitter.get_node_text(key_node, bufnr), movable = true }
+    end
+    if key_type == "string" then
+      return {
+        sort_key = key_normalize.js(vim.treesitter.get_node_text(key_node, bufnr)),
+        movable = true,
+      }
+    end
+    -- template_string or any other key node form: don't pretend we can sort.
+    return { sort_key = "", movable = false }
+  end
+
+  return nil
+end
+
+-- ─── capability + build_outline ───────────────────────────────────────────────
 
 local function capability_allows(kind, toml)
   if kind == "object" then
@@ -171,15 +226,12 @@ local function capability_allows(kind, toml)
   return false
 end
 
--- ─── outline construction ──────────────────────────────────────────────
-
 local function build_outline(container, ctx)
   if not capability_allows(container.kind, ctx.toml) then
     return nil
   end
 
   local raw = ctx.entries_by_parent[container.node_key] or {}
-  -- Sort entries by source position to fix `anchor` independent of query order.
   local sorted_raw = {}
   for _, e in ipairs(raw) do
     sorted_raw[#sorted_raw + 1] = e
@@ -203,15 +255,22 @@ local function build_outline(container, ctx)
     }
 
     if e.entry_kind == "pair" then
-      if not e.key_node then
-        return nil
+      local cls = classify_entry(e.node, ctx.bufnr)
+      if cls then
+        entry.sort_key = cls.sort_key
+        entry.movable = cls.movable
+      else
+        entry.sort_key = ""
+        entry.movable = false
       end
-      local key_text = vim.treesitter.get_node_text(e.key_node, ctx.bufnr)
-      entry.sort_key = key_normalize.json(key_text)
-      if e.value_node then
-        local inner = find_container_for_node(ctx.containers_by_key, e.value_node)
-        if inner then
-          entry.child = build_outline(inner, ctx)
+
+      if e.node:type() == "pair" then
+        local value_node = e.node:named_child(1)
+        if value_node then
+          local inner = find_container_for_node(ctx.containers_by_key, value_node)
+          if inner then
+            entry.child = build_outline(inner, ctx)
+          end
         end
       end
     else
@@ -240,8 +299,6 @@ local function build_outline(container, ctx)
   }
 end
 
--- ─── public entry point ────────────────────────────────────────────────
-
 local function validate_toml(toml)
   local required = {
     "can_sort_object",
@@ -266,14 +323,6 @@ function M.build(bufnr, target, config)
     return nil
   end
 
-  -- Parser availability is environmental: a missing language is not a plugin
-  -- bug, so we surface it via the same `nil Outline → notify` path the rest
-  -- of the build uses. Query syntax errors below are plugin/user bugs and
-  -- are intentionally allowed to propagate.
-  --
-  -- `toml.parser_lang` lets a filetype reuse another language's parser when
-  -- its own grammar is a superset (e.g. jsonc reuses the json parser, which
-  -- accepts JSON-with-comments as a `(comment)` node).
   local lang = config.toml.parser_lang or config.filetype
   local parser_ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
   if not parser_ok or parser == nil then
@@ -310,12 +359,8 @@ function M.build(bufnr, target, config)
   return build_outline(chosen, ctx)
 end
 
--- Filetypes this builder serves, each mapped to the canonical config name
--- used to locate its `.toml` and treesitter query at runtime. Declared here
--- (not in the registry) so language-specific routing stays out of core.
 M.filetypes = {
-  json = "json",
-  jsonc = "jsonc",
+  javascript = "javascript",
 }
 
 return M

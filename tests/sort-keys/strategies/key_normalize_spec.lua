@@ -99,4 +99,41 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("", key_normalize.yaml("''"))
     end)
   end)
+
+  describe("js(text)", function()
+    it("returns a bare identifier unchanged", function()
+      assert.equals("foo", key_normalize.js("foo"))
+    end)
+
+    it("strips double quotes around a quoted key", function()
+      assert.equals("foo", key_normalize.js('"foo"'))
+    end)
+
+    it("strips single quotes around a quoted key", function()
+      assert.equals("foo", key_normalize.js("'foo'"))
+    end)
+
+    it('unescapes `\\"` inside a double-quoted key', function()
+      assert.equals('a"b', key_normalize.js([["a\"b"]]))
+    end)
+
+    it("unescapes `\\'` inside a single-quoted key", function()
+      assert.equals("a'b", key_normalize.js("'a\\'b'"))
+    end)
+
+    it("unescapes `\\n` inside a double-quoted key to a literal LF byte", function()
+      assert.equals("a\nb", key_normalize.js([["a\nb"]]))
+    end)
+
+    it("returns a numeric literal key as its surface text", function()
+      -- JS object keys like `{ 42: "x" }` parse as numeric nodes; the sort
+      -- compares them as strings, so the normalizer just returns the digits.
+      assert.equals("42", key_normalize.js("42"))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.js('""'))
+      assert.equals("", key_normalize.js("''"))
+    end)
+  end)
 end)

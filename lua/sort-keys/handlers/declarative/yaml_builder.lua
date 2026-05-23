@@ -7,6 +7,7 @@
 
 local key_normalize = require("sort-keys.strategies.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
+local container_pick = require("sort-keys.core.container_pick")
 
 local M = {}
 
@@ -87,24 +88,20 @@ local function count_entries_overlapping(container, entries, selection_range)
 end
 
 local function pick_innermost(containers, entries, target)
+  if target.kind == "cursor" then
+    return container_pick.for_cursor(containers, target.pos)
+  end
+  -- A visual range that overlaps an indented child also overlaps every
+  -- single-entry value-level mapping inside that child (e.g. `any: true`
+  -- inside `vim:` in a typical config file). Those degenerate single-entry
+  -- containers offer nothing to sort, so we require at least two entries to
+  -- overlap before considering a container a sortable candidate.
   local candidates = {}
   for _, c in ipairs(containers) do
-    local hit = false
-    if target.kind == "cursor" then
-      hit = pos_inside(c.range, target.pos[1], target.pos[2])
-    elseif target.kind == "selection" then
-      -- A visual range that overlaps an indented child also overlaps every
-      -- single-entry value-level mapping inside that child (e.g. `any: true`
-      -- inside `vim:` in a typical config file). Those degenerate
-      -- single-entry containers offer nothing to sort, so we require at
-      -- least two entries to overlap before considering a container a
-      -- sortable candidate.
-      if ranges_intersect(c.range, target.range) then
-        hit = count_entries_overlapping(c, entries, target.range) >= 2
+    if ranges_intersect(c.range, target.range) then
+      if count_entries_overlapping(c, entries, target.range) >= 2 then
+        candidates[#candidates + 1] = c
       end
-    end
-    if hit then
-      candidates[#candidates + 1] = c
     end
   end
   if #candidates == 0 then
