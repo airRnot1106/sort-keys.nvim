@@ -1,0 +1,21 @@
+description = "Lua declarative handler"
+
+can_sort_object = true
+can_sort_array = true
+can_deep = true
+key_quoting = "logical"
+
+comment_aware = true
+
+# Lua tables can mix bare-identifier keys (`foo`), bracket-string keys
+# (`["foo"]`), and computed-key keys (`[expr]`) in the same table_constructor.
+mixed_key_types = true
+
+# Lua tables allow `,` and `;` as field separators (and a trailing one).
+# v1 canonicalizes on `,` — sources that use `;` are not rewritten safely yet
+# because `core/separator_normalize` would insert `,` alongside the existing
+# `;` and produce malformed output.
+structural_separator = ","
+trailing_separator_allowed = true
+
+query_file = "sort-keys.scm"

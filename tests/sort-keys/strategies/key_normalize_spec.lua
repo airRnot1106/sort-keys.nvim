@@ -136,4 +136,52 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("", key_normalize.js("''"))
     end)
   end)
+
+  describe("lua(text)", function()
+    it("returns a bare identifier unchanged", function()
+      assert.equals("foo", key_normalize.lua("foo"))
+    end)
+
+    it("strips double quotes around a quoted key", function()
+      assert.equals("foo", key_normalize.lua('"foo"'))
+    end)
+
+    it("strips single quotes around a quoted key", function()
+      assert.equals("foo", key_normalize.lua("'foo'"))
+    end)
+
+    it('unescapes `\\"` inside a double-quoted key', function()
+      assert.equals('a"b', key_normalize.lua([["a\"b"]]))
+    end)
+
+    it("unescapes `\\'` inside a single-quoted key", function()
+      assert.equals("a'b", key_normalize.lua("'a\\'b'"))
+    end)
+
+    it("unescapes `\\n` / `\\t` / `\\r` to their literal control bytes", function()
+      assert.equals("a\nb", key_normalize.lua([["a\nb"]]))
+      assert.equals("a\tb", key_normalize.lua([["a\tb"]]))
+      assert.equals("a\rb", key_normalize.lua([["a\rb"]]))
+    end)
+
+    it("unescapes `\\\\` to a single backslash", function()
+      assert.equals("a\\b", key_normalize.lua([["a\\b"]]))
+    end)
+
+    it("strips a long-bracket key `[[foo]]` and treats inner bytes literally", function()
+      -- Lua long brackets do not process escape sequences; `\n` inside `[[...]]`
+      -- is the two literal bytes `\` and `n`, not a newline.
+      assert.equals("foo", key_normalize.lua("[[foo]]"))
+      assert.equals("a\\nb", key_normalize.lua("[[a\\nb]]"))
+    end)
+
+    it("strips a level-N long bracket `[==[foo]==]`", function()
+      assert.equals("foo", key_normalize.lua("[==[foo]==]"))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.lua('""'))
+      assert.equals("", key_normalize.lua("''"))
+    end)
+  end)
 end)

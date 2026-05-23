@@ -2,6 +2,7 @@ local toml_loader = require("sort-keys.core.toml_loader")
 local json_builder = require("sort-keys.handlers.declarative.json_builder")
 local yaml_builder = require("sort-keys.handlers.declarative.yaml_builder")
 local javascript_builder = require("sort-keys.handlers.declarative.javascript_builder")
+local lua_builder = require("sort-keys.handlers.declarative.lua_builder")
 
 local M = {}
 
@@ -10,7 +11,7 @@ local M = {}
 -- The registry only enumerates known builders and aggregates those
 -- declarations into a single lookup map — it never hardcodes which
 -- filetypes belong to which language.
-local DECLARATIVE_BUILDERS = { json_builder, yaml_builder, javascript_builder }
+local DECLARATIVE_BUILDERS = { json_builder, yaml_builder, javascript_builder, lua_builder }
 
 local function build_filetype_table(builders)
   local out = {}
