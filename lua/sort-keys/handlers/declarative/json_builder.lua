@@ -312,4 +312,12 @@ function M.build(bufnr, target, config)
   return build_outline(chosen, ctx)
 end
 
+-- Filetypes this builder serves, each mapped to the canonical config name
+-- used to locate its `.toml` and treesitter query at runtime. Declared here
+-- (not in the registry) so language-specific routing stays out of core.
+M.filetypes = {
+  json = "json",
+  jsonc = "jsonc",
+}
+
 return M

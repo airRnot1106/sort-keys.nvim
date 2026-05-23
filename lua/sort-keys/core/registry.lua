@@ -4,12 +4,24 @@ local yaml_builder = require("sort-keys.handlers.declarative.yaml_builder")
 
 local M = {}
 
-local DECLARATIVE_BUILDERS = {
-  json = json_builder,
-  jsonc = json_builder,
-  yaml = yaml_builder,
-  yml = yaml_builder,
-}
+-- Each declarative builder self-declares the filetypes it serves and the
+-- canonical config name each filetype maps to (see `builder.filetypes`).
+-- The registry only enumerates known builders and aggregates those
+-- declarations into a single lookup map — it never hardcodes which
+-- filetypes belong to which language.
+local DECLARATIVE_BUILDERS = { json_builder, yaml_builder }
+
+local function build_filetype_table(builders)
+  local out = {}
+  for _, builder in ipairs(builders) do
+    for filetype, config_name in pairs(builder.filetypes or {}) do
+      out[filetype] = { builder = builder, config_name = config_name }
+    end
+  end
+  return out
+end
+
+local FILETYPE_TABLE = build_filetype_table(DECLARATIVE_BUILDERS)
 
 local TOML_PATH_FMT = "lua/sort-keys/handlers/declarative/%s.toml"
 local QUERY_PATH_FMT = "queries/%s/%s"
@@ -40,8 +52,10 @@ local function build_capabilities(toml)
   }
 end
 
-local function load_declarative(filetype, builder)
-  local toml_path = locate_runtime(TOML_PATH_FMT:format(filetype))
+local function load_declarative(entry)
+  local builder = entry.builder
+  local config_name = entry.config_name
+  local toml_path = locate_runtime(TOML_PATH_FMT:format(config_name))
   if not toml_path then
     return nil
   end
@@ -50,7 +64,7 @@ local function load_declarative(filetype, builder)
     error(string.format("registry: %s is missing query_file", toml_path))
   end
 
-  local query_path = locate_runtime(QUERY_PATH_FMT:format(filetype, toml.query_file))
+  local query_path = locate_runtime(QUERY_PATH_FMT:format(config_name, toml.query_file))
   if not query_path then
     return nil
   end
@@ -60,7 +74,7 @@ local function load_declarative(filetype, builder)
     capabilities = build_capabilities(toml),
     outline = function(bufnr, target)
       return builder.build(bufnr, target, {
-        filetype = filetype,
+        filetype = config_name,
         query_text = query_text,
         toml = toml,
       })
@@ -71,11 +85,11 @@ end
 ---@param filetype string
 ---@return table|nil
 function M.get(filetype)
-  local builder = DECLARATIVE_BUILDERS[filetype]
-  if not builder then
+  local entry = FILETYPE_TABLE[filetype]
+  if not entry then
     return nil
   end
-  return load_declarative(filetype, builder)
+  return load_declarative(entry)
 end
 
 return M

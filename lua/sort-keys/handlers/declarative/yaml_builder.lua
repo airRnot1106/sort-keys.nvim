@@ -484,4 +484,12 @@ function M.build(bufnr, target, config)
   return build_outline(chosen, ctx)
 end
 
+-- The `.yml` extension is a write-style alias for YAML; both filetypes
+-- resolve to the same `yaml.toml` + `queries/yaml/sort-keys.scm` so the
+-- yml/yaml relationship lives here with the builder, not in core.
+M.filetypes = {
+  yaml = "yaml",
+  yml = "yaml",
+}
+
 return M
