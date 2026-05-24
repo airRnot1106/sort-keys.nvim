@@ -37,28 +37,35 @@ end
 ---    starts at or after the comment ends.
 ---  * If there is no following entry, the comment falls back to the
 ---    preceding entry as a trailing attachment.
-local function target_for_comment(comment, entries)
+---
+---Selection walks the *original* entry ranges (captured before any absorb
+---runs). Walking the in-progress expanded ranges instead breaks when a
+---later comment block sits between two entries whose former neighbor has
+---already swelled past it — the would-be `next` candidate looks like it
+---starts before the comment, so it gets skipped and the comment falls back
+---to `prev`, causing entry ranges to overlap.
+local function target_index_for_comment(comment, original_ranges)
   local c_start = { comment.range[1], comment.range[2] }
   local c_end = { comment.range[3], comment.range[4] }
 
-  local prev, next_entry
-  for _, e in ipairs(entries) do
-    local e_start = { e.range[1], e.range[2] }
-    local e_end = { e.range[3], e.range[4] }
+  local prev_idx, next_idx
+  for i, r in ipairs(original_ranges) do
+    local e_start = { r[1], r[2] }
+    local e_end = { r[3], r[4] }
     if pos_le(e_end, c_start) then
-      prev = e
-    elseif pos_le(c_end, e_start) and not next_entry then
-      next_entry = e
+      prev_idx = i
+    elseif pos_le(c_end, e_start) and not next_idx then
+      next_idx = i
     end
   end
 
-  if prev and prev.range[3] == comment.range[1] then
-    return prev
+  if prev_idx and original_ranges[prev_idx][3] == comment.range[1] then
+    return prev_idx
   end
-  if next_entry then
-    return next_entry
+  if next_idx then
+    return next_idx
   end
-  return prev
+  return prev_idx
 end
 
 ---@param entries table[]   ordered by source position
@@ -66,14 +73,16 @@ end
 ---@return table[]
 function M.attach(entries, comments)
   local result = {}
+  local original_ranges = {}
   for i, e in ipairs(entries) do
     result[i] = copy_entry(e)
+    original_ranges[i] = { e.range[1], e.range[2], e.range[3], e.range[4] }
   end
 
   for _, c in ipairs(comments) do
-    local target = target_for_comment(c, result)
-    if target then
-      absorb(target, c.range)
+    local idx = target_index_for_comment(c, original_ranges)
+    if idx then
+      absorb(result[idx], c.range)
     end
   end
 
