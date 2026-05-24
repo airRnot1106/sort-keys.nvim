@@ -1,0 +1,21 @@
+description = "Nix declarative handler"
+
+can_sort_object = true
+can_sort_array = true
+can_deep = true
+key_quoting = "logical"
+
+comment_aware = true
+
+# Nix bindings mix bare-identifier, dotted, and quoted attrpath forms in the
+# same container, so per-pair normalization is required at the builder layer.
+mixed_key_types = true
+
+# Nix containers carry different inter-entry separators: attrset / rec_attrset
+# / let use `;`, formals use `,` (with `...` pinned at the tail), list and
+# inherited_attrs are whitespace-gapped. The builder picks
+# `structural_separator` / `trailing_separator_allowed` per container by
+# inspecting the underlying treesitter node type rather than declaring them
+# once here.
+
+query_file = "sort-keys.scm"

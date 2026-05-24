@@ -237,4 +237,51 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("", key_normalize.toml("''"))
     end)
   end)
+
+  describe("nix(text)", function()
+    it("returns a bare identifier unchanged", function()
+      assert.equals("foo", key_normalize.nix("foo"))
+    end)
+
+    it("returns a dotted attrpath verbatim so the dots become part of the sort_key", function()
+      -- Same precedent as TOML: v1 keeps `a.b.c` as one flat sort_key rather
+      -- than recursing into nested attrsets.
+      assert.equals("a.b.c", key_normalize.nix("a.b.c"))
+    end)
+
+    it("strips double quotes around a basic-string key", function()
+      assert.equals("foo", key_normalize.nix('"foo"'))
+    end)
+
+    it('unescapes `\\"` inside a basic-string key', function()
+      assert.equals('a"b', key_normalize.nix([["a\"b"]]))
+    end)
+
+    it("unescapes `\\n` / `\\t` / `\\r` inside a basic-string key", function()
+      assert.equals("a\nb", key_normalize.nix([["a\nb"]]))
+      assert.equals("a\tb", key_normalize.nix([["a\tb"]]))
+      assert.equals("a\rb", key_normalize.nix([["a\rb"]]))
+    end)
+
+    it("unescapes `\\\\` to a single backslash", function()
+      assert.equals("a\\b", key_normalize.nix([["a\\b"]]))
+    end)
+
+    it("unescapes `\\$` to a literal `$` (Nix-specific escape)", function()
+      -- Nix string-fragment-escape adds `\$` so a key can hold a literal `$`
+      -- without triggering anti-quotation (`${...}`).
+      assert.equals("a$b", key_normalize.nix([["a\$b"]]))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.nix('""'))
+    end)
+
+    it("returns a dotted attrpath with a quoted segment verbatim at this layer", function()
+      -- Mixed `a."b.c".d` is rare and per-segment normalization is out of
+      -- scope for v1; round-tripping the literal text keeps sort_key stable
+      -- with the source spelling.
+      assert.equals('a."b.c".d', key_normalize.nix('a."b.c".d'))
+    end)
+  end)
 end)
