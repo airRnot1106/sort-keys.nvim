@@ -37,7 +37,7 @@ describe("sort-keys.handlers.javascript_builder", function()
 ((comment) @sortkeys.comment)
 ]]
 
-  local js_toml = {
+  local js_options = {
     can_sort_object = true,
     can_sort_array = true,
     can_deep = true,
@@ -53,7 +53,7 @@ describe("sort-keys.handlers.javascript_builder", function()
     return builder.build(bufnr, { kind = "cursor", pos = { row, col } }, {
       filetype = "javascript",
       query_text = js_query,
-      toml = js_toml,
+      options = js_options,
     })
   end
 

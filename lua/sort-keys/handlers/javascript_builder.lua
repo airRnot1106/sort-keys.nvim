@@ -216,18 +216,18 @@ end
 
 -- ─── capability + build_outline ───────────────────────────────────────────────
 
-local function capability_allows(kind, toml)
+local function capability_allows(kind, options)
   if kind == "object" then
-    return toml.can_sort_object == true
+    return options.can_sort_object == true
   end
   if kind == "array" then
-    return toml.can_sort_array == true
+    return options.can_sort_array == true
   end
   return false
 end
 
 local function build_outline(container, ctx)
-  if not capability_allows(container.kind, ctx.toml) then
+  if not capability_allows(container.kind, ctx.options) then
     return nil
   end
 
@@ -285,7 +285,7 @@ local function build_outline(container, ctx)
     outline_entries[#outline_entries + 1] = entry
   end
 
-  if ctx.toml.comment_aware then
+  if ctx.options.comment_aware then
     local container_comments = ctx.comments_by_parent[container.node_key] or {}
     outline_entries = comment_attach.attach(outline_entries, container_comments)
   end
@@ -293,13 +293,13 @@ local function build_outline(container, ctx)
   return {
     kind = container.kind,
     range = container.range,
-    structural_separator = ctx.toml.structural_separator,
-    trailing_separator_allowed = ctx.toml.trailing_separator_allowed == true,
+    structural_separator = ctx.options.structural_separator,
+    trailing_separator_allowed = ctx.options.trailing_separator_allowed == true,
     entries = outline_entries,
   }
 end
 
-local function validate_toml(toml)
+local function validate_options(options)
   local required = {
     "can_sort_object",
     "can_sort_array",
@@ -307,7 +307,7 @@ local function validate_toml(toml)
     "key_quoting",
   }
   for _, k in ipairs(required) do
-    if toml[k] == nil then
+    if options[k] == nil then
       return false
     end
   end
@@ -316,14 +316,14 @@ end
 
 ---@param bufnr integer
 ---@param target table
----@param config { filetype: string, query_text: string, toml: table }
+---@param config { filetype: string, query_text: string, options: table }
 ---@return table|nil
 function M.build(bufnr, target, config)
-  if not validate_toml(config.toml) then
+  if not validate_options(config.options) then
     return nil
   end
 
-  local lang = config.toml.parser_lang or config.filetype
+  local lang = config.options.parser_lang or config.filetype
   local parser_ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
   if not parser_ok or parser == nil then
     return nil
@@ -350,7 +350,7 @@ function M.build(bufnr, target, config)
 
   local ctx = {
     bufnr = bufnr,
-    toml = config.toml,
+    options = config.options,
     containers_by_key = containers_by_key,
     entries_by_parent = index_by_parent(entries),
     comments_by_parent = index_by_parent(comments),

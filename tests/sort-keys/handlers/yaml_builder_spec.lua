@@ -38,7 +38,7 @@ describe("sort-keys.handlers.yaml_builder", function()
 ((comment) @sortkeys.comment)
 ]]
 
-  local yaml_toml = {
+  local yaml_options = {
     can_sort_object = true,
     can_sort_array = true,
     can_deep = true,
@@ -52,7 +52,7 @@ describe("sort-keys.handlers.yaml_builder", function()
     return builder.build(bufnr, { kind = "cursor", pos = { row, col } }, {
       filetype = "yaml",
       query_text = yaml_query,
-      toml = yaml_toml,
+      options = yaml_options,
     })
   end
 
@@ -225,7 +225,7 @@ describe("sort-keys.handlers.yaml_builder", function()
       local outline = builder.build(bufnr, { kind = "cursor", pos = { 1, 0 } }, {
         filetype = "yaml",
         query_text = yaml_query,
-        toml = vim.tbl_deep_extend("force", {}, yaml_toml, { comment_aware = false }),
+        options = vim.tbl_deep_extend("force", {}, yaml_options, { comment_aware = false }),
       })
       assert.is_not_nil(outline)
       assert.equals(1, #outline.entries)

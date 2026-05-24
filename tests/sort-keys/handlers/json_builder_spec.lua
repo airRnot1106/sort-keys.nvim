@@ -39,7 +39,7 @@ describe("sort-keys.handlers.json_builder", function()
  (#set! sortkeys.entry_kind "element"))
 ]]
 
-  local json_toml = {
+  local json_options = {
     can_sort_object = true,
     can_sort_array = true,
     can_deep = true,
@@ -62,7 +62,7 @@ describe("sort-keys.handlers.json_builder", function()
         local outline = builder.build(bufnr, target, {
           filetype = "json",
           query_text = json_query,
-          toml = json_toml,
+          options = json_options,
         })
         assert.is_not_nil(outline)
         assert.equals("object", outline.kind)
@@ -87,7 +87,7 @@ describe("sort-keys.handlers.json_builder", function()
       local outline = builder.build(bufnr, target, {
         filetype = "json",
         query_text = json_query,
-        toml = json_toml,
+        options = json_options,
       })
       assert.is_not_nil(outline)
       for _, e in ipairs(outline.entries) do
@@ -107,7 +107,7 @@ describe("sort-keys.handlers.json_builder", function()
       local outline = builder.build(bufnr, target, {
         filetype = "json",
         query_text = json_query,
-        toml = json_toml,
+        options = json_options,
       })
       assert.is_not_nil(outline)
       assert.equals("array", outline.kind)
@@ -126,7 +126,7 @@ describe("sort-keys.handlers.json_builder", function()
       end
       local bufnr = make_buf({ '{ "a": 1 }' }, "json")
       local target = { kind = "cursor", pos = { 0, 4 } }
-      local config = { filetype = "json", query_text = json_query, toml = json_toml }
+      local config = { filetype = "json", query_text = json_query, options = json_options }
       assert.equals(1, select("#", builder.build(bufnr, target, config)))
     end)
   end)
@@ -142,7 +142,7 @@ describe("sort-keys.handlers.json_builder", function()
       local outline = builder.build(bufnr, target, {
         filetype = "json",
         query_text = json_query,
-        toml = json_toml,
+        options = json_options,
       })
       assert.is_nil(outline)
     end)
@@ -153,14 +153,14 @@ describe("sort-keys.handlers.json_builder", function()
         return
       end
       -- .scm declares kind="object" but .toml says can_sort_object = false.
-      local clashing_toml = vim.tbl_deep_extend("force", {}, json_toml)
-      clashing_toml.can_sort_object = false
+      local clashing_options = vim.tbl_deep_extend("force", {}, json_options)
+      clashing_options.can_sort_object = false
       local bufnr = make_buf({ '{ "a": 1 }' }, "json")
       local target = { kind = "cursor", pos = { 0, 4 } }
       local outline = builder.build(bufnr, target, {
         filetype = "json",
         query_text = json_query,
-        toml = clashing_toml,
+        options = clashing_options,
       })
       assert.is_nil(outline)
     end)
@@ -191,11 +191,16 @@ describe("sort-keys.handlers.json_builder", function()
           pending("JSON treesitter parser not available")
           return
         end
-        local aware_toml = vim.tbl_deep_extend("force", {}, json_toml, { comment_aware = true })
+        local aware_options = vim.tbl_deep_extend(
+          "force",
+          {},
+          json_options,
+          { comment_aware = true }
+        )
         local outline = builder.build(make_jsonc_buf(), { kind = "cursor", pos = { 0, 0 } }, {
           filetype = "json",
           query_text = jsonc_query,
-          toml = aware_toml,
+          options = aware_options,
         })
         assert.is_not_nil(outline)
         assert.equals(1, #outline.entries)
@@ -211,11 +216,11 @@ describe("sort-keys.handlers.json_builder", function()
         pending("JSON treesitter parser not available")
         return
       end
-      -- json_toml.comment_aware is false (the JSON default).
+      -- json_options.comment_aware is false (the JSON default).
       local outline = builder.build(make_jsonc_buf(), { kind = "cursor", pos = { 0, 0 } }, {
         filetype = "json",
         query_text = jsonc_query,
-        toml = json_toml,
+        options = json_options,
       })
       assert.is_not_nil(outline)
       assert.equals(1, #outline.entries)

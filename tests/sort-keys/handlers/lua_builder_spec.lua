@@ -30,7 +30,7 @@ describe("sort-keys.handlers.lua_builder", function()
 ((comment)          @sortkeys.comment)
 ]]
 
-  local function toml(overrides)
+  local function options_for(overrides)
     local base = {
       can_sort_object = true,
       can_sort_array = true,
@@ -52,7 +52,7 @@ describe("sort-keys.handlers.lua_builder", function()
     return builder.build(bufnr, { kind = "cursor", pos = { row, col } }, {
       filetype = "lua",
       query_text = lua_query,
-      toml = t or toml(),
+      options = t or options_for(),
     })
   end
 
@@ -223,7 +223,7 @@ describe("sort-keys.handlers.lua_builder", function()
         "  a = 1,",
         "}",
       })
-      local outline = build_at(bufnr, 0, 11, toml({ comment_aware = false }))
+      local outline = build_at(bufnr, 0, 11, options_for({ comment_aware = false }))
       assert.is_not_nil(outline)
       local by = entries_by_key(outline)
       assert.equals(2, by["b"].range[1])

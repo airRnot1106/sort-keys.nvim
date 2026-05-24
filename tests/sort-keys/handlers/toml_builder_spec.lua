@@ -46,7 +46,7 @@ describe("sort-keys.handlers.toml_builder", function()
 ((comment) @sortkeys.comment)
 ]]
 
-  local function toml_config(overrides)
+  local function options_for(overrides)
     local base = {
       can_sort_object = true,
       can_sort_array = true,
@@ -66,7 +66,7 @@ describe("sort-keys.handlers.toml_builder", function()
     return builder.build(bufnr, { kind = "cursor", pos = { row, col } }, {
       filetype = "toml",
       query_text = toml_query,
-      toml = t or toml_config(),
+      options = t or options_for(),
     })
   end
 
@@ -269,7 +269,7 @@ describe("sort-keys.handlers.toml_builder", function()
         'b = "2"',
         'a = "1"',
       })
-      local outline = build_at(bufnr, 1, 0, toml_config({ comment_aware = false }))
+      local outline = build_at(bufnr, 1, 0, options_for({ comment_aware = false }))
       assert.is_not_nil(outline)
       local by = {}
       for _, e in ipairs(outline.entries) do

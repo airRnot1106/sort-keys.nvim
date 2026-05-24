@@ -72,7 +72,7 @@ describe("sort-keys.handlers.nix_builder", function()
 ((comment) @sortkeys.comment)
 ]]
 
-  local function nix_config(overrides)
+  local function options_for(overrides)
     local base = {
       can_sort_object = true,
       can_sort_array = true,
@@ -92,7 +92,7 @@ describe("sort-keys.handlers.nix_builder", function()
     return builder.build(bufnr, { kind = "cursor", pos = { row, col } }, {
       filetype = "nix",
       query_text = nix_query,
-      toml = t or nix_config(),
+      options = t or options_for(),
     })
   end
 
@@ -322,7 +322,7 @@ describe("sort-keys.handlers.nix_builder", function()
         "  a = 1;",
         "}",
       })
-      local outline = build_at(bufnr, 0, 0, nix_config({ comment_aware = false }))
+      local outline = build_at(bufnr, 0, 0, options_for({ comment_aware = false }))
       assert.is_not_nil(outline)
       local by = {}
       for _, e in ipairs(outline.entries) do

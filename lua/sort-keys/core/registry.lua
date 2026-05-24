@@ -52,13 +52,13 @@ local function locate_runtime(rel_path)
   return found[1]
 end
 
-local function build_capabilities(toml)
+local function build_capabilities(options)
   return {
-    can_sort_object = toml.can_sort_object,
-    can_sort_array = toml.can_sort_array,
-    can_deep = toml.can_deep,
-    comment_aware = toml.comment_aware,
-    key_quoting = toml.key_quoting,
+    can_sort_object = options.can_sort_object,
+    can_sort_array = options.can_sort_array,
+    can_deep = options.can_deep,
+    comment_aware = options.comment_aware,
+    key_quoting = options.key_quoting,
     requires_treesitter = true,
   }
 end
@@ -66,28 +66,28 @@ end
 local function load_handler(entry)
   local builder = entry.builder
   local config_name = entry.config_name
-  local toml_path = locate_runtime(TOML_PATH_FMT:format(config_name))
-  if not toml_path then
+  local options_path = locate_runtime(TOML_PATH_FMT:format(config_name))
+  if not options_path then
     return nil
   end
-  local toml = toml_loader.load(toml_path)
-  if not toml.query_file then
-    error(string.format("registry: %s is missing query_file", toml_path))
+  local options = toml_loader.load(options_path)
+  if not options.query_file then
+    error(string.format("registry: %s is missing query_file", options_path))
   end
 
-  local query_path = locate_runtime(QUERY_PATH_FMT:format(config_name, toml.query_file))
+  local query_path = locate_runtime(QUERY_PATH_FMT:format(config_name, options.query_file))
   if not query_path then
     return nil
   end
   local query_text = read_file(query_path)
 
   return {
-    capabilities = build_capabilities(toml),
+    capabilities = build_capabilities(options),
     outline = function(bufnr, target)
       return builder.build(bufnr, target, {
         filetype = config_name,
         query_text = query_text,
-        toml = toml,
+        options = options,
       })
     end,
   }
