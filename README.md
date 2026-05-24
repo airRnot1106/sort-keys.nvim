@@ -47,9 +47,9 @@ require("sort-keys").setup({
 
 ## Commands
 
-| Command       | Description                                                      |
-| ------------- | ---------------------------------------------------------------- |
-| `:SortKeys`   | Sort keys in the current buffer or `[range]`.                    |
+| Command     | Description                                   |
+| ----------- | --------------------------------------------- |
+| `:SortKeys` | Sort keys in the current buffer or `[range]`. |
 
 ## Health
 
