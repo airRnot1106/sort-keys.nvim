@@ -1,4 +1,4 @@
-description = "JSON declarative handler"
+description = "JSON handler"
 
 can_sort_object = true
 can_sort_array = true

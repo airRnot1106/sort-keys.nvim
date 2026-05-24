@@ -1,4 +1,4 @@
-description = "JavaScript declarative handler"
+description = "TypeScript handler"
 
 can_sort_object = true
 can_sort_array = true
@@ -9,7 +9,8 @@ comment_aware = true
 
 mixed_key_types = false
 
-# ES5+ allows the optional trailing comma on object / array literals.
+# ES5+ semantics: TypeScript allows the optional trailing comma on object /
+# array literals.
 structural_separator = ","
 trailing_separator_allowed = true
 

@@ -1,4 +1,4 @@
--- YAML declarative builder. Parallel to json_builder in flow, but YAML's
+-- YAML builder. Parallel to json_builder in flow, but YAML's
 -- per-container structural separator and per-pair key extraction force a
 -- separate handler today: block_mapping_pair / flow_pair have no `key:` /
 -- `value:` field syntax (so the builder reads them via named_child rather

@@ -1,4 +1,4 @@
--- TOML declarative builder.
+-- TOML builder.
 --
 -- TOML has its own container zoo: `inline_table` / `array` (comma-separated),
 -- `table` / `table_array_element` (newline-separated, no inline comma), and

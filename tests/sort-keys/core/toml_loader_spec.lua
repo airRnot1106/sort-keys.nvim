@@ -1,6 +1,6 @@
 -- Pinned subset: only `key = "string"` and `key = true/false` are in scope;
 -- any TOML feature beyond that must raise rather than silently parse, since
--- the declarative handler files rely on the strict shape.
+-- the handler files rely on the strict shape.
 
 local function with_tmp(content, fn)
   local path = vim.fn.tempname() .. ".toml"
@@ -24,8 +24,8 @@ describe("sort-keys.core.toml_loader", function()
 
   describe("parse(text)", function()
     it('reads a `key = "value"` string pair', function()
-      local t = loader.parse('description = "JSON declarative handler"\n')
-      assert.equals("JSON declarative handler", t.description)
+      local t = loader.parse('description = "JSON handler"\n')
+      assert.equals("JSON handler", t.description)
     end)
 
     it("reads `key = true` and `key = false` boolean pairs", function()

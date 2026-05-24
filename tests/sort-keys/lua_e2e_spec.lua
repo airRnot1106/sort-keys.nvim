@@ -1,6 +1,6 @@
 -- Smoke-level cover of the full :SortKeys pipeline on a real lua buffer:
 -- object-style table sort, array-style table sort, mixed (positional pinned),
--- and comment-attach via the declarative comment_aware path.
+-- and comment-attach via the comment_aware path.
 
 local ts = require("tests.support.treesitter")
 

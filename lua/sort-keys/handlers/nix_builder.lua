@@ -1,4 +1,4 @@
--- Nix declarative builder.
+-- Nix builder.
 --
 -- Nix has six sortable container shapes (attrset, rec attrset, let,
 -- list, formals, inherited_attrs) with three different separator policies

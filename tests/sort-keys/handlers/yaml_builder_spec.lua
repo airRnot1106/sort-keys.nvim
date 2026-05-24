@@ -6,13 +6,13 @@
 
 local ts = require("tests.support.treesitter")
 
-describe("sort-keys.handlers.declarative.yaml_builder", function()
+describe("sort-keys.handlers.yaml_builder", function()
   local builder
   local has_yaml
 
   before_each(function()
-    package.loaded["sort-keys.handlers.declarative.yaml_builder"] = nil
-    builder = require("sort-keys.handlers.declarative.yaml_builder")
+    package.loaded["sort-keys.handlers.yaml_builder"] = nil
+    builder = require("sort-keys.handlers.yaml_builder")
     has_yaml = ts.has_parser("yaml")
   end)
 

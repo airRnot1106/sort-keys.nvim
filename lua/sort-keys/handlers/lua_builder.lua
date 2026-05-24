@@ -1,4 +1,4 @@
--- Lua declarative builder.
+-- Lua builder.
 --
 -- Lua's `table_constructor` is one AST node for both object-like
 -- (`{a=1, b=2}`) and array-like (`{1, 2, 3}`) tables. Kind cannot be set

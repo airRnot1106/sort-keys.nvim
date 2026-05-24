@@ -33,7 +33,7 @@ Two layers, hard-enforced by what each module is allowed to depend on:
 
 **Detail (treesitter / buffer / runtime lookup)**:
 
-- `handlers/declarative/json_builder.lua` — runs the treesitter query, collects entries + comments, delegates "where does this comment go" to `comment_attach` when `toml.comment_aware`, returns an Outline.
+- `handlers/json_builder.lua` — runs the treesitter query, collects entries + comments, delegates "where does this comment go" to `comment_attach` when `toml.comment_aware`, returns an Outline.
 - `core/applier.lua` — reads piece / gap text from the buffer, delegates inter-entry separator emission to `separator_normalize` when `outline.structural_separator` is set, writes back via `nvim_buf_set_text`.
 - `core/registry.lua` — filetype → handler lookup, loads the per-language `.toml` and `.scm` at runtime.
 - `command.lua` + `plugin/sort-keys.lua` — flag parsing and `:SortKeys` / `:DeepSortKeys` dispatch.
@@ -48,7 +48,7 @@ Drive every behavioral change through the Red → Green → Refactor cycle, and 
 2. **Green** — make it pass with the smallest possible change to a policy module (`core/*.lua` or `strategies/*.lua`). Do not touch `vim.*`, treesitter, or the buffer to satisfy a policy test; if you feel the need to, the test is in the wrong layer.
 3. **Refactor** — only with green tests. Policy modules must stay free of `vim.*` / treesitter / buffer dependencies, so refactoring is bounded by the layering rule above.
 
-Triangulate inside the policy layer: prefer adding a second failing policy spec that forces the generalization over jumping straight to e2e. Detail and e2e specs (`handlers/declarative/*_spec.lua`, `<lang>_e2e_spec.lua`) come **after** the policy is green, and only to pin the delegation contract or smoke-check the wiring — they are not where new behavior is designed.
+Triangulate inside the policy layer: prefer adding a second failing policy spec that forces the generalization over jumping straight to e2e. Detail and e2e specs (`handlers/*_spec.lua`, `<lang>_e2e_spec.lua`) come **after** the policy is green, and only to pin the delegation contract or smoke-check the wiring — they are not where new behavior is designed.
 
 This is why the layering is hard-enforced: the policy modules being pure Lua is what makes the Red step cheap enough to do honestly every time.
 
@@ -58,7 +58,7 @@ This is why the layering is hard-enforced: the policy modules being pure Lua is 
 
 Detail and e2e tests are smaller on purpose:
 
-- `tests/sort-keys/handlers/declarative/*_spec.lua` pins the **delegation contract** (e.g., "when `toml.comment_aware = true`, the entry range gets expanded by `comment_attach`"), not every comment shape.
+- `tests/sort-keys/handlers/*_spec.lua` pins the **delegation contract** (e.g., "when `toml.comment_aware = true`, the entry range gets expanded by `comment_attach`"), not every comment shape.
 - `tests/sort-keys/<lang>_e2e_spec.lua` is a smoke-level check that the wired pipeline still produces correct buffer text after reorder.
 - `tests/support/treesitter.lua` exposes `has_parser(lang)`. Specs that need treesitter must `pending(...)` early when it returns false; the helper checks `parser/<lang>.{so,dylib,dll}` on `&runtimepath`, not just `language.add`, because the latter can silently succeed without a parser binary.
 
@@ -91,7 +91,7 @@ outline = {
 
 ### Case A — language reuses an existing parser (e.g. JSONC reusing tree-sitter-json)
 
-1. `lua/sort-keys/handlers/declarative/<lang>.toml`:
+1. `lua/sort-keys/handlers/<lang>.toml`:
    - `parser_lang = "json"` (override; defaults to the filetype name)
    - `can_sort_object` / `can_sort_array` / `can_deep`
    - `comment_aware = true|false` (gates `comment_attach`)
@@ -99,7 +99,7 @@ outline = {
    - `trailing_separator_allowed = true|false`
    - `query_file = "sort-keys.scm"`
 2. `queries/<lang>/sort-keys.scm` using the `sortkeys.*` capture convention (`@sortkeys.container`, `@sortkeys.entry`, `@sortkeys.key`, `@sortkeys.value`, plus `@sortkeys.comment` if comment-aware) with the metadata `#set! sortkeys.kind` / `#set! sortkeys.entry_kind`.
-3. `lua/sort-keys/core/registry.lua` — add `<lang> = json_builder` to `DECLARATIVE_BUILDERS`.
+3. `lua/sort-keys/core/registry.lua` — add `<lang> = json_builder` to `BUILDERS`.
 4. `tests/sort-keys/core/registry_spec.lua` — pin handler presence + capabilities.
 5. `tests/sort-keys/<lang>_e2e_spec.lua` — minimal e2e (comment-free smoke + at least one comment / separator case if applicable). Use `tests/support/treesitter.lua` `has_parser` for the underlying parser, not the filetype name.
 
@@ -121,7 +121,7 @@ Until this extension exists, languages with non-JSON key syntax need their own b
 
 ### Case D — entirely different AST shape (Lua tables `{ a = 1, b = 2 }`, Nix attrset, YAML block-style)
 
-Implement `lua/sort-keys/handlers/declarative/<lang>_builder.lua` honoring the `build(bufnr, target, config) -> outline | nil` contract, then register it in `DECLARATIVE_BUILDERS`. Policy modules stay untouched — they only depend on the Outline shape.
+Implement `lua/sort-keys/handlers/<lang>_builder.lua` honoring the `build(bufnr, target, config) -> outline | nil` contract, then register it in `BUILDERS`. Policy modules stay untouched — they only depend on the Outline shape.
 
 ## Conventions
 

@@ -1,4 +1,4 @@
-description = "JSONC declarative handler"
+description = "JSONC handler"
 
 # tree-sitter-json's grammar already accepts JSONC's // and /* */ comments
 # as `(comment)` nodes, so we reuse the json parser rather than requiring

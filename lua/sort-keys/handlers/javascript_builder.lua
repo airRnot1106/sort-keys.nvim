@@ -1,4 +1,4 @@
--- JavaScript declarative builder.
+-- JavaScript builder.
 --
 -- JS objects mix several entry kinds (regular pairs, shorthand identifiers,
 -- spreads, methods, computed-key pairs); some are sortable, some must stay

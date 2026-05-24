@@ -1,4 +1,4 @@
-description = "TOML declarative handler"
+description = "TOML handler"
 
 can_sort_object = true
 can_sort_array = true
