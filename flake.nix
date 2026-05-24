@@ -2,10 +2,24 @@
   description = "sort-keys.nvim — Neovim plugin for sorting keys";
 
   inputs = {
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    {
+      self,
+      git-hooks,
+      nixpkgs,
+      treefmt-nix,
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -14,26 +28,30 @@
         "aarch64-darwin"
       ];
 
-      forAllSystems = f:
-        nixpkgs.lib.genAttrs systems
-          (system: f nixpkgs.legacyPackages.${system});
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
-      mkSortKeysPlugin = pkgs: pkgs.vimUtils.buildVimPlugin {
-        pname = "sort-keys.nvim";
-        version = "0.0.0";
-        src = ./.;
-        meta = {
-          description = "Sort keys in the current buffer or range";
-          homepage = "https://github.com/airRnot/sort-keys.nvim";
-          license = pkgs.lib.licenses.mit;
-          platforms = pkgs.lib.platforms.all;
+      mkSortKeysPlugin =
+        pkgs:
+        pkgs.vimUtils.buildVimPlugin {
+          pname = "sort-keys.nvim";
+          version = "0.0.0";
+          src = ./.;
+          meta = {
+            description = "Sort keys in the current buffer or range";
+            homepage = "https://github.com/airRnot/sort-keys.nvim";
+            license = pkgs.lib.licenses.mit;
+            platforms = pkgs.lib.platforms.all;
+          };
         };
-      };
 
-      mkWrappedNvim = pkgs:
+      mkWrappedNvim =
+        pkgs:
         pkgs.wrapNeovimUnstable pkgs.neovim-unwrapped {
           plugins = [
-            { plugin = mkSortKeysPlugin pkgs; optional = false; }
+            {
+              plugin = mkSortKeysPlugin pkgs;
+              optional = false;
+            }
           ];
           luaRcContent = ''
             vim.opt.swapfile = false
@@ -47,7 +65,8 @@
           vimAlias = false;
         };
 
-      mkDevLauncher = pkgs:
+      mkDevLauncher =
+        pkgs:
         let
           initLua = pkgs.writeText "sort-keys-dev-init.lua" ''
             -- Minimal init for sort-keys.nvim development.
@@ -84,29 +103,42 @@
         };
       });
 
-      devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
-          packages = with pkgs; [
-            neovim
-            stylua
-            selene
-            git
-            gnumake
-          ];
+      devShells = forAllSystems (
+        pkgs:
+        let
+          inherit (self.checks.${pkgs.stdenv.hostPlatform.system}.pre-commit) shellHook enabledPackages;
+        in
+        {
+          default = pkgs.mkShellNoCC {
+            inherit shellHook;
+            packages =
+              (with pkgs; [
+                neovim
+                git
+                gnumake
+              ])
+              ++ enabledPackages;
+          };
+        }
+      );
 
-          shellHook = ''
-            echo "sort-keys.nvim dev shell"
-            echo "  nvim   : $(nvim --version | head -n1)"
-            echo "  stylua : $(stylua --version)"
-            echo "  selene : $(selene --version)"
-            echo ""
-            echo "Try: nix run .#dev   # dev launcher (live edits from cwd)"
-            echo "     nix run         # wrapped nvim (packpath install)"
-            echo "     make test       # run plenary specs"
-          '';
+      formatter = forAllSystems (
+        pkgs:
+        let
+          treefmtEval = treefmt-nix.lib.evalModule pkgs ./nix/treefmt.nix;
+        in
+        treefmtEval.config.build.wrapper
+      );
+
+      checks = forAllSystems (pkgs: {
+        pre-commit = git-hooks.lib.${pkgs.stdenv.hostPlatform.system}.run (
+          import ./nix/pre-commit.nix {
+            inherit self pkgs;
+          }
+        );
+        test = import ./nix/test.nix {
+          inherit self pkgs;
         };
       });
-
-      formatter = forAllSystems (pkgs: pkgs.nixpkgs-fmt);
     };
 }
