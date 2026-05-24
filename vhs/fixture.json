@@ -1,0 +1,13 @@
+{
+  "fruits": ["banana", "apple", "cherry"],
+  "numbers": [3, 1, 2],
+  "colors": {
+    "red": "#ff0000",
+    "green": "#00ff00",
+    "blue": "#0000ff"
+  },
+  "alphabet": {
+    "first": "a",
+    "last": "z"
+  }
+}

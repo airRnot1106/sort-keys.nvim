@@ -49,12 +49,30 @@
           };
         };
 
+      mkSortKeysParsers =
+        pkgs:
+        pkgs.vimPlugins.nvim-treesitter.withPlugins (
+          parsers: with parsers; [
+            javascript
+            json
+            lua
+            nix
+            toml
+            typescript
+            yaml
+          ]
+        );
+
       mkWrappedNvim =
         pkgs:
         pkgs.wrapNeovimUnstable pkgs.neovim-unwrapped {
           plugins = [
             {
               plugin = mkSortKeysPlugin pkgs;
+              optional = false;
+            }
+            {
+              plugin = mkSortKeysParsers pkgs;
               optional = false;
             }
           ];
@@ -87,6 +105,44 @@
           runtimeInputs = [ pkgs.neovim ];
           text = ''exec nvim -u ${initLua} "$@"'';
         };
+
+      mkVhsNvim =
+        pkgs:
+        pkgs.wrapNeovimUnstable pkgs.neovim-unwrapped {
+          plugins = [
+            {
+              plugin = mkSortKeysParsers pkgs;
+              optional = false;
+            }
+            {
+              plugin = pkgs.vimPlugins.lualine-nvim;
+              optional = false;
+            }
+          ];
+          wrapRc = false;
+          withPython3 = false;
+          withRuby = false;
+          withNodeJs = false;
+          viAlias = false;
+          vimAlias = false;
+        };
+
+      mkVhsApp =
+        pkgs:
+        pkgs.writeShellApplication {
+          name = "sort-keys-vhs";
+          runtimeInputs = with pkgs; [
+            vhs
+            (mkVhsNvim pkgs)
+            git
+            ttyd
+            ffmpeg
+          ];
+          text = ''
+            cd "$(git rev-parse --show-toplevel)"
+            exec vhs vhs/demo.tape
+          '';
+        };
     in
     {
       packages = forAllSystems (pkgs: {
@@ -105,6 +161,11 @@
           type = "app";
           program = "${mkDevLauncher pkgs}/bin/sort-keys-dev-nvim";
           meta.description = "Dev launcher: load sort-keys.nvim from cwd (live edits)";
+        };
+        vhs = {
+          type = "app";
+          program = "${mkVhsApp pkgs}/bin/sort-keys-vhs";
+          meta.description = "Regenerate vhs/demo.gif from vhs/demo.tape";
         };
       });
 
