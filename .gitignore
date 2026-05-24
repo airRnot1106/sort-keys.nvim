@@ -24,3 +24,6 @@ result
 result-*
 .direnv/
 .pre-commit-config.yaml
+
+# Skills
+.claude/skills

@@ -2,6 +2,10 @@
   description = "sort-keys.nvim — Neovim plugin for sorting keys";
 
   inputs = {
+    agent-skills = {
+      url = "path:./nix/agent-skills";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     git-hooks = {
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -16,6 +20,7 @@
   outputs =
     {
       self,
+      agent-skills,
       git-hooks,
       nixpkgs,
       treefmt-nix,
@@ -110,6 +115,7 @@
         in
         {
           default = pkgs.mkShellNoCC {
+            inputsFrom = [ agent-skills.devShells.${pkgs.stdenv.hostPlatform.system}.default ];
             inherit shellHook;
             packages =
               (with pkgs; [
