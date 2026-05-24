@@ -113,9 +113,8 @@
             inherit shellHook;
             packages =
               (with pkgs; [
-                neovim
                 git
-                gnumake
+                neovim
               ])
               ++ enabledPackages;
           };

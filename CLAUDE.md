@@ -5,10 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```sh
-make test       # plenary.nvim busted runner via headless nvim (-u tests/minimal_init.lua)
-make fmt        # stylua over lua/ plugin/ tests/
-make fmt-check  # stylua --check (CI gate)
-make lint       # selene over lua/ plugin/
+nix flake check   # all checks: tests, lint (selene), format (stylua)
+nix fmt           # format lua/ plugin/ tests/ in place (stylua via treefmt)
 ```
 
 Run a single spec file:
@@ -18,7 +16,7 @@ nvim --headless --noplugin -u tests/minimal_init.lua \
   -c "PlenaryBustedFile tests/sort-keys/core/comment_attach_spec.lua"
 ```
 
-`make test` clones `plenary.nvim` into `/tmp/sort-keys.nvim/plenary.nvim` on first run. `make clean` removes it.
+`plenary.nvim` is cloned automatically to `/tmp/sort-keys.nvim/plenary.nvim` on first run, or supplied via `PLENARY_DIR` (Nix sets this to `pkgs.vimPlugins.plenary-nvim`).
 
 ## Architecture: policy / detail separation
 
@@ -40,13 +38,13 @@ Two layers, hard-enforced by what each module is allowed to depend on:
 - `core/registry.lua` — filetype → handler lookup, loads the per-language `.toml` and `.scm` at runtime.
 - `command.lua` + `plugin/sort-keys.lua` — flag parsing and `:SortKeys` / `:DeepSortKeys` dispatch.
 
-**Why this split**: the policy modules are reusable across languages — JSON, JSONC, future YAML / Lua / Nix all share the same `comment_attach` / `separator_normalize` / `policy.sort` / `walker`. The detail layer is what changes per language. Keeping the policy free of `vim.*` is what lets `make test` run the bulk of the suite as fast, deterministic unit tests on Outline literals.
+**Why this split**: the policy modules are reusable across languages — JSON, JSONC, future YAML / Lua / Nix all share the same `comment_attach` / `separator_normalize` / `policy.sort` / `walker`. The detail layer is what changes per language. Keeping the policy free of `vim.*` is what lets the test suite run the bulk of the specs as fast, deterministic unit tests on Outline literals.
 
 ## Development workflow: TDD (t-wada style)
 
 Drive every behavioral change through the Red → Green → Refactor cycle, and **anchor the cycle on the policy layer**, not on e2e:
 
-1. **Red** — write a failing spec in `tests/sort-keys/core/*_spec.lua` (or `tests/sort-keys/strategies/*_spec.lua`) that expresses the new rule as an assertion on an Outline literal / pure-Lua input. The test name encodes the WHY of the rule. Run `make test` and confirm it fails for the expected reason — not on a typo or a missing require.
+1. **Red** — write a failing spec in `tests/sort-keys/core/*_spec.lua` (or `tests/sort-keys/strategies/*_spec.lua`) that expresses the new rule as an assertion on an Outline literal / pure-Lua input. The test name encodes the WHY of the rule. Run `nix flake check` and confirm it fails for the expected reason — not on a typo or a missing require.
 2. **Green** — make it pass with the smallest possible change to a policy module (`core/*.lua` or `strategies/*.lua`). Do not touch `vim.*`, treesitter, or the buffer to satisfy a policy test; if you feel the need to, the test is in the wrong layer.
 3. **Refactor** — only with green tests. Policy modules must stay free of `vim.*` / treesitter / buffer dependencies, so refactoring is bounded by the layering rule above.
 
