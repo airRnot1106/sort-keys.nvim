@@ -184,4 +184,57 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("", key_normalize.lua("''"))
     end)
   end)
+
+  describe("toml(text)", function()
+    it("returns a bare key unchanged", function()
+      assert.equals("foo", key_normalize.toml("foo"))
+    end)
+
+    it("strips double quotes around a basic-string key", function()
+      assert.equals("foo", key_normalize.toml('"foo"'))
+    end)
+
+    it("strips single quotes around a literal-string key", function()
+      assert.equals("foo", key_normalize.toml("'foo'"))
+    end)
+
+    it('unescapes `\\"` inside a basic-string key', function()
+      assert.equals('a"b', key_normalize.toml([["a\"b"]]))
+    end)
+
+    it("unescapes `\\n` / `\\t` / `\\r` inside a basic-string key", function()
+      assert.equals("a\nb", key_normalize.toml([["a\nb"]]))
+      assert.equals("a\tb", key_normalize.toml([["a\tb"]]))
+      assert.equals("a\rb", key_normalize.toml([["a\rb"]]))
+    end)
+
+    it("decodes `\\u00E9` inside a basic-string key to UTF-8", function()
+      assert.equals("\xC3\xA9", key_normalize.toml('"\\u00E9"'))
+    end)
+
+    it("treats backslash inside a literal-string key as a literal byte", function()
+      -- TOML literal strings (single quotes) do NOT process escapes; `\n`
+      -- inside `'...'` is the two literal bytes `\` and `n`.
+      assert.equals("a\\nb", key_normalize.toml("'a\\nb'"))
+    end)
+
+    it("returns a dotted-key text unchanged so the dots become part of the sort_key", function()
+      -- v1 treats `a.b.c` as one flat sort_key rather than recursing into
+      -- nested tables. Keeping the dots in the returned string lets callers
+      -- compare dotted keys lexicographically as a unit.
+      assert.equals("a.b.c", key_normalize.toml("a.b.c"))
+    end)
+
+    it("returns a dotted key with quoted segment unchanged at this layer", function()
+      -- Mixed dotted keys (`a."b.c"`) are returned verbatim; per-segment
+      -- normalization is out of scope for v1 and would force the sort_key to
+      -- diverge from the source spelling.
+      assert.equals('a."b.c"', key_normalize.toml('a."b.c"'))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.toml('""'))
+      assert.equals("", key_normalize.toml("''"))
+    end)
+  end)
 end)
