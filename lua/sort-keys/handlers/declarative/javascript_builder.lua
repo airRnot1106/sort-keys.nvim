@@ -359,8 +359,14 @@ function M.build(bufnr, target, config)
   return build_outline(chosen, ctx)
 end
 
+-- tree-sitter-typescript inherits the object / pair / array / spread_element /
+-- method_definition / property_identifier node names from tree-sitter-javascript,
+-- so the JS classify_entry logic applies as-is to TS object/array literals.
+-- TS-specific nodes (type_annotation, as_expression, generic_type) appear
+-- outside the key position or inside the value subtree and are transparent.
 M.filetypes = {
   javascript = "javascript",
+  typescript = "typescript",
 }
 
 return M
