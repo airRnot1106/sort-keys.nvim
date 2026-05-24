@@ -45,6 +45,80 @@ require("sort-keys").setup({
 })
 ```
 
+## Adding or customizing a handler
+
+Languages are served by **handlers** keyed off `vim.bo.filetype`. The plugin
+ships built-in handlers for JSON / JSONC / YAML / JavaScript / TypeScript /
+Lua / TOML / Nix; you can override any of them or add a brand-new one from
+your own config via `setup({ handlers = { ... } })`.
+
+### Override a single field of a built-in
+
+When the `handlers` key matches a built-in's name, only the fields you
+supply are overlaid on top of the built-in spec. Everything you omit
+(builder, query, the rest of `options`) is inherited.
+
+```lua
+-- Turn on comment handling for the built-in JSON handler.
+require("sort-keys").setup({
+  handlers = {
+    json = { options = { comment_aware = true } },
+  },
+})
+
+-- Replace just the builder, keeping the built-in's options + tree-sitter query.
+require("sort-keys").setup({
+  handlers = {
+    nix = { builder = require("my.fancier_nix_builder") },
+  },
+})
+```
+
+### Register a new language
+
+Use a `handlers` key that does **not** match any built-in. All four
+pieces — `filetypes`, `builder`, `options`, `query_text` — are then
+required.
+
+```lua
+require("sort-keys").setup({
+  handlers = {
+    my_lang = {
+      filetypes = { "my_lang", "ml" },
+      builder = require("my.sort_keys_my_lang"),
+      options = {
+        can_sort_object            = true,
+        can_sort_array             = true,
+        can_deep                   = true,
+        key_quoting                = "logical",
+        comment_aware              = true,
+        structural_separator       = ",",
+        trailing_separator_allowed = true,
+      },
+      query_text = [[
+        ((container_node) @sortkeys.container (#set! sortkeys.kind "object"))
+        ((entry_node)     @sortkeys.entry     (#set! sortkeys.entry_kind "pair"))
+        ((comment)        @sortkeys.comment)
+      ]],
+    },
+  },
+})
+```
+
+The `builder` module must expose `build(bufnr, target, config) -> outline | nil`
+where `config = { filetype, query_text, options }`. The returned `outline`
+follows the shape documented in `CLAUDE.md` (see "Outline contract"); the
+built-in handlers under `lua/sort-keys/handlers/*_builder.lua` are the
+canonical reference.
+
+### Notes
+
+- Calling `setup({ handlers = ... })` again **replaces** the previously
+  registered user handlers (built-ins stay intact).
+- If a user handler uses a key that does not match a built-in but its
+  `filetypes` collide with a built-in's, the user handler wins entirely
+  (no field-level merging — the built-in is hidden).
+
 ## Commands
 
 | Command     | Description                                   |

@@ -8,12 +8,9 @@ local nix_builder = require("sort-keys.handlers.nix_builder")
 
 local M = {}
 
--- Each builder self-declares the filetypes it serves and the canonical
--- config name each filetype maps to (see `builder.filetypes`). The
--- registry only enumerates known builders and aggregates those
--- declarations into a single lookup map — it never hardcodes which
--- filetypes belong to which language.
-local BUILDERS = {
+-- Each built-in builder self-declares the filetypes it serves and the
+-- canonical config name each filetype maps to (see `builder.filetypes`).
+local BUILT_IN_BUILDERS = {
   json_builder,
   yaml_builder,
   javascript_builder,
@@ -22,17 +19,14 @@ local BUILDERS = {
   nix_builder,
 }
 
-local function build_filetype_table(builders)
-  local out = {}
-  for _, builder in ipairs(builders) do
-    for filetype, config_name in pairs(builder.filetypes or {}) do
-      out[filetype] = { builder = builder, config_name = config_name }
-    end
+-- Built-ins indexed by config_name. Used by partial-override to find a base
+-- spec when a user spec's key matches a built-in.
+local BUILT_IN_BY_CONFIG_NAME = {}
+for _, builder in ipairs(BUILT_IN_BUILDERS) do
+  for _, config_name in pairs(builder.filetypes or {}) do
+    BUILT_IN_BY_CONFIG_NAME[config_name] = builder
   end
-  return out
 end
-
-local FILETYPE_TABLE = build_filetype_table(BUILDERS)
 
 local TOML_PATH_FMT = "lua/sort-keys/handlers/%s.toml"
 local QUERY_PATH_FMT = "queries/%s/%s"
@@ -63,9 +57,11 @@ local function build_capabilities(options)
   }
 end
 
-local function load_handler(entry)
-  local builder = entry.builder
-  local config_name = entry.config_name
+-- Loads the raw spec table (filetypes / builder / options / query_text) for
+-- a built-in handler off disk. Used directly when serving a built-in and as
+-- the base for partial-override merging when a user spec targets the same
+-- config_name.
+local function load_built_in_spec(builder, config_name)
   local options_path = locate_runtime(TOML_PATH_FMT:format(config_name))
   if not options_path then
     return nil
@@ -74,23 +70,119 @@ local function load_handler(entry)
   if not options.query_file then
     error(string.format("registry: %s is missing query_file", options_path))
   end
-
   local query_path = locate_runtime(QUERY_PATH_FMT:format(config_name, options.query_file))
   if not query_path then
     return nil
   end
   local query_text = read_file(query_path)
 
+  -- builder.filetypes is a dict { filetype = config_name }; collapse to the
+  -- list of filetypes that map to this specific config_name.
+  local filetypes = {}
+  for filetype, cn in pairs(builder.filetypes or {}) do
+    if cn == config_name then
+      filetypes[#filetypes + 1] = filetype
+    end
+  end
+
   return {
-    capabilities = build_capabilities(options),
+    filetypes = filetypes,
+    builder = builder,
+    options = options,
+    query_text = query_text,
+  }
+end
+
+-- Turn a resolved spec (whether built-in, user-only, or merged) into the
+-- `{ capabilities, outline }` handler shape that M.get returns.
+local function spec_to_handler(spec, config_name)
+  return {
+    capabilities = build_capabilities(spec.options),
     outline = function(bufnr, target)
-      return builder.build(bufnr, target, {
+      return spec.builder.build(bufnr, target, {
         filetype = config_name,
-        query_text = query_text,
-        options = options,
+        query_text = spec.query_text,
+        options = spec.options,
       })
     end,
   }
+end
+
+-- ─── user handler state ───────────────────────────────────────────────────────
+
+local USER_SPECS = {}
+
+-- A spec is "complete" (= self-contained, no built-in to merge from) if it
+-- supplies the three pieces a builder needs. Partial-override specs are
+-- allowed to omit any of these because the built-in fills them in.
+local function spec_is_complete(spec)
+  return type(spec.builder) == "table"
+    and type(spec.query_text) == "string"
+    and type(spec.filetypes) == "table"
+    and #spec.filetypes > 0
+end
+
+local function resolve_user_spec(config_name, user_spec)
+  local built_in = BUILT_IN_BY_CONFIG_NAME[config_name]
+  if built_in then
+    local base = load_built_in_spec(built_in, config_name)
+    if not base then
+      return nil
+    end
+    local merged = vim.tbl_deep_extend("force", base, user_spec)
+    -- `filetypes` is a list; vim.tbl_deep_extend treats lists as dicts and
+    -- would index-merge them. Replace explicitly when the user supplied one.
+    if user_spec.filetypes then
+      merged.filetypes = user_spec.filetypes
+    end
+    return merged
+  end
+  -- No matching built-in → user spec must be self-sufficient.
+  if not spec_is_complete(user_spec) then
+    return nil
+  end
+  return user_spec
+end
+
+-- ─── filetype → entry table ───────────────────────────────────────────────────
+
+-- Rebuilt every time set_user_handlers is called. Each entry is either a
+-- built-in pointer (just (config_name, builder)) or a resolved user spec.
+local FILETYPE_TABLE = {}
+
+local function rebuild_filetype_table()
+  FILETYPE_TABLE = {}
+  -- Built-ins first.
+  for _, builder in ipairs(BUILT_IN_BUILDERS) do
+    for filetype, config_name in pairs(builder.filetypes or {}) do
+      FILETYPE_TABLE[filetype] = {
+        source = "built_in",
+        config_name = config_name,
+        builder = builder,
+      }
+    end
+  end
+  -- User specs override / add.
+  for config_name, user_spec in pairs(USER_SPECS) do
+    local resolved = resolve_user_spec(config_name, user_spec)
+    if resolved then
+      for _, filetype in ipairs(resolved.filetypes or {}) do
+        FILETYPE_TABLE[filetype] = {
+          source = "user",
+          config_name = config_name,
+          spec = resolved,
+        }
+      end
+    end
+  end
+end
+
+rebuild_filetype_table()
+
+---@param specs table<string, table>|nil
+function M.set_user_handlers(specs)
+  USER_SPECS = specs or {}
+  rebuild_filetype_table()
 end
 
 ---@param filetype string
@@ -100,7 +192,15 @@ function M.get(filetype)
   if not entry then
     return nil
   end
-  return load_handler(entry)
+  if entry.source == "built_in" then
+    local spec = load_built_in_spec(entry.builder, entry.config_name)
+    if not spec then
+      return nil
+    end
+    return spec_to_handler(spec, entry.config_name)
+  end
+  -- entry.source == "user"
+  return spec_to_handler(entry.spec, entry.config_name)
 end
 
 return M
