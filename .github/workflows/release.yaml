@@ -1,50 +1,26 @@
-name: Deploy
+name: Release
 
 on:
   push:
-    tags:
-      - v[0-9]+.[0-9]+.[0-9]+
+    branches: [main]
 
-permissions:
-  contents: write
+permissions: {}
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  release-please:
+    name: Release Please
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Update CHANGELOG
-        id: changelog
-        uses: requarks/changelog-action@b78a3354a01f4a1affb484b9264b506a815c46b1 # v1.10.3
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-
-      - name: Create Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NOTES: ${{ steps.changelog.outputs.changes }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          printf '%s' "$NOTES" > /tmp/release-notes.md
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes-file /tmp/release-notes.md \
-            --latest \
-            || gh release edit "$TAG" \
-            --title "$TAG" \
-            --notes-file /tmp/release-notes.md \
-            --latest
-
-      - name: Commit CHANGELOG.md
-        uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7.1.0
-        with:
-          branch: main
-          commit_message: "docs: update CHANGELOG.md for ${{ github.ref_name }} [skip ci]"
-          file_pattern: CHANGELOG.md
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
