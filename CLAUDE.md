@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```sh
 nix flake check                 # everything: tests + lint (selene) + format (stylua) + git-hooks
 nix fmt                         # apply stylua formatting in place
-nix run .#default               # launch wrapped nvim with sort-keys.nvim + 7 tree-sitter parsers bundled
+nix run .#default               # launch wrapped nvim with sort-keys.nvim + all bundled tree-sitter parsers
 nix run .#dev                   # launch nvim that loads sort-keys.nvim from cwd (live-edit dev launcher)
 nix run .#vhs                   # regenerate vhs/demo.gif from vhs/demo.tape
 ```
@@ -19,7 +19,7 @@ nvim --headless --noplugin -u tests/minimal_init.lua \
   -c "PlenaryBustedFile tests/sort-keys/core/comment_attach_spec.lua"
 ```
 
-`plenary.nvim` is cloned to `/tmp/sort-keys.nvim/plenary.nvim` on first run, or supplied via `PLENARY_DIR` (Nix sets this to `pkgs.vimPlugins.plenary-nvim`). Tree-sitter parsers for the 7 supported filetypes (`javascript` / `json` / `lua` / `nix` / `toml` / `typescript` / `yaml`) are bundled by the wrapped nvim used in `nix run`, so `:SortKeys` works out of the box without a user `~/.local/share/nvim/site/` install.
+`plenary.nvim` is cloned to `/tmp/sort-keys.nvim/plenary.nvim` on first run, or supplied via `PLENARY_DIR` (Nix sets this to `pkgs.vimPlugins.plenary-nvim`). Tree-sitter parsers for all supported filetypes are bundled by the wrapped nvim used in `nix run`, so `:SortKeys` works out of the box without a user `~/.local/share/nvim/site/` install.
 
 ## Architecture: policy / detail separation
 
@@ -91,7 +91,7 @@ spinning up nvim or treesitter.
 
 Two known places where the inversion is only partial:
 
-- `registry.lua` `require`s the six built-in builder modules directly.
+- `registry.lua` `require`s each built-in builder module directly.
   Self-registration via `builder.M.filetypes` keeps filetype→builder
   mapping out of `registry`, but the builder list itself is still
   hardcoded. (User handlers escape this via `setup({handlers={...}})`.)
@@ -110,18 +110,18 @@ Lives in `lua/sort-keys/core/` and `lua/sort-keys/strategies/`. Operates entirel
 - `separator_normalize.lua` — inserts the inter-entry separator when missing and strips a trailing separator when the language forbids it. Treats `separator` as an opaque byte string, so whitespace separators (`"\n"` for YAML block style, `" "` for Nix lists / `inherited_attrs`) work the same as `,` / `;`.
 - `container_pick.lua` — cursor → innermost container resolution with a 3-tier fallback (strict containment → same-row leftmost start → row-span innermost area), shared by builders.
 - `unicode.lua`, `toml_loader.lua` — pure helpers.
-- `strategies/key_normalize.lua` — `M.json` / `M.yaml` / `M.js` / `M.lua` / `M.toml` / `M.nix`, each turns a raw key node text into the canonical sort_key (quote stripping + per-language escape decoding).
+- `strategies/key_normalize.lua` — one `M.<lang>` function per supported language, each turns a raw key node text into the canonical sort_key (quote stripping + per-language escape decoding).
 
 ### Detail layer (treesitter / buffer / runtime lookup)
 
-- `lua/sort-keys/handlers/<lang>_builder.lua` — runs the per-language treesitter query and returns an Outline. Six concrete builders today: `json_builder` (also serves `jsonc`), `yaml_builder`, `javascript_builder` (also serves `typescript`), `lua_builder`, `toml_builder`, `nix_builder`. Each `M.filetypes = { <ft> = <config_name>, ... }` is self-declared so the registry doesn't hardcode filetype → builder mapping.
+- `lua/sort-keys/handlers/<lang>_builder.lua` — runs the per-language treesitter query and returns an Outline. Each builder self-declares `M.filetypes = { <ft> = <config_name>, ... }` so the registry doesn't hardcode filetype → builder mapping.
 - `lua/sort-keys/core/applier.lua` — reads piece / gap text from the buffer, delegates inter-entry separator emission to `separator_normalize` when `outline.structural_separator` is set, writes back via `nvim_buf_set_text`.
 - `lua/sort-keys/core/registry.lua` — built-in handlers come from `handlers/<config_name>.toml` + `queries/<config_name>/sort-keys.scm` on `&runtimepath`. User handlers come from `set_user_handlers(specs)` (called from `config.setup`). Same-config-name overrides deep-merge over the built-in spec.
 - `lua/sort-keys/command.lua` + `plugin/sort-keys.lua` — flag parsing and `:SortKeys` / `:DeepSortKeys` dispatch.
 
 ### Why this split
 
-The policy modules are reusable across languages — JSON, JSONC, YAML, JavaScript, TypeScript, Lua, TOML, Nix (and future languages) all share the same `comment_attach` / `separator_normalize` / `policy.sort` / `walker`. The detail layer is what changes per language. Keeping the policy layer free of `vim.*` lets the bulk of the spec suite run as fast, deterministic unit tests on Outline literals — which is what makes the TDD Red step cheap enough to do honestly every time.
+The policy modules are reusable across languages — all supported languages share the same `comment_attach` / `separator_normalize` / `policy.sort` / `walker`. The detail layer is what changes per language. Keeping the policy layer free of `vim.*` lets the bulk of the spec suite run as fast, deterministic unit tests on Outline literals — which is what makes the TDD Red step cheap enough to do honestly every time.
 
 ## Outline contract
 
@@ -246,8 +246,127 @@ Implement `lua/sort-keys/handlers/<lang>_builder.lua` honoring the `build(bufnr,
 Working examples (in increasing complexity):
 
 - `handlers/lua_builder.lua` — single `table_constructor` AST for both object-like and array-like tables; container kind is decided dynamically by voting on whether any field is keyed.
-- `handlers/toml_builder.lua` — five container shapes (`inline_table` / `array` / `table` / `table_array_element` / synthesized root pseudo-container) with three different separator policies.
-- `handlers/nix_builder.lua` — six container shapes (`attrset` / `rec_attrset` / `let` / `list` / `formals` / `inherited_attrs`), AST quirk that interposes `binding_set` between container and entries (handled by `index_by_container_ancestor`), and the inherit-as-pinned-with-child container pattern.
+- `handlers/toml_builder.lua` — multiple container shapes (`inline_table` / `array` / `table` / `table_array_element` / synthesized root pseudo-container) with different separator policies per shape.
+- `handlers/nix_builder.lua` — multiple container shapes (`attrset` / `rec_attrset` / `let` / `list` / `formals` / `inherited_attrs`), AST quirk that interposes `binding_set` between container and entries (handled by `index_by_container_ancestor`), and the inherit-as-pinned-with-child container pattern.
+
+## Writing a builder
+
+A builder is a Lua module at `lua/sort-keys/handlers/<lang>_builder.lua` that exports two things:
+
+- `M.build(bufnr, target, config) → outline | nil` — the entry point called by `registry`
+- `M.filetypes = { [filetype] = config_name, ... }` — self-declared filetype routing
+
+### `config` argument
+
+```lua
+config = {
+  filetype   = "json",    -- vim.bo.filetype of the current buffer
+  query_text = "...",     -- tree-sitter query string from the .scm file
+  options    = { ... },   -- parsed from the .toml; capability flags + per-container hints
+}
+```
+
+### Standard `M.build` flow
+
+1. **Validate options** — return `nil` early if required fields are missing.
+2. **Get parser** — use `pcall`; return `nil` (not an error) if the parser is absent. Missing parsers are environmental, not plugin bugs.
+   ```lua
+   local lang = config.options.parser_lang or config.filetype
+   local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+   if not ok or parser == nil then return nil end
+   local root = parser:parse()[1]:root()
+   ```
+3. **Run the query** — `vim.treesitter.query.parse(lang, config.query_text)`, then `query:iter_matches(root, bufnr, 0, -1, { all = true })`.
+4. **Collect containers / entries / comments** from the matches using the `sortkeys.*` capture convention (see below).
+5. **Pick the target container** — `container_pick.for_cursor(containers, target.pos)` for cursor targets; for selection targets, find the innermost container whose range contains `target.range`.
+6. **Build the Outline** recursively for the chosen container and return it. Return `nil` if no container is found or its kind is disabled by `options`.
+
+### Capture convention
+
+The `.scm` query must use these capture names:
+
+| Capture               | `metadata` key                                | Meaning                                                         |
+| --------------------- | --------------------------------------------- | --------------------------------------------------------------- |
+| `@sortkeys.container` | `#set! sortkeys.kind "object"\|"array"`       | the sortable container node                                     |
+| `@sortkeys.entry`     | `#set! sortkeys.entry_kind "pair"\|"element"` | one item inside the container                                   |
+| `@sortkeys.key`       | —                                             | key node of a `"pair"` entry                                    |
+| `@sortkeys.value`     | —                                             | value node of a `"pair"` entry (used to find nested containers) |
+| `@sortkeys.comment`   | —                                             | comment node (only when `options.comment_aware`)                |
+
+Languages whose container kind cannot be determined statically (e.g. Lua `table_constructor`) omit `sortkeys.kind` from the query and compute kind dynamically in `build_outline`.
+
+### Grouping nodes by parent
+
+Entries and comments are collected flat and grouped by their immediate parent via a string identity key:
+
+```lua
+local function node_id_key(node)
+  local sr, sc, er, ec = node:range()
+  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
+end
+-- entries_by_parent[container.node_key]  → list of raw entry tables
+-- comments_by_parent[container.node_key] → list of comment tables
+```
+
+Builders that interpose an extra AST level between container and entries (e.g. Nix `binding_set`) use `index_by_container_ancestor` instead of `index_by_parent`.
+
+### Building entries
+
+Iterate entries in source-position order (the loop index becomes `anchor`):
+
+```lua
+local entry = {
+  kind     = "pair" | "element",
+  range    = node_range(entry_node),
+  sort_key = key_normalize.<lang>(raw_key_text),
+  movable  = true,   -- false for pinned entries (positional, spread, inherit, computed keys)
+  anchor   = i,      -- 1-based source-order index
+  attached = {},
+  child    = nil,
+}
+-- Recurse for :DeepSortKeys:
+local inner = containers_by_key[node_id_key(value_node)]
+if inner then entry.child = build_outline(inner, ctx) end
+```
+
+### Comment attachment
+
+Call `comment_attach.attach` after all entries are built, only when `options.comment_aware`:
+
+```lua
+if ctx.options.comment_aware then
+  local container_comments = ctx.comments_by_parent[container.node_key] or {}
+  outline_entries = comment_attach.attach(outline_entries, container_comments)
+end
+```
+
+### Returning the Outline
+
+```lua
+return {
+  kind                       = container.kind,
+  range                      = container.range,
+  structural_separator       = ctx.options.structural_separator,
+  trailing_separator_allowed = ctx.options.trailing_separator_allowed == true,
+  entries                    = outline_entries,
+}
+```
+
+Return `nil` (never a partial outline) when the container's kind is disabled by `options.can_sort_object` / `options.can_sort_array`.
+
+### Registering the builder
+
+Append the new builder to `BUILDERS` in `registry.lua` and self-declare its filetypes:
+
+```lua
+-- in your_builder.lua
+M.filetypes = { yourlang = "yourlang" }
+
+-- in registry.lua
+local BUILDERS = { ..., require("sort-keys.handlers.your_builder") }
+```
+
+The registry aggregates each builder's `M.filetypes` at startup — there is no central filetype → builder table to maintain separately.
 
 ## Conventions
 

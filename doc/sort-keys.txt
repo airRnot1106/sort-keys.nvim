@@ -7,47 +7,285 @@ License: MIT
 CONTENTS                                                  *sort-keys-contents*
 
   1. Introduction ............................. |sort-keys-introduction|
-  2. Setup .................................... |sort-keys-setup|
+  2. Commands ................................. |sort-keys-commands|
   3. Configuration ............................ |sort-keys-configuration|
-  4. Commands ................................. |sort-keys-commands|
-  5. Health ................................... |sort-keys-health|
+  4. Handlers ................................. |sort-keys-handlers|
+  5. Writing a builder ........................ |sort-keys-builder|
+  6. Health ................................... |sort-keys-health|
 
 ==============================================================================
 1. INTRODUCTION                                       *sort-keys-introduction*
 
-sort-keys.nvim is a Neovim plugin that sorts keys in structured data
-(JSON objects, Lua tables, etc.) within the current buffer or a given range.
+sort-keys.nvim sorts object/table keys in the current buffer or a visual
+range using tree-sitter, similar to Vim's built-in |:sort| command.
+
+Built-in handlers cover all languages listed in the bundled handlers
+directory. Additional languages can be added — see |sort-keys-handlers|.
 
 ==============================================================================
-2. SETUP                                                     *sort-keys-setup*
+2. COMMANDS                                               *sort-keys-commands*
 
-Call |sort-keys.setup()| once during your Neovim initialization. The function
-accepts a table of options, which is merged on top of the defaults.
+                                                                    *:SortKeys*
+:[range]SortKeys[!] [flags]
+                Sort the innermost container under the cursor (shallow).
+                With [range], only entries inside the selection reorder.
+                Accepts the same trailing flags as |:sort|:
 
->lua
-    require("sort-keys").setup({})
-<
+                  !         Reverse the comparison (descending).
+                  i         Case-insensitive comparison.
+                  n         Numeric comparison (falls back to string).
+                  r/{pat}/  Compare the substring matched by {pat}.
+                  u         Deduplicate: keep first occurrence per key.
+
+                                                                *:DeepSortKeys*
+:DeepSortKeys[!] [flags]
+                Like |:SortKeys| but recurses into nested containers
+                post-order: children are sorted before their parent.
 
 ==============================================================================
 3. CONFIGURATION                                     *sort-keys-configuration*
 
-Default options:
+Call `require("sort-keys").setup()` once during Neovim initialization.
+All fields are optional; the function merges your options on top of the
+defaults.
 
 >lua
-    {
-      -- options will be added as features land.
+    require("sort-keys").setup({
+      normalize_keys = true,  -- decode escapes when computing sort_key
+      comparator     = nil,   -- function(a, b, ctx) -> bool|nil
+      handlers       = {},    -- map of config_name -> handler spec
+    })
+<
+
+Fields ~
+
+normalize_keys (boolean, default: true)
+  When true, the sort key is the decoded logical value, so `"a\nb"` and
+  the two-character literal `a\nb` compare as equal.
+
+comparator (function|nil, default: nil)
+  Custom comparison function. Receives `(a_entry, b_entry, ctx)` and
+  returns true if `a < b`. Return nil to fall through to the default.
+
+handlers (table, default: {})
+  User handler specs. See |sort-keys-handlers|.
+
+==============================================================================
+4. HANDLERS                                               *sort-keys-handlers*
+
+Languages are served by handlers keyed off |'filetype'|. You can override
+any built-in or register a new language from your config via
+`setup({ handlers = { ... } })`.
+
+------------------------------------------------------------------------------
+                                              *sort-keys-handlers-override*
+Override a field of a built-in ~
+
+When the handlers key matches a built-in config name, only the fields you
+supply are overlaid. Everything else (builder, query, remaining options)
+is inherited.
+
+>lua
+    -- Enable comment handling for the built-in JSON handler.
+    require("sort-keys").setup({
+      handlers = {
+        json = { options = { comment_aware = true } },
+      },
+    })
+
+    -- Replace just the builder, keeping the built-in options + query.
+    require("sort-keys").setup({
+      handlers = {
+        nix = { builder = require("my.fancier_nix_builder") },
+      },
+    })
+<
+
+------------------------------------------------------------------------------
+                                            *sort-keys-handlers-new-lang*
+Register a new language ~
+
+Use a handlers key that does NOT match any built-in. All four fields are
+required: filetypes, builder, options, query_text.
+
+>lua
+    require("sort-keys").setup({
+      handlers = {
+        my_lang = {
+          filetypes = { "my_lang", "ml" },
+          builder   = require("my.sort_keys_my_lang"),
+          options   = {
+            can_sort_object            = true,
+            can_sort_array             = true,
+            can_deep                   = true,
+            key_quoting                = "logical",
+            comment_aware              = true,
+            structural_separator       = ",",
+            trailing_separator_allowed = true,
+          },
+          query_text = [[
+            ((container_node) @sortkeys.container
+              (#set! sortkeys.kind "object"))
+            ((entry_node) @sortkeys.entry
+              (#set! sortkeys.entry_kind "pair"))
+            ((comment) @sortkeys.comment)
+          ]],
+        },
+      },
+    })
+<
+
+The builder module must expose `build(bufnr, target, config) -> outline|nil`.
+See |sort-keys-builder|.
+
+------------------------------------------------------------------------------
+                                      *sort-keys-handlers-override-rules*
+Override rules ~
+
+handlers key matches a built-in config name:
+  Partial override. options is deep-merged on top of the built-in.
+  builder / query_text / filetypes are replaced only if supplied.
+
+Different key, but filetypes collide with a built-in:
+  User handler wins entirely for that filetype. No field-level merge;
+  the built-in is hidden.
+
+Different key + new filetypes:
+  New language. filetypes, builder, query_text, and options are all
+  required.
+
+Notes ~
+- Calling `setup({ handlers = ... })` again replaces the user-handler map
+  wholesale. Built-in handlers are never mutated.
+
+==============================================================================
+5. WRITING A BUILDER                                      *sort-keys-builder*
+
+A builder is any Lua module that exposes:
+
+>lua
+    M.build(bufnr, target, config) -> outline | nil
+<
+
+Pass it as the `builder` field of a handler spec. See
+|sort-keys-handlers-new-lang|.
+
+------------------------------------------------------------------------------
+                                                 *sort-keys-builder-args*
+Arguments ~
+
+>lua
+    -- target: where the user invoked the command
+    target = { kind = "cursor",    pos   = { row, col } }
+    target = { kind = "selection", range = { srow, scol, erow, ecol } }
+
+    -- config: resolved from the handler spec
+    config = {
+      filetype   = "mylang",  -- vim.bo.filetype of the buffer
+      query_text = "...",     -- tree-sitter query from the spec
+      options    = { ... },   -- options table from the spec
     }
 <
 
-==============================================================================
-4. COMMANDS                                               *sort-keys-commands*
+------------------------------------------------------------------------------
+                                                 *sort-keys-builder-flow*
+Typical flow ~
 
-                                                                    *:SortKeys*
-:[range]SortKeys        Sort keys within the current buffer or the given
-                        |[range]|.
+1. Get the parser via pcall. Return nil (not a plugin error) if absent.
+
+>lua
+    local lang = config.options.parser_lang or config.filetype
+    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+    if not ok or parser == nil then return nil end
+    local root = parser:parse()[1]:root()
+<
+
+2. Run the query and collect containers, entries, and comments.
+
+>lua
+    local query = vim.treesitter.query.parse(lang, config.query_text)
+    for _, match, metadata in
+        query:iter_matches(root, bufnr, 0, -1, { all = true }) do
+      -- inspect @sortkeys.container / @sortkeys.entry / @sortkeys.comment
+    end
+<
+
+3. Pick the target container: innermost container at the cursor position,
+   or whose range contains the selection range.
+
+4. Build and return the Outline. Return nil if no container is found or
+   its kind is disabled by options.
+
+------------------------------------------------------------------------------
+                                              *sort-keys-builder-captures*
+Tree-sitter query captures ~
+
+  Capture                Metadata                         Role ~
+  @sortkeys.container    sortkeys.kind "object"|"array"   sortable container
+  @sortkeys.entry        sortkeys.entry_kind              item inside
+                           "pair"|"element"
+  @sortkeys.key          —                                key node of pair
+  @sortkeys.value        —                                value node of pair
+  @sortkeys.comment      —                                comment node
+
+If container kind cannot be determined statically (e.g. Lua
+`table_constructor`), omit `sortkeys.kind` and compute the kind in your
+builder after inspecting the entries.
+
+------------------------------------------------------------------------------
+                                              *sort-keys-builder-outline*
+Outline shape ~
+
+>lua
+    {
+      kind                       = "object" | "array",
+      range                      = { srow, scol, erow, ecol },
+      structural_separator       = ",",   -- "" for whitespace-gapped
+      trailing_separator_allowed = true,
+
+      entries = {
+        {
+          kind     = "pair" | "element",
+          sort_key = "...",
+          range    = { srow, scol, erow, ecol },
+          movable  = true,   -- false = stays at its anchor slot
+          anchor   = 1,      -- 1-based source-order index
+          attached = {},
+          child    = nil,    -- nested outline for :DeepSortKeys
+        },
+      },
+    }
+<
+
+movable = false
+  Keeps an entry pinned at its anchor position. Use for entries that must
+  not reorder: positional fields, spread elements (...), computed keys,
+  inherit bindings, etc.
+
+child
+  Set to a recursively built Outline when the entry's value is itself a
+  sortable container. Required for |:DeepSortKeys| recursion.
+
+------------------------------------------------------------------------------
+                                             *sort-keys-builder-helpers*
+Built-in helpers ~
+
+`require("sort-keys.core.comment_attach").attach(entries, comments)`
+  Assigns comments to adjacent entries and expands their ranges. Call
+  after building all entries when options.comment_aware is true.
+
+`require("sort-keys.core.container_pick").for_cursor(containers, pos)`
+  3-tier innermost-container resolution for cursor targets.
+
+`require("sort-keys.strategies.key_normalize")`
+  Per-language sort-key normalization. One M.<lang> function per
+  supported language.
+
+The built-in handlers in `lua/sort-keys/handlers/*_builder.lua` are the
+canonical reference implementations.
 
 ==============================================================================
-5. HEALTH                                                   *sort-keys-health*
+6. HEALTH                                                   *sort-keys-health*
 
 Run `:checkhealth sort-keys` to verify the plugin is loaded correctly.
 
