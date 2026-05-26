@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.3.0](https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.3...v0.3.0) (2026-05-25)
+
+
+### Features
+
+* **command:** wire :SortKeys and :DeepSortKeys to the sort engine ([7116aa8](https://github.com/airRnot1106/sort-keys.nvim/commit/7116aa8b9c7328f5a19e20dda45c7b81c95d92fe))
+* **config:** add normalize_keys and comparator options ([a609440](https://github.com/airRnot1106/sort-keys.nvim/commit/a609440b1004d59ea8a1888ab3ce70918badd043))
+* **config:** register user handlers via setup({handlers={...}}) ([3fb8e98](https://github.com/airRnot1106/sort-keys.nvim/commit/3fb8e982aa823002a36108ca6c0e995b95282aa4))
+* **core:** add comment-aware outline policies and wire them through ([61e7d5b](https://github.com/airRnot1106/sort-keys.nvim/commit/61e7d5b1d85657d7a54b34e665cdcef84d049832))
+* **core:** add sort engine primitives ([4c66f7b](https://github.com/airRnot1106/sort-keys.nvim/commit/4c66f7b3a300ed38e9e107472522eefec5685490))
+* **filetype:** add JavaScript support ([4b1a572](https://github.com/airRnot1106/sort-keys.nvim/commit/4b1a5721b5111b58c008eae38a089007dc9494fc))
+* **filetype:** add JSONC support ([ba2236b](https://github.com/airRnot1106/sort-keys.nvim/commit/ba2236b93e1c8c439ca9f6dd55a9c740e8b201c7))
+* **filetype:** add Lua support ([4b7119e](https://github.com/airRnot1106/sort-keys.nvim/commit/4b7119eddc3319fac31d98691398fe89717add76))
+* **filetype:** add Nix support ([d5e5ed5](https://github.com/airRnot1106/sort-keys.nvim/commit/d5e5ed5ea1fbe2ed82391f84798f20bf1e43c01f))
+* **filetype:** add TOML support ([7d1f303](https://github.com/airRnot1106/sort-keys.nvim/commit/7d1f3033f661afc5e769c03487c07923d8c9bf9e))
+* **filetype:** add TypeScript support ([d222a94](https://github.com/airRnot1106/sort-keys.nvim/commit/d222a94c20dd6d08641d145c68c41e88cba3a787))
+* **filetype:** add YAML support ([25180e1](https://github.com/airRnot1106/sort-keys.nvim/commit/25180e172c087d2ba03e0afd5a9588d3c2b0d6aa))
+* **handlers:** add JSON declarative handler and filetype registry ([c0425cd](https://github.com/airRnot1106/sort-keys.nvim/commit/c0425cd65736560c13a40200074afc1b7dcb24a8))
+* **nix:** add flake.nix and development shell setup ([0fe624e](https://github.com/airRnot1106/sort-keys.nvim/commit/0fe624ee804d2480f6a532cd5ad9b1cb7418440d))
+
+
+### Bug Fixes
+
+* **comment_attach:** select comment targets using original entry ranges ([53237ff](https://github.com/airRnot1106/sort-keys.nvim/commit/53237ffeda354a4a5452cb3a66cbc859bed0e5ee))
+* **tests/support:** require parser binary on runtimepath in has_parser ([55798af](https://github.com/airRnot1106/sort-keys.nvim/commit/55798afa21311ee9f7f80f9e91f78764ee1c7b65))
+
+
+### Documentation
+
+* **claude:** rewrite CLAUDE.md to match the current architecture ([01f9832](https://github.com/airRnot1106/sort-keys.nvim/commit/01f983245a62ec4d63df94d43cdce351440fc646))
+* migrate reference docs to vimdoc and simplify README ([c94e8b7](https://github.com/airRnot1106/sort-keys.nvim/commit/c94e8b70c98760ad98b060f793050f6b790e4e35))
+
 ## [v0.2.3] - 2026-02-03
 
 ### :sparkles: New Features
