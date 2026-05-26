@@ -1,5 +1,6 @@
 {
   projectRootFile = "flake.nix";
+  settings.excludes = [ "CHANGELOG.md" ];
   programs = {
     nixfmt.enable = true;
     oxfmt = {
