@@ -87,7 +87,7 @@ local function collect_matches(bufnr, root, query)
   end
 
   local containers = {}
-  local entries = {}
+  local entry_candidates = {}
   local comments = {}
 
   local function first_node(match, capture_name)
@@ -120,7 +120,7 @@ local function collect_matches(bufnr, root, query)
     if entry_node then
       local entry_kind = metadata[META.entry_kind]
       if entry_kind then
-        entries[#entries + 1] = {
+        entry_candidates[#entry_candidates + 1] = {
           node = entry_node,
           range = node_range(entry_node),
           entry_kind = entry_kind,
@@ -136,6 +136,24 @@ local function collect_matches(bufnr, root, query)
         node = comment_node,
         range = node_range(comment_node),
       }
+    end
+  end
+
+  -- The array element query is a wildcard `(array (_) @sortkeys.entry)` so
+  -- it also matches `(comment)` siblings inside the array. If we let those
+  -- through, comments end up sorted as data AND attached as comments, and
+  -- comment_attach's range expansion can push a real entry past the
+  -- comment-as-entry on the same row — which makes the applier's inter-
+  -- entry gap read out-of-order and crash on `start_col > end_col`. Drop
+  -- entries whose node was also captured as a comment.
+  local comment_ids = {}
+  for _, c in ipairs(comments) do
+    comment_ids[node_id_key(c.node)] = true
+  end
+  local entries = {}
+  for _, e in ipairs(entry_candidates) do
+    if not comment_ids[node_id_key(e.node)] then
+      entries[#entries + 1] = e
     end
   end
 

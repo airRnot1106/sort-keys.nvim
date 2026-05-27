@@ -229,5 +229,42 @@ describe("sort-keys.handlers.json_builder", function()
       assert.equals(2, outline.entries[1].range[1])
       assert.equals(2, outline.entries[1].range[2])
     end)
+
+    -- Regression: the array entry query is `(array (_) @sortkeys.entry)`. The
+    -- wildcard `(_)` matches every named child of the array, including
+    -- `comment` nodes. Without a filter, the builder fed each trailing line
+    -- comment into the sort pipeline as if it were a data element, which
+    -- both garbled the result and crashed the applier when comment_attach
+    -- expanded a real entry's range past the next "entry" (the comment).
+    it("filters comment-captured nodes out of array entries when comment_aware is true", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      local aware_options = vim.tbl_deep_extend("force", {}, json_options, { comment_aware = true })
+      local bufnr = make_buf({
+        "[",
+        '  "c", // T-c',
+        '  "a", // T-a',
+        '  "b"',
+        "]",
+      }, "json")
+      local outline = builder.build(bufnr, { kind = "cursor", pos = { 0, 0 } }, {
+        filetype = "json",
+        query_text = jsonc_query,
+        options = aware_options,
+      })
+      assert.is_not_nil(outline)
+      assert.equals("array", outline.kind)
+      -- Three string elements; the two `// T-*` comments must NOT show up
+      -- as entries even though `(_) @sortkeys.entry` matched them.
+      assert.equals(3, #outline.entries)
+      local keys = {}
+      for _, e in ipairs(outline.entries) do
+        keys[#keys + 1] = e.sort_key
+      end
+      table.sort(keys)
+      assert.same({ '"a"', '"b"', '"c"' }, keys)
+    end)
   end)
 end)
