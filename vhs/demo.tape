@@ -3,7 +3,7 @@
 # Generates vhs/demo.gif via `nix run .#vhs` (preferred) or by calling
 # `vhs vhs/demo.tape` directly with vhs + nvim + ttyd + ffmpeg on PATH.
 #
-# Covers four scenarios on a single JSON fixture:
+# Covers four scenarios on a single JSONC fixture:
 #   1. :SortKeys           — ascending sort of the top-level keys
 #   2. :SortKeys!          — descending sort (! flag = reverse)
 #   3. :DeepSortKeys       — recurse into nested containers
@@ -14,9 +14,9 @@ Output vhs/demo.gif
 Require nvim
 
 Set Shell "bash"
-Set FontSize 14
-Set Width 900
-Set Height 600
+Set FontSize 22
+Set Width 1440
+Set Height 960
 Set Padding 20
 Set TypingSpeed 50ms
 Set PlaybackSpeed 1.0
@@ -26,7 +26,7 @@ Set PlaybackSpeed 1.0
 # the nvim buffer (the literal `\[ \]` bracket escapes leaked by
 # non-interactive bash's PS1 look like garbage in the gif).
 Hide
-Type "nvim -u vhs/init.lua vhs/fixture.json"
+Type "nvim -u vhs/init.lua vhs/fixture.jsonc"
 Enter
 Sleep 2s
 Show
