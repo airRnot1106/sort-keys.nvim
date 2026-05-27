@@ -43,7 +43,7 @@
           src = ./.;
           meta = {
             description = "Sort keys in the current buffer or range";
-            homepage = "https://github.com/airRnot/sort-keys.nvim";
+            homepage = "https://github.com/airRnot1106/sort-keys.nvim";
             license = pkgs.lib.licenses.mit;
             platforms = pkgs.lib.platforms.all;
           };
@@ -132,11 +132,11 @@
         pkgs.writeShellApplication {
           name = "sort-keys-vhs";
           runtimeInputs = with pkgs; [
-            vhs
             (mkVhsNvim pkgs)
+            ffmpeg
             git
             ttyd
-            ffmpeg
+            vhs
           ];
           text = ''
             cd "$(git rev-parse --show-toplevel)"
