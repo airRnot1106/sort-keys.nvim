@@ -167,5 +167,170 @@ describe("sort-keys.core.separator_normalize", function()
         assert.same({ "\n" }, gaps)
       end)
     end)
+
+    -- opts.data_lengths lets a piece declare where its "data" portion ends
+    -- and an absorbed trailing-comment "suffix" begins. With it, the policy
+    -- can splice a missing separator BETWEEN data and suffix instead of
+    -- appending it to the piece (which on line-comment languages would
+    -- bury the separator inside the comment). Without it the policy keeps
+    -- the existing gap-prepend behavior so legacy callers are unaffected.
+    describe("with opts.data_lengths (data/suffix-aware splicing)", function()
+      it("splices the separator at data_lengths[i] inside the piece", function()
+        -- piece[1] = data `"a": 1` + suffix ` // T-a`. data_lengths[1] = 6.
+        local pieces, gaps = separator_normalize.normalize(
+          { '"a": 1 // T-a', '"b": 2' },
+          { "\n  " },
+          {
+            separator = ",",
+            trailing_separator_allowed = false,
+            data_lengths = { 6, 6 },
+          }
+        )
+        assert.same({ '"a": 1, // T-a', '"b": 2' }, pieces)
+        -- The gap stays clean — the separator went into the piece, not the gap.
+        assert.same({ "\n  " }, gaps)
+      end)
+
+      it("does not splice when the suffix already starts with the separator", function()
+        -- piece[1] data `"a": 1` + suffix `, // T-a` already carries `,`.
+        local pieces, gaps = separator_normalize.normalize(
+          { '"a": 1, // T-a', '"b": 2' },
+          { "\n  " },
+          {
+            separator = ",",
+            trailing_separator_allowed = false,
+            data_lengths = { 6, 6 },
+          }
+        )
+        assert.same({ '"a": 1, // T-a', '"b": 2' }, pieces)
+        assert.same({ "\n  " }, gaps)
+      end)
+
+      it("strips the separator from the suffix's leading position on the last piece", function()
+        -- piece[2] = data `"b": 2` + suffix `, // T-b`. last piece, forbid trailing.
+        -- Stripping must come from the suffix's front, not from data's tail
+        -- (which would do nothing) nor by leaving the suffix untouched (which
+        -- would leave a stray separator before the comment).
+        local pieces, gaps = separator_normalize.normalize(
+          { '"a": 1', '"b": 2, // T-b' },
+          { ",\n  " },
+          {
+            separator = ",",
+            trailing_separator_allowed = false,
+            data_lengths = { 6, 6 },
+          }
+        )
+        assert.same({ '"a": 1', '"b": 2 // T-b' }, pieces)
+        assert.same({ ",\n  " }, gaps)
+      end)
+
+      it(
+        "keeps the suffix's leading separator on the last piece when the language allows it",
+        function()
+          local pieces, gaps = separator_normalize.normalize(
+            { '"a": 1', '"b": 2, // T-b' },
+            { ",\n  " },
+            {
+              separator = ",",
+              trailing_separator_allowed = true,
+              data_lengths = { 6, 6 },
+            }
+          )
+          assert.same({ '"a": 1', '"b": 2, // T-b' }, pieces)
+          assert.same({ ",\n  " }, gaps)
+        end
+      )
+
+      it(
+        "falls back to data tail when the suffix is empty (data_lengths[i] == #pieces[i])",
+        function()
+          -- No trailing suffix → the policy should behave like the no-
+          -- data_lengths path: trailing-sep strip operates on data's tail.
+          local pieces, gaps = separator_normalize.normalize({ '"a": 1', '"b": 2,' }, { ", " }, {
+            separator = ",",
+            trailing_separator_allowed = false,
+            data_lengths = { 6, 7 },
+          })
+          assert.same({ '"a": 1', '"b": 2' }, pieces)
+          assert.same({ ", " }, gaps)
+        end
+      )
+
+      it("relocates a gap-leading separator into the piece's data/suffix boundary", function()
+        -- Reproduces the user-reported case where the entry was
+        -- originally last in source (no inline `,`) but absorbed a
+        -- trailing `// comment`. After sort it is no longer last; the
+        -- gap that follows starts with the `,` carried over from a
+        -- different source-position slot. Left as-is it would render
+        -- after the comment and be swallowed by the line-comment.
+        -- The policy must move that leading `,` into the piece's
+        -- data/suffix boundary and strip it from the gap so the
+        -- separator lands before the comment.
+        local pieces, gaps = separator_normalize.normalize(
+          { '"a": 1 // T-a', '"b": 2' },
+          { ",\n  " },
+          {
+            separator = ",",
+            trailing_separator_allowed = false,
+            data_lengths = { 6, 6 },
+          }
+        )
+        assert.same({ '"a": 1, // T-a', '"b": 2' }, pieces)
+        assert.same({ "\n  " }, gaps)
+      end)
+
+      it(
+        "strips a redundant gap-leading separator when the piece suffix already carries one",
+        function()
+          -- The entry absorbed `, // hoge` from source: piece's suffix
+          -- already starts with `,`, so the slot's separator is correctly
+          -- placed. The gap that follows still carries a leading `,`
+          -- (a different source-position neighbor's trailing comma).
+          -- Left there it would render after the comment and look like a
+          -- duplicate "`, // hoge,`". Strip it.
+          local pieces, gaps = separator_normalize.normalize(
+            { '"a": 1, // T-a', '"b": 2' },
+            { ",\n  " },
+            {
+              separator = ",",
+              trailing_separator_allowed = true,
+              data_lengths = { 6, 6 },
+            }
+          )
+          assert.same({ '"a": 1, // T-a', '"b": 2' }, pieces)
+          assert.same({ "\n  " }, gaps)
+        end
+      )
+
+      it(
+        "appends a trailing separator to the new-last piece when source_last_had_trailing_sep is set and the language allows it",
+        function()
+          -- opts.source_last_had_trailing_sep is the applier's signal
+          -- that the source used trailing-separator style (e.g. JSONC
+          -- with `,` after every entry, including the last). Reordering
+          -- can move the new-last entry out of that slot, so the policy
+          -- adds one back to keep the style consistent.
+          local pieces, gaps = separator_normalize.normalize({ '"a": 1', '"b": 2' }, { ",\n  " }, {
+            separator = ",",
+            trailing_separator_allowed = true,
+            data_lengths = { 6, 6 },
+            source_last_had_trailing_sep = true,
+          })
+          assert.same({ '"a": 1', '"b": 2,' }, pieces)
+          assert.same({ ",\n  " }, gaps)
+        end
+      )
+
+      it("leaves the new-last piece alone when source_last_had_trailing_sep is false", function()
+        local pieces, gaps = separator_normalize.normalize({ '"a": 1', '"b": 2' }, { ",\n  " }, {
+          separator = ",",
+          trailing_separator_allowed = true,
+          data_lengths = { 6, 6 },
+          source_last_had_trailing_sep = false,
+        })
+        assert.same({ '"a": 1', '"b": 2' }, pieces)
+        assert.same({ ",\n  " }, gaps)
+      end)
+    end)
   end)
 end)

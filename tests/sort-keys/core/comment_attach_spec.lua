@@ -96,6 +96,46 @@ describe("sort-keys.core.comment_attach", function()
       assert.same({ 2, 2, 2, 8 }, input_range)
     end)
 
+    -- Downstream consumers (the applier + separator_normalize) need to
+    -- know where the entry's data portion ends so a missing inter-entry
+    -- separator can be spliced BETWEEN data and an absorbed trailing
+    -- comment, instead of after the whole expanded piece (which would
+    -- bury the separator inside a line comment).
+    it("records each entry's pre-absorb range as result[i].data_range", function()
+      local entries = { entry({ 1, 2, 1, 8 }), entry({ 3, 2, 3, 8 }) }
+      local comments = {
+        comment({ 1, 10, 1, 21 }, "block"), -- trailing for entry 1
+        comment({ 2, 2, 2, 9 }), -- leading for entry 2
+      }
+      local result = comment_attach.attach(entries, comments)
+      -- entry 1's range expanded to absorb the trailing block comment,
+      -- but data_range still points at the original pair end.
+      assert.same({ 1, 2, 1, 21 }, result[1].range)
+      assert.same({ 1, 2, 1, 8 }, result[1].data_range)
+      -- entry 2's range expanded leftward to absorb the leading comment,
+      -- but data_range still points at the original pair start.
+      assert.same({ 2, 2, 3, 8 }, result[2].range)
+      assert.same({ 3, 2, 3, 8 }, result[2].data_range)
+    end)
+
+    it("records data_range even for entries that did not absorb any comment", function()
+      -- Consumers should be able to read data_range unconditionally.
+      local entries = { entry({ 1, 2, 1, 8 }) }
+      local result = comment_attach.attach(entries, {})
+      assert.same({ 1, 2, 1, 8 }, result[1].range)
+      assert.same({ 1, 2, 1, 8 }, result[1].data_range)
+    end)
+
+    it("returns data_range as a fresh table, not a shared reference with range", function()
+      -- Mutating one must not silently mutate the other; the absorb path
+      -- writes through result[i].range and would otherwise clobber the
+      -- data boundary it just recorded.
+      local entries = { entry({ 1, 2, 1, 8 }) }
+      local result = comment_attach.attach(entries, {})
+      result[1].range[3] = 99
+      assert.equals(1, result[1].data_range[3])
+    end)
+
     it(
       "routes the second leading-block comment to the same next entry as the first, not to the previous entry",
       function()

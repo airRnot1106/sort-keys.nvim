@@ -10,6 +10,12 @@ local function read_text(bufnr, range)
   return table.concat(lines, "\n")
 end
 
+-- Returns (piece_text, data_length). `data_length` is the byte offset in
+-- piece_text where the entry's data ends and an absorbed trailing comment
+-- begins; it is `#piece_text` when nothing was absorbed past the data.
+-- separator_normalize uses it to splice a missing inter-entry separator
+-- BETWEEN data and suffix so the separator never lands inside a line-
+-- comment that comment_attach merged into the piece.
 local function render_entry(bufnr, entry, render_outline)
   if entry.child then
     local er = entry.range
@@ -17,9 +23,23 @@ local function render_entry(bufnr, entry, render_outline)
     local prefix = read_text(bufnr, { er[1], er[2], cr[1], cr[2] })
     local middle = render_outline(bufnr, entry.child)
     local suffix = read_text(bufnr, { cr[3], cr[4], er[3], er[4] })
-    return prefix .. middle .. suffix
+    return prefix .. middle .. suffix, #prefix + #middle
   end
-  return read_text(bufnr, entry.range)
+  local piece = read_text(bufnr, entry.range)
+  if
+    entry.data_range
+    and (entry.data_range[3] ~= entry.range[3] or entry.data_range[4] ~= entry.range[4])
+  then
+    -- Trailing absorbed comment: data ends at data_range[3,4].
+    local data_text = read_text(bufnr, {
+      entry.range[1],
+      entry.range[2],
+      entry.data_range[3],
+      entry.data_range[4],
+    })
+    return piece, #data_text
+  end
+  return piece, #piece
 end
 
 local function render_outline(bufnr, outline)
@@ -52,8 +72,15 @@ local function render_outline(bufnr, outline)
   end
 
   local pieces = {}
-  for _, e in ipairs(outline.entries) do
-    pieces[#pieces + 1] = render_entry(bufnr, e, render_outline)
+  local data_lengths = {}
+  local source_last_idx
+  for i, e in ipairs(outline.entries) do
+    local p, dl = render_entry(bufnr, e, render_outline)
+    pieces[#pieces + 1] = p
+    data_lengths[#data_lengths + 1] = dl
+    if e == last then
+      source_last_idx = i
+    end
   end
 
   -- `structural_separator` is declared verbatim by each language's .toml so
@@ -61,9 +88,26 @@ local function render_outline(bufnr, outline)
   -- field is absent or empty the language has no inter-entry separator
   -- (e.g., newline-based formats) and normalization is skipped.
   if outline.structural_separator and #outline.structural_separator > 0 then
+    local sep = outline.structural_separator
+    local source_last_had_trailing_sep = false
+    if source_last_idx then
+      local p = pieces[source_last_idx]
+      local dl = data_lengths[source_last_idx]
+      local data_part = p:sub(1, dl)
+      local suffix_part = p:sub(dl + 1)
+      -- The source's last entry signals trailing-separator style iff its
+      -- piece carries the sep at the data/suffix boundary (either at
+      -- data's tail or at the absorbed suffix's leading position). The
+      -- check is on the SOURCE-position last entry, not the sorted-last,
+      -- so reordering can preserve that style on the new last piece.
+      source_last_had_trailing_sep = (#suffix_part >= #sep and suffix_part:sub(1, #sep) == sep)
+        or (#data_part >= #sep and data_part:sub(-#sep) == sep)
+    end
     pieces, gaps = separator_normalize.normalize(pieces, gaps, {
-      separator = outline.structural_separator,
+      separator = sep,
       trailing_separator_allowed = outline.trailing_separator_allowed == true,
+      data_lengths = data_lengths,
+      source_last_had_trailing_sep = source_last_had_trailing_sep,
     })
   end
 

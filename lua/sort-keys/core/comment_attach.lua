@@ -6,6 +6,10 @@ local function copy_entry(e)
     out[k] = v
   end
   out.range = { e.range[1], e.range[2], e.range[3], e.range[4] }
+  -- Snapshot the pre-absorb range so downstream consumers (applier +
+  -- separator_normalize) can find where the entry's data ends and an
+  -- absorbed trailing comment begins within the expanded piece text.
+  out.data_range = { e.range[1], e.range[2], e.range[3], e.range[4] }
   return out
 end
 

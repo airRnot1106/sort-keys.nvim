@@ -97,7 +97,7 @@ describe("jsonc end-to-end via :SortKeys", function()
     -- were a data element, comment_attach then expanded an adjacent real
     -- entry's range past the comment-as-entry's start, and the applier
     -- crashed reading the inter-entry gap with `start_col > end_col`.
-    it("sorts string elements while ignoring per-element trailing comments", function()
+    it("sorts string elements while keeping each trailing comment with its element", function()
       if not has_jsonc then
         pending("json treesitter parser not available (jsonc reuses it)")
         return
@@ -111,15 +111,15 @@ describe("jsonc end-to-end via :SortKeys", function()
       })
       set_cursor(bufnr, 0, 0)
       vim.cmd("SortKeys")
-      -- Primary contract: the applier no longer crashes on
-      -- `start_col > end_col`, and the data elements are reordered into
-      -- "a", "b", "c". The trailing comma rendered inside `// T-a,` is a
-      -- separate, pre-existing separator-placement issue with same-line
-      -- trailing comments (it affects pair containers too); JSONC allows
-      -- trailing commas, so the output remains syntactically valid.
+      -- `a` is now non-last and already had its `,` in front of `// T-a`,
+      -- so the separator stays there. `b` has no trailing comment so its
+      -- separator is appended as usual. `c` becomes the last element, but
+      -- JSONC permits a trailing comma so its absorbed `,` stays put —
+      -- the critical contract is that the comma is BEFORE `// T-c`, not
+      -- buried inside the line comment.
       assert.same({
         "[",
-        '  "a", // T-a,',
+        '  "a", // T-a',
         '  "b",',
         '  "c", // T-c',
         "]",
