@@ -39,7 +39,7 @@
         pkgs:
         pkgs.vimUtils.buildVimPlugin {
           pname = "sort-keys.nvim";
-          version = "0.0.0";
+          version = (builtins.fromJSON (builtins.readFile ./.release-please-manifest.json)).".";
           src = ./.;
           meta = {
             description = "Sort keys in the current buffer or range";
