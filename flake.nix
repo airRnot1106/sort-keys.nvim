@@ -57,6 +57,7 @@
             json
             lua
             nix
+            pkl
             toml
             typescript
             yaml

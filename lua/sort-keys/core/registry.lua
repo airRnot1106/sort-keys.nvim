@@ -1,22 +1,24 @@
-local toml_loader = require("sort-keys.core.toml_loader")
-local json_builder = require("sort-keys.languages.json.builder")
-local yaml_builder = require("sort-keys.languages.yaml.builder")
 local javascript_builder = require("sort-keys.languages.javascript.builder")
+local json_builder = require("sort-keys.languages.json.builder")
 local lua_builder = require("sort-keys.languages.lua.builder")
-local toml_builder = require("sort-keys.languages.toml.builder")
 local nix_builder = require("sort-keys.languages.nix.builder")
+local pkl_builder = require("sort-keys.languages.pkl.builder")
+local toml_builder = require("sort-keys.languages.toml.builder")
+local toml_loader = require("sort-keys.core.toml_loader")
+local yaml_builder = require("sort-keys.languages.yaml.builder")
 
 local M = {}
 
 -- Each built-in builder self-declares the filetypes it serves and the
 -- canonical config name each filetype maps to (see `builder.filetypes`).
 local BUILT_IN_BUILDERS = {
-  json_builder,
-  yaml_builder,
   javascript_builder,
+  json_builder,
   lua_builder,
-  toml_builder,
   nix_builder,
+  pkl_builder,
+  toml_builder,
+  yaml_builder,
 }
 
 -- Built-ins indexed by config_name. Used by partial-override to find a base

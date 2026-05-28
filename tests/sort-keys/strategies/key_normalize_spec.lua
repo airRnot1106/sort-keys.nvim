@@ -284,4 +284,36 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals('a."b.c".d', key_normalize.nix('a."b.c".d'))
     end)
   end)
+
+  describe("pkl(text)", function()
+    it("returns a bare property identifier unchanged", function()
+      assert.equals("name", key_normalize.pkl("name"))
+    end)
+
+    it("strips the surrounding double quotes of a mapping key string literal", function()
+      -- Mapping entries spell their key as `["a"]`; the captured key node is
+      -- the inner string literal `"a"`, which must collapse to `a`.
+      assert.equals("a", key_normalize.pkl('"a"'))
+    end)
+
+    it("strips surrounding backticks of a quoted (keyword-escaped) identifier", function()
+      -- Pkl wraps identifiers that collide with keywords in backticks, e.g.
+      -- `` `default` = 1``; the sort_key is the bare word.
+      assert.equals("default", key_normalize.pkl("`default`"))
+    end)
+
+    it("leaves inner characters of a string-literal key verbatim (v1 keeps escapes)", function()
+      -- v1 only strips the delimiters; escape decoding is out of scope and
+      -- round-tripping the literal text keeps the sort_key stable.
+      assert.equals([[a\nb]], key_normalize.pkl([["a\nb"]]))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.pkl('""'))
+    end)
+
+    it("trims surrounding whitespace before deciding the surface form", function()
+      assert.equals("a", key_normalize.pkl('  "a"  '))
+    end)
+  end)
 end)
