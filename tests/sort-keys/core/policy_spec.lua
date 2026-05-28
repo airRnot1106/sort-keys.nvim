@@ -155,6 +155,39 @@ describe("sort-keys.core.policy", function()
       assert.equals(2, anchors.b)
       assert.equals(5, anchors.c)
     end)
+
+    -- The applier needs the removed entries' ranges to recompute the
+    -- container's prefix/gaps/suffix partition; otherwise it re-emits the
+    -- dropped entries' source bytes. So dedup surfaces the removed entries
+    -- on `outline.dropped` instead of discarding them outright.
+    it("exposes the removed duplicates on outline.dropped", function()
+      local o = make_outline("object", {
+        make_entry("a", 1),
+        make_entry("b", 2),
+        make_entry("a", 3),
+        make_entry("b", 4),
+        make_entry("c", 5),
+      })
+      local sorted = policy.sort(o, { flags = { unique = true }, normalize_keys = true })
+      assert.same({ "a", "b", "c" }, keys(sorted))
+      assert.is_table(sorted.dropped)
+      local dropped_anchors = {}
+      for _, e in ipairs(sorted.dropped) do
+        dropped_anchors[#dropped_anchors + 1] = e.anchor
+      end
+      table.sort(dropped_anchors)
+      -- The second "a" (anchor 3) and second "b" (anchor 4) were removed.
+      assert.same({ 3, 4 }, dropped_anchors)
+    end)
+
+    it("leaves outline.dropped empty when no flag removes anything", function()
+      local o = make_outline("object", {
+        make_entry("b", 1),
+        make_entry("a", 2),
+      })
+      local sorted = policy.sort(o, { flags = {}, normalize_keys = true })
+      assert.same({}, sorted.dropped)
+    end)
   end)
 
   describe("sort — custom comparator", function()

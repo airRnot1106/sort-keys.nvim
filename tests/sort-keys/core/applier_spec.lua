@@ -107,6 +107,121 @@ describe("sort-keys.core.applier", function()
     assert.equals('[ "a", "b", "c" ]', get_lines(bufnr)[1])
   end)
 
+  it("omits entries listed in outline.dropped (deduplicate / `u` flag)", function()
+    -- Buffer: [ "b", "a", "b", "a" ]
+    --         0         1         2
+    --         0123456789012345678901
+    -- The `u` flag removed the second "b" and second "a". outline.entries
+    -- carries the two survivors in sorted order; outline.dropped carries the
+    -- removed pair so the applier can rebuild the container's prefix / gaps /
+    -- suffix over the full source partition and emit only the survivors,
+    -- instead of letting the dropped bytes leak back via the suffix/gaps.
+    local bufnr = make_buf({ '[ "b", "a", "b", "a" ]' })
+
+    local b1 = {
+      kind = "element",
+      sort_key = "b",
+      range = { 0, 2, 0, 5 },
+      movable = true,
+      anchor = 1,
+      attached = {},
+    }
+    local a2 = {
+      kind = "element",
+      sort_key = "a",
+      range = { 0, 7, 0, 10 },
+      movable = true,
+      anchor = 2,
+      attached = {},
+    }
+    local b3 = {
+      kind = "element",
+      sort_key = "b",
+      range = { 0, 12, 0, 15 },
+      movable = true,
+      anchor = 3,
+      attached = {},
+    }
+    local a4 = {
+      kind = "element",
+      sort_key = "a",
+      range = { 0, 17, 0, 20 },
+      movable = true,
+      anchor = 4,
+      attached = {},
+    }
+
+    local outline = {
+      kind = "array",
+      range = { 0, 0, 0, 22 },
+      structural_separator = ",",
+      trailing_separator_allowed = false,
+      entries = { a2, b1 }, -- survivors, sorted
+      dropped = { b3, a4 }, -- removed duplicates
+    }
+
+    applier.apply(bufnr, outline)
+    assert.equals('[ "a", "b" ]', get_lines(bufnr)[1])
+  end)
+
+  it("omits dropped entries in a whitespace-gapped (newline) container", function()
+    -- Buffer:
+    --   [
+    --     "b"
+    --     "a"
+    --     "b"
+    --     "a"
+    --   ]
+    -- Nix-list style: empty structural separator, gaps carry the newline +
+    -- indentation. After `u`, only the first "a"/"b" survive.
+    local bufnr = make_buf({ "[", '  "b"', '  "a"', '  "b"', '  "a"', "]" })
+
+    local b1 = {
+      kind = "element",
+      sort_key = "b",
+      range = { 1, 2, 1, 5 },
+      movable = true,
+      anchor = 1,
+      attached = {},
+    }
+    local a2 = {
+      kind = "element",
+      sort_key = "a",
+      range = { 2, 2, 2, 5 },
+      movable = true,
+      anchor = 2,
+      attached = {},
+    }
+    local b3 = {
+      kind = "element",
+      sort_key = "b",
+      range = { 3, 2, 3, 5 },
+      movable = true,
+      anchor = 3,
+      attached = {},
+    }
+    local a4 = {
+      kind = "element",
+      sort_key = "a",
+      range = { 4, 2, 4, 5 },
+      movable = true,
+      anchor = 4,
+      attached = {},
+    }
+
+    local outline = {
+      kind = "array",
+      range = { 0, 0, 5, 1 },
+      structural_separator = "",
+      trailing_separator_allowed = true,
+      entries = { a2, b1 },
+      dropped = { b3, a4 },
+    }
+
+    applier.apply(bufnr, outline)
+    assert.same({ "[", '  "a"', '  "b"', "]" }, get_lines(bufnr))
+  end)
+
   describe("delegation to separator_normalize", function()
     -- These cases pin that the applier honors outline.structural_separator
     -- and outline.trailing_separator_allowed without re-deriving them from

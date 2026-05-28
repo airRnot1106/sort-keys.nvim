@@ -48,28 +48,49 @@ local function render_outline(bufnr, outline)
     return read_text(bufnr, r)
   end
 
-  local by_position = {}
-  for _, e in ipairs(outline.entries) do
-    by_position[#by_position + 1] = e
-  end
-  table.sort(by_position, function(a, b)
-    if a.range[1] ~= b.range[1] then
-      return a.range[1] < b.range[1]
+  local function by_source_position(list)
+    local out = {}
+    for _, e in ipairs(list) do
+      out[#out + 1] = e
     end
-    return a.range[2] < b.range[2]
-  end)
-
-  local first = by_position[1]
-  local last = by_position[#by_position]
-  local prefix = read_text(bufnr, { r[1], r[2], first.range[1], first.range[2] })
-  local suffix = read_text(bufnr, { last.range[3], last.range[4], r[3], r[4] })
-
-  local gaps = {}
-  for i = 1, #by_position - 1 do
-    local cur = by_position[i]
-    local nxt = by_position[i + 1]
-    gaps[i] = read_text(bufnr, { cur.range[3], cur.range[4], nxt.range[1], nxt.range[2] })
+    table.sort(out, function(a, b)
+      if a.range[1] ~= b.range[1] then
+        return a.range[1] < b.range[1]
+      end
+      return a.range[2] < b.range[2]
+    end)
+    return out
   end
+
+  -- Full source partition = survivors + entries the `u` flag dropped. The
+  -- container's prefix / inter-entry gaps / suffix are recovered from this
+  -- complete partition so dropped spans never leak back into the output; the
+  -- dropped entries themselves are never emitted as pieces.
+  local combined = {}
+  for _, e in ipairs(outline.entries) do
+    combined[#combined + 1] = e
+  end
+  for _, e in ipairs(outline.dropped or {}) do
+    combined[#combined + 1] = e
+  end
+  local all = by_source_position(combined)
+
+  local first = all[1]
+  local last_all = all[#all]
+  local prefix = read_text(bufnr, { r[1], r[2], first.range[1], first.range[2] })
+  local suffix = read_text(bufnr, { last_all.range[3], last_all.range[4], r[3], r[4] })
+
+  local all_gaps = {}
+  for i = 1, #all - 1 do
+    local cur = all[i]
+    local nxt = all[i + 1]
+    all_gaps[i] = read_text(bufnr, { cur.range[3], cur.range[4], nxt.range[1], nxt.range[2] })
+  end
+
+  -- Trailing-separator style is judged by the source-position-last SURVIVOR
+  -- (a dropped entry must not stand in for it).
+  local survivors_by_position = by_source_position(outline.entries)
+  local last_survivor = survivors_by_position[#survivors_by_position]
 
   local pieces = {}
   local data_lengths = {}
@@ -78,9 +99,18 @@ local function render_outline(bufnr, outline)
     local p, dl = render_entry(bufnr, e, render_outline)
     pieces[#pieces + 1] = p
     data_lengths[#data_lengths + 1] = dl
-    if e == last then
+    if e == last_survivor then
       source_last_idx = i
     end
+  end
+
+  -- Only #pieces-1 gaps separate the surviving pieces; borrow the first
+  -- ones from the full partition so their whitespace/indentation style is
+  -- preserved (gaps are uniform in practice). Identical to the old behavior
+  -- when nothing was dropped (#pieces == #all).
+  local gaps = {}
+  for i = 1, #pieces - 1 do
+    gaps[i] = all_gaps[i] or ""
   end
 
   -- `structural_separator` is declared verbatim by each language's .toml so

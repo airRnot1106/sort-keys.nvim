@@ -84,12 +84,15 @@ local function deduplicate(entries, flags, normalize_keys)
     keep[e] = true
   end
   local out = {}
+  local dropped = {}
   for _, e in ipairs(entries) do
     if keep[e] then
       out[#out + 1] = e
+    else
+      dropped[#dropped + 1] = e
     end
   end
-  return out
+  return out, dropped
 end
 
 -- ─── stable sort over movable slots only ─────────────────────────────────
@@ -146,13 +149,16 @@ local function sort_with_anchors(entries, less_fn)
   return out
 end
 
-local function shallow_copy_outline(o, entries)
+local function shallow_copy_outline(o, entries, dropped)
   return {
     kind = o.kind,
     range = o.range,
     structural_separator = o.structural_separator,
     trailing_separator_allowed = o.trailing_separator_allowed,
     entries = entries,
+    -- Entries removed by the `u` flag. The applier needs their ranges to
+    -- rebuild the container partition; empty when nothing was deduped.
+    dropped = dropped or {},
   }
 end
 
@@ -168,8 +174,9 @@ function M.sort(outline, opts)
     entries[#entries + 1] = e
   end
 
+  local dropped = {}
   if flags.unique then
-    entries = deduplicate(entries, flags, normalize_keys)
+    entries, dropped = deduplicate(entries, flags, normalize_keys)
   end
 
   -- Pre-compute logical keys so the comparator sees stable, transformed keys.
@@ -202,7 +209,7 @@ function M.sort(outline, opts)
   end
 
   local sorted = sort_with_anchors(entries, less)
-  return shallow_copy_outline(outline, sorted)
+  return shallow_copy_outline(outline, sorted, dropped)
 end
 
 -- ─── apply_selection_overlay (any-overlap rule) ──────────────────────────

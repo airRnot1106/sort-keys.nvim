@@ -345,4 +345,29 @@ describe("json end-to-end via :SortKeys / :DeepSortKeys", function()
       assert.is_true(#notifies >= 1)
     end)
   end)
+
+  describe("deduplicate (`u` flag)", function()
+    it("removes duplicate array elements and sorts the survivors", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      local bufnr = setup_buf({ '[ "b", "a", "b", "a" ]' })
+      set_cursor(bufnr, 0, 4)
+      vim.cmd("SortKeys u")
+      assert.equals('[ "a", "b" ]', lines_of(bufnr)[1])
+    end)
+
+    it("removes duplicate object keys, keeping the first occurrence", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      local bufnr = setup_buf({ '{ "b": 2, "a": 1, "b": 9 }' })
+      set_cursor(bufnr, 0, 4)
+      vim.cmd("SortKeys u")
+      -- "b" dedupes to its first occurrence (value 2), then a < b.
+      assert.equals('{ "a": 1, "b": 2 }', lines_of(bufnr)[1])
+    end)
+  end)
 end)
