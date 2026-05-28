@@ -12,7 +12,6 @@
         "*.hbs"
         "*.html"
         "*.js"
-        "*.jsx"
         "*.json"
         "*.json5"
         "*.jsonc"
