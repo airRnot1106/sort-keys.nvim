@@ -1,10 +1,10 @@
 local toml_loader = require("sort-keys.core.toml_loader")
-local json_builder = require("sort-keys.handlers.json_builder")
-local yaml_builder = require("sort-keys.handlers.yaml_builder")
-local javascript_builder = require("sort-keys.handlers.javascript_builder")
-local lua_builder = require("sort-keys.handlers.lua_builder")
-local toml_builder = require("sort-keys.handlers.toml_builder")
-local nix_builder = require("sort-keys.handlers.nix_builder")
+local json_builder = require("sort-keys.languages.json.builder")
+local yaml_builder = require("sort-keys.languages.yaml.builder")
+local javascript_builder = require("sort-keys.languages.javascript.builder")
+local lua_builder = require("sort-keys.languages.lua.builder")
+local toml_builder = require("sort-keys.languages.toml.builder")
+local nix_builder = require("sort-keys.languages.nix.builder")
 
 local M = {}
 
@@ -28,8 +28,8 @@ for _, builder in ipairs(BUILT_IN_BUILDERS) do
   end
 end
 
-local TOML_PATH_FMT = "lua/sort-keys/handlers/%s.toml"
-local QUERY_PATH_FMT = "queries/%s/%s"
+local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"
+local QUERY_PATH_FMT = "lua/sort-keys/languages/%s/%s"
 
 local function read_file(path)
   local f, err = io.open(path, "r")

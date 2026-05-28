@@ -4,13 +4,13 @@
 
 local ts = require("tests.support.treesitter")
 
-describe("sort-keys.handlers.json_builder", function()
+describe("sort-keys.languages.json.builder", function()
   local builder
   local has_json
 
   before_each(function()
-    package.loaded["sort-keys.handlers.json_builder"] = nil
-    builder = require("sort-keys.handlers.json_builder")
+    package.loaded["sort-keys.languages.json.builder"] = nil
+    builder = require("sort-keys.languages.json.builder")
     has_json = ts.has_parser("json")
   end)
 

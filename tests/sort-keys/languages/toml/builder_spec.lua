@@ -6,13 +6,13 @@
 
 local ts = require("tests.support.treesitter")
 
-describe("sort-keys.handlers.toml_builder", function()
+describe("sort-keys.languages.toml.builder", function()
   local builder
   local has_toml
 
   before_each(function()
-    package.loaded["sort-keys.handlers.toml_builder"] = nil
-    builder = require("sort-keys.handlers.toml_builder")
+    package.loaded["sort-keys.languages.toml.builder"] = nil
+    builder = require("sort-keys.languages.toml.builder")
     has_toml = ts.has_parser("toml")
   end)
 

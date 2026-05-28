@@ -6,13 +6,13 @@
 
 local ts = require("tests.support.treesitter")
 
-describe("sort-keys.handlers.javascript_builder", function()
+describe("sort-keys.languages.javascript.builder", function()
   local builder
   local has_js
 
   before_each(function()
-    package.loaded["sort-keys.handlers.javascript_builder"] = nil
-    builder = require("sort-keys.handlers.javascript_builder")
+    package.loaded["sort-keys.languages.javascript.builder"] = nil
+    builder = require("sort-keys.languages.javascript.builder")
     has_js = ts.has_parser("javascript")
   end)
 

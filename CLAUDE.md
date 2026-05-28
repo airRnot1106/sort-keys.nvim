@@ -38,11 +38,11 @@ lua/sort-keys/command.lua       parses :sort-compat flags (!/i/n/r/u + /pat/),
         │                       builds a Target (cursor or selection range)
         ▼
 lua/sort-keys/core/registry.lua filetype → { capabilities, outline } lookup.
-        │                       built-in:  handlers/<lang>.toml + queries/<lang>/sort-keys.scm (on disk)
+        │                       built-in:  languages/<lang>/config.toml + languages/<lang>/sort-keys.scm (on disk)
         │                       user:      setup({handlers={...}}) injected at runtime
         ▼
-lua/sort-keys/handlers/         runs the per-language treesitter query, collects
-  <lang>_builder.lua            entries + comments, normalizes each sort_key via
+lua/sort-keys/languages/        runs the per-language treesitter query, collects
+  <lang>/builder.lua            entries + comments, normalizes each sort_key via
         │                       strategies/key_normalize.<lang>, optionally delegates
         │                       comment attachment to core/comment_attach.
         ▼ Outline
@@ -72,11 +72,11 @@ policy in:
 high-level detail        →  require              ←  low-level pure policy
 ─────────────────────────                          ─────────────────────────
 command.lua              ──require──────────►   core/{target,policy,walker,applier}, registry, config
-core/registry.lua        ──require──────────►   core/toml_loader, handlers/<lang>_builder × 6
+core/registry.lua        ──require──────────►   core/toml_loader, languages/<lang>/builder × 6
 core/applier.lua         ──require──────────►   core/separator_normalize
 core/walker.lua          ──require──────────►   core/policy
 core/policy.lua          ──require──────────►   core/unicode
-handlers/<lang>_builder  ──require──────────►   strategies/key_normalize, core/comment_attach, core/container_pick
+languages/<lang>/builder ──require──────────►   strategies/key_normalize, core/comment_attach, core/container_pick
 
 (no incoming requires)                          core/{comment_attach, separator_normalize,
                                                      container_pick, unicode}
@@ -114,9 +114,9 @@ Lives in `lua/sort-keys/core/` and `lua/sort-keys/strategies/`. Operates entirel
 
 ### Detail layer (treesitter / buffer / runtime lookup)
 
-- `lua/sort-keys/handlers/<lang>_builder.lua` — runs the per-language treesitter query and returns an Outline. Each builder self-declares `M.filetypes = { <ft> = <config_name>, ... }` so the registry doesn't hardcode filetype → builder mapping.
+- `lua/sort-keys/languages/<lang>/builder.lua` — runs the per-language treesitter query and returns an Outline. Each builder self-declares `M.filetypes = { <ft> = <config_name>, ... }` so the registry doesn't hardcode filetype → builder mapping.
 - `lua/sort-keys/core/applier.lua` — reads piece / gap text from the buffer, delegates inter-entry separator emission to `separator_normalize` when `outline.structural_separator` is set, writes back via `nvim_buf_set_text`.
-- `lua/sort-keys/core/registry.lua` — built-in handlers come from `handlers/<config_name>.toml` + `queries/<config_name>/sort-keys.scm` on `&runtimepath`. User handlers come from `set_user_handlers(specs)` (called from `config.setup`). Same-config-name overrides deep-merge over the built-in spec.
+- `lua/sort-keys/core/registry.lua` — built-in handlers come from `languages/<config_name>/config.toml` + `languages/<config_name>/sort-keys.scm` on `&runtimepath`. User handlers come from `set_user_handlers(specs)` (called from `config.setup`). Same-config-name overrides deep-merge over the built-in spec.
 - `lua/sort-keys/command.lua` + `plugin/sort-keys.lua` — flag parsing and `:SortKeys` / `:DeepSortKeys` dispatch.
 
 ### Why this split
@@ -164,7 +164,7 @@ Drive every behavioral change through the Red → Green → Refactor cycle, and 
 2. **Green** — make it pass with the smallest possible change to a policy module (`core/*.lua` or `strategies/*.lua`). Do not touch `vim.*`, treesitter, or the buffer to satisfy a policy test; if you feel the need to, the test is in the wrong layer.
 3. **Refactor** — only with green tests. Policy modules must stay free of `vim.*` / treesitter / buffer dependencies, so refactoring is bounded by the layering rule above.
 
-**Triangulate inside the policy layer**: prefer adding a second failing policy spec that forces the generalization over jumping straight to e2e. Detail and e2e specs (`handlers/*_spec.lua`, `<lang>_e2e_spec.lua`) come **after** the policy is green, and only to pin the delegation contract or smoke-check the wiring — they are not where new behavior is designed.
+**Triangulate inside the policy layer**: prefer adding a second failing policy spec that forces the generalization over jumping straight to e2e. Detail and e2e specs (`languages/<lang>/builder_spec.lua`, `<lang>_e2e_spec.lua`) come **after** the policy is green, and only to pin the delegation contract or smoke-check the wiring — they are not where new behavior is designed.
 
 If a policy spec doesn't feel like the right way to express the rule, the rule probably isn't a policy rule (= it belongs in a per-language builder, not in `core/`).
 
@@ -174,7 +174,7 @@ If a policy spec doesn't feel like the right way to express the rule, the rule p
 
 Detail and e2e tests are intentionally thinner:
 
-- `tests/sort-keys/handlers/*_spec.lua` pins the **delegation contract** ("when `options.comment_aware = true`, the entry range gets expanded by `comment_attach`"; "inherit binding is movable=false with a child container"), not every comment shape.
+- `tests/sort-keys/languages/<lang>/builder_spec.lua` pins the **delegation contract** ("when `options.comment_aware = true`, the entry range gets expanded by `comment_attach`"; "inherit binding is movable=false with a child container"), not every comment shape.
 - `tests/sort-keys/<lang>_e2e_spec.lua` is a smoke check that the wired pipeline still produces correct buffer text after reorder.
 - `tests/sort-keys/user_handler_e2e_spec.lua` exercises the public `setup({handlers={...}})` path end-to-end with a fake builder, so the test is independent of any treesitter parser availability.
 - `tests/sort-keys/{config,command,init}_spec.lua` pin entry-point shape and the config defaults.
@@ -194,7 +194,7 @@ A handler spec is `{ filetypes, builder, options, query_text }`:
 
 - `filetypes` — list of `vim.bo.filetype` values this spec applies to
 - `builder` — Lua module exposing `build(bufnr, target, config) → outline | nil`. `config = { filetype, query_text, options }`
-- `options` — capability flags + per-container hints. Same shape as `lua/sort-keys/handlers/<lang>.toml` (`can_sort_object` / `can_sort_array` / `can_deep` / `comment_aware` / `key_quoting` / `structural_separator` / `trailing_separator_allowed` / `mixed_key_types` / `parser_lang`)
+- `options` — capability flags + per-container hints. Same shape as `lua/sort-keys/languages/<lang>/config.toml` (`can_sort_object` / `can_sort_array` / `can_deep` / `comment_aware` / `key_quoting` / `structural_separator` / `trailing_separator_allowed` / `mixed_key_types` / `parser_lang`)
 - `query_text` — tree-sitter query string with `sortkeys.*` captures
 
 Override rules (registry decides based on whether the user `handlers` key matches a built-in `config_name`):
@@ -213,25 +213,25 @@ The right Case to pick depends on what's different from JSON: the parser, the AS
 
 ### Case A — language reuses an existing parser (e.g. JSONC reusing tree-sitter-json)
 
-1. `lua/sort-keys/handlers/<lang>.toml`:
+1. `lua/sort-keys/languages/<lang>/config.toml`:
    - `parser_lang = "json"` (override; defaults to the filetype name)
    - `can_sort_object` / `can_sort_array` / `can_deep`
    - `comment_aware = true|false` (gates `core/comment_attach` delegation)
    - `structural_separator = ","` (opaque literal byte(s) — `;`, `\n`, etc. all work)
    - `trailing_separator_allowed = true|false`
    - `query_file = "sort-keys.scm"`
-2. `queries/<lang>/sort-keys.scm` using the `sortkeys.*` capture convention (`@sortkeys.container`, `@sortkeys.entry`, plus `@sortkeys.comment` if comment-aware) with the metadata `#set! sortkeys.kind "object"|"array"` / `#set! sortkeys.entry_kind "pair"|"element"`.
-3. `lua/sort-keys/handlers/<existing>_builder.lua` — append the new filetype to `M.filetypes`. The registry aggregates each builder's self-declared `filetypes`, so there's no central filetype → builder table to edit. The `BUILDERS` list in `registry.lua` only grows when an entirely new builder ships.
+2. `lua/sort-keys/languages/<lang>/sort-keys.scm` using the `sortkeys.*` capture convention (`@sortkeys.container`, `@sortkeys.entry`, plus `@sortkeys.comment` if comment-aware) with the metadata `#set! sortkeys.kind "object"|"array"` / `#set! sortkeys.entry_kind "pair"|"element"`.
+3. `lua/sort-keys/languages/<existing>/builder.lua` — append the new filetype to `M.filetypes`. The registry aggregates each builder's self-declared `filetypes`, so there's no central filetype → builder table to edit. The `BUILT_IN_BUILDERS` list in `registry.lua` only grows when an entirely new builder ships.
 4. `tests/sort-keys/core/registry_spec.lua` — pin handler presence + capability flags.
 5. `tests/sort-keys/<lang>_e2e_spec.lua` — a minimal e2e (comment-free smoke + at least one comment / separator case if applicable). Use `tests/support/treesitter.has_parser` for the underlying parser, not the filetype name.
 
-Working example: `lua/sort-keys/handlers/jsonc.toml` + `queries/jsonc/sort-keys.scm` riding on `json_builder`.
+Working example: `lua/sort-keys/languages/jsonc/config.toml` + `lua/sort-keys/languages/jsonc/sort-keys.scm` riding on `json` builder (note: the `jsonc/` directory has no `builder.lua` — it reuses `languages/json/builder.lua`).
 
 ### Case B — AST shape matches an existing builder's but the parser is independent (e.g. TypeScript ↔ tree-sitter-typescript inherits from tree-sitter-javascript)
 
 Same as Case A, drop `parser_lang`. Make sure the query uses node names that actually exist in your grammar. Add the new filetype to the existing builder's `M.filetypes` table.
 
-Working example: `handlers/javascript_builder.lua` declares `M.filetypes = { javascript = "javascript", typescript = "typescript" }`.
+Working example: `languages/javascript/builder.lua` declares `M.filetypes = { javascript = "javascript", typescript = "typescript" }`, and `languages/typescript/` carries only `config.toml` + `sort-keys.scm`.
 
 ### Case C — key syntax differs from JSON (e.g. Lua bare identifiers, YAML bare keys, Nix dotted attrpath)
 
@@ -241,17 +241,17 @@ Working examples: `strategies/key_normalize.{yaml,lua,toml,nix}` — each handle
 
 ### Case D — entirely different AST shape (Lua tables `{ a = 1, b = 2 }`, Nix attrset / formals / inherit, TOML inline_table + standard table + root-level pseudo-container)
 
-Implement `lua/sort-keys/handlers/<lang>_builder.lua` honoring the `build(bufnr, target, config) → outline | nil` contract. Register the builder by appending it to `BUILDERS` in `registry.lua` (and self-declare its `M.filetypes`). Policy modules stay untouched — they only depend on the Outline shape.
+Implement `lua/sort-keys/languages/<lang>/builder.lua` honoring the `build(bufnr, target, config) → outline | nil` contract. Register the builder by appending it to `BUILT_IN_BUILDERS` in `registry.lua` (and self-declare its `M.filetypes`). Policy modules stay untouched — they only depend on the Outline shape.
 
 Working examples (in increasing complexity):
 
-- `handlers/lua_builder.lua` — single `table_constructor` AST for both object-like and array-like tables; container kind is decided dynamically by voting on whether any field is keyed.
-- `handlers/toml_builder.lua` — multiple container shapes (`inline_table` / `array` / `table` / `table_array_element` / synthesized root pseudo-container) with different separator policies per shape.
-- `handlers/nix_builder.lua` — multiple container shapes (`attrset` / `rec_attrset` / `let` / `list` / `formals` / `inherited_attrs`), AST quirk that interposes `binding_set` between container and entries (handled by `index_by_container_ancestor`), and the inherit-as-pinned-with-child container pattern.
+- `languages/lua/builder.lua` — single `table_constructor` AST for both object-like and array-like tables; container kind is decided dynamically by voting on whether any field is keyed.
+- `languages/toml/builder.lua` — multiple container shapes (`inline_table` / `array` / `table` / `table_array_element` / synthesized root pseudo-container) with different separator policies per shape.
+- `languages/nix/builder.lua` — multiple container shapes (`attrset` / `rec_attrset` / `let` / `list` / `formals` / `inherited_attrs`), AST quirk that interposes `binding_set` between container and entries (handled by `index_by_container_ancestor`), and the inherit-as-pinned-with-child container pattern.
 
 ## Writing a builder
 
-A builder is a Lua module at `lua/sort-keys/handlers/<lang>_builder.lua` that exports two things:
+A builder is a Lua module at `lua/sort-keys/languages/<lang>/builder.lua` that exports two things:
 
 - `M.build(bufnr, target, config) → outline | nil` — the entry point called by `registry`
 - `M.filetypes = { [filetype] = config_name, ... }` — self-declared filetype routing
@@ -356,14 +356,15 @@ Return `nil` (never a partial outline) when the container's kind is disabled by 
 
 ### Registering the builder
 
-Append the new builder to `BUILDERS` in `registry.lua` and self-declare its filetypes:
+Append the new builder to `BUILT_IN_BUILDERS` in `registry.lua` and self-declare its filetypes:
 
 ```lua
--- in your_builder.lua
+-- in languages/yourlang/builder.lua
 M.filetypes = { yourlang = "yourlang" }
 
 -- in registry.lua
-local BUILDERS = { ..., require("sort-keys.handlers.your_builder") }
+local yourlang_builder = require("sort-keys.languages.yourlang.builder")
+local BUILT_IN_BUILDERS = { ..., yourlang_builder }
 ```
 
 The registry aggregates each builder's `M.filetypes` at startup — there is no central filetype → builder table to maintain separately.

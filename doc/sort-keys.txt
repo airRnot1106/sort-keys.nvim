@@ -281,7 +281,7 @@ Built-in helpers ~
   Per-language sort-key normalization. One M.<lang> function per
   supported language.
 
-The built-in handlers in `lua/sort-keys/handlers/*_builder.lua` are the
+The built-in handlers in `lua/sort-keys/languages/*/builder.lua` are the
 canonical reference implementations.
 
 ==============================================================================

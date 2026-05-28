@@ -7,13 +7,13 @@
 
 local ts = require("tests.support.treesitter")
 
-describe("sort-keys.handlers.nix_builder", function()
+describe("sort-keys.languages.nix.builder", function()
   local builder
   local has_nix
 
   before_each(function()
-    package.loaded["sort-keys.handlers.nix_builder"] = nil
-    builder = require("sort-keys.handlers.nix_builder")
+    package.loaded["sort-keys.languages.nix.builder"] = nil
+    builder = require("sort-keys.languages.nix.builder")
     has_nix = ts.has_parser("nix")
   end)
 

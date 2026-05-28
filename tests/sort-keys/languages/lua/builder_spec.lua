@@ -7,13 +7,13 @@
 
 local ts = require("tests.support.treesitter")
 
-describe("sort-keys.handlers.lua_builder", function()
+describe("sort-keys.languages.lua.builder", function()
   local builder
   local has_lua
 
   before_each(function()
-    package.loaded["sort-keys.handlers.lua_builder"] = nil
-    builder = require("sort-keys.handlers.lua_builder")
+    package.loaded["sort-keys.languages.lua.builder"] = nil
+    builder = require("sort-keys.languages.lua.builder")
     has_lua = ts.has_parser("lua")
   end)
 
