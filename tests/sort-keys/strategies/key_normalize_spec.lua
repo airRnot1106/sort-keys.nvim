@@ -316,4 +316,66 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("a", key_normalize.pkl('  "a"  '))
     end)
   end)
+
+  describe("kdl(text)", function()
+    it("returns a bare node identifier unchanged", function()
+      assert.equals("config", key_normalize.kdl("config"))
+    end)
+
+    it("keeps the dashes/dots a bare KDL identifier is allowed to contain", function()
+      -- KDL bare identifiers admit `-`, `_`, `.` and more; none of them are
+      -- delimiters here, so the whole name is the sort_key verbatim.
+      assert.equals("foo-bar.baz", key_normalize.kdl("foo-bar.baz"))
+    end)
+
+    it("strips the surrounding double quotes of a quoted node name", function()
+      assert.equals("bar baz", key_normalize.kdl('"bar baz"'))
+    end)
+
+    it('unescapes `\\"` to a literal double quote', function()
+      assert.equals('a"b', key_normalize.kdl([["a\"b"]]))
+    end)
+
+    it("unescapes `\\\\` to a literal backslash", function()
+      assert.equals("a\\b", key_normalize.kdl([["a\\b"]]))
+    end)
+
+    it("unescapes `\\/` to a literal forward slash", function()
+      assert.equals("a/b", key_normalize.kdl([["a\/b"]]))
+    end)
+
+    it("unescapes `\\n` / `\\t` / `\\r` / `\\b` / `\\f` to their literal control bytes", function()
+      assert.equals("a\nb", key_normalize.kdl([["a\nb"]]))
+      assert.equals("a\tb", key_normalize.kdl([["a\tb"]]))
+      assert.equals("a\rb", key_normalize.kdl([["a\rb"]]))
+      assert.equals("\b", key_normalize.kdl([["\b"]]))
+      assert.equals("\f", key_normalize.kdl([["\f"]]))
+    end)
+
+    it(
+      "decodes a brace-delimited `\\u{E9}` escape to UTF-8 (KDL uses braces, not \\uXXXX)",
+      function()
+        -- KDL's unicode escape is `\u{1-6 hex}`, unlike JSON's fixed-width
+        -- `\uXXXX`; U+00E9 encodes to the two UTF-8 bytes C3 A9.
+        assert.equals("\xC3\xA9", key_normalize.kdl('"\\u{E9}"'))
+      end
+    )
+
+    it("decodes a 5-hex `\\u{1F600}` astral escape to its 4-byte UTF-8 sequence", function()
+      assert.equals("\xF0\x9F\x98\x80", key_normalize.kdl('"\\u{1F600}"'))
+    end)
+
+    it('takes a raw string `r"..."` body verbatim without escape processing', function()
+      -- Raw strings disable escapes, so `\n` is the two literal bytes `\` `n`.
+      assert.equals([[a\nb]], key_normalize.kdl([[r"a\nb"]]))
+    end)
+
+    it('strips the hash fence of a `r#"..."#` raw string and keeps inner quotes', function()
+      assert.equals('a"b', key_normalize.kdl([[r#"a"b"#]]))
+    end)
+
+    it("preserves an empty quoted name", function()
+      assert.equals("", key_normalize.kdl('""'))
+    end)
+  end)
 end)

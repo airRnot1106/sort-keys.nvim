@@ -194,6 +194,27 @@ describe("sort-keys.core.registry", function()
       local handler = registry.get("pkl")
       assert.is_true(handler.capabilities.comment_aware)
     end)
+
+    it("returns a handler that exposes `capabilities` and `outline` for kdl", function()
+      local handler = registry.get("kdl")
+      assert.is_not_nil(handler)
+      assert.is_table(handler.capabilities)
+      assert.is_function(handler.outline)
+    end)
+
+    it("the kdl handler declares can_sort_object / can_deep (and no array shape)", function()
+      -- KDL only sorts node groups keyed by node name; positional node args
+      -- are order-significant, so there is deliberately no array container.
+      local handler = registry.get("kdl")
+      assert.is_true(handler.capabilities.can_sort_object)
+      assert.is_false(handler.capabilities.can_sort_array)
+      assert.is_true(handler.capabilities.can_deep)
+    end)
+
+    it("the kdl handler declares comment_aware = true", function()
+      local handler = registry.get("kdl")
+      assert.is_true(handler.capabilities.comment_aware)
+    end)
   end)
 
   describe("set_user_handlers(specs)", function()

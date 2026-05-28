@@ -1,5 +1,6 @@
 local javascript_builder = require("sort-keys.languages.javascript.builder")
 local json_builder = require("sort-keys.languages.json.builder")
+local kdl_builder = require("sort-keys.languages.kdl.builder")
 local lua_builder = require("sort-keys.languages.lua.builder")
 local nix_builder = require("sort-keys.languages.nix.builder")
 local pkl_builder = require("sort-keys.languages.pkl.builder")
@@ -14,6 +15,7 @@ local M = {}
 local BUILT_IN_BUILDERS = {
   javascript_builder,
   json_builder,
+  kdl_builder,
   lua_builder,
   nix_builder,
   pkl_builder,

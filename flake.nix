@@ -55,6 +55,7 @@
           parsers: with parsers; [
             javascript
             json
+            kdl
             lua
             nix
             pkl
