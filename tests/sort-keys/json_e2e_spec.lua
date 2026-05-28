@@ -370,4 +370,54 @@ describe("json end-to-end via :SortKeys / :DeepSortKeys", function()
       assert.equals('{ "a": 1, "b": 2 }', lines_of(bufnr)[1])
     end)
   end)
+
+  -- Order-only :sort-compat flags reach the buffer through the same applier
+  -- path as a flagless sort (they change comparison, not entry count), so a
+  -- single end-to-end case each guards the policy→applier wiring against
+  -- future regressions.
+  describe("order-only :sort-compat flags", function()
+    it("`!` reverses the sort order", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      local bufnr = setup_buf({ '{ "a": 1, "b": 2, "c": 3 }' })
+      set_cursor(bufnr, 0, 4)
+      vim.cmd("SortKeys!")
+      assert.equals('{ "c": 3, "b": 2, "a": 1 }', lines_of(bufnr)[1])
+    end)
+
+    it("`i` sorts case-insensitively", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      local bufnr = setup_buf({ '{ "B": 2, "a": 1, "C": 3 }' })
+      set_cursor(bufnr, 0, 4)
+      vim.cmd("SortKeys i")
+      assert.equals('{ "a": 1, "B": 2, "C": 3 }', lines_of(bufnr)[1])
+    end)
+
+    it("`n` sorts numerically (10 after 2), not lexicographically", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      local bufnr = setup_buf({ "[ 10, 2, 1 ]" })
+      set_cursor(bufnr, 0, 4)
+      vim.cmd("SortKeys n")
+      assert.equals("[ 1, 2, 10 ]", lines_of(bufnr)[1])
+    end)
+
+    it("`r/pat/` keys on the regex match, then `n` orders those numerically", function()
+      if not has_json then
+        pending("JSON treesitter parser not available")
+        return
+      end
+      local bufnr = setup_buf({ '[ "item-10", "item-2", "item-30" ]' })
+      set_cursor(bufnr, 0, 4)
+      vim.cmd("SortKeys n r/%d+/")
+      assert.equals('[ "item-2", "item-10", "item-30" ]', lines_of(bufnr)[1])
+    end)
+  end)
 end)
