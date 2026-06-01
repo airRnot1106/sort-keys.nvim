@@ -59,6 +59,7 @@
             lua
             nix
             pkl
+            python
             toml
             typescript
             yaml

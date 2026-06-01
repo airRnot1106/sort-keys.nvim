@@ -378,4 +378,124 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("", key_normalize.kdl('""'))
     end)
   end)
+
+  describe("python(text)", function()
+    it("returns a bare identifier unchanged", function()
+      -- Python dict keys can be identifiers when the dict is built from a
+      -- variable, e.g. `{ x: 1 }` (rare in literals but valid).
+      assert.equals("foo", key_normalize.python("foo"))
+    end)
+
+    it("returns an integer literal key as its surface text", function()
+      -- `{ 42: "x" }` parses the key as an integer node; the sort compares
+      -- string surface bytes, so the normalizer just hands back the digits.
+      assert.equals("42", key_normalize.python("42"))
+    end)
+
+    it("returns a None / True / False key as its surface text", function()
+      assert.equals("None", key_normalize.python("None"))
+      assert.equals("True", key_normalize.python("True"))
+      assert.equals("False", key_normalize.python("False"))
+    end)
+
+    it("strips double quotes around a string key", function()
+      assert.equals("foo", key_normalize.python('"foo"'))
+    end)
+
+    it("strips single quotes around a string key", function()
+      assert.equals("foo", key_normalize.python("'foo'"))
+    end)
+
+    it('strips triple double-quotes around a `"""foo"""` key', function()
+      assert.equals("foo", key_normalize.python('"""foo"""'))
+    end)
+
+    it("strips triple single-quotes around a `'''foo'''` key", function()
+      assert.equals("foo", key_normalize.python("'''foo'''"))
+    end)
+
+    it('unescapes `\\"` inside a double-quoted key to a literal double quote', function()
+      assert.equals('a"b', key_normalize.python([["a\"b"]]))
+    end)
+
+    it("unescapes `\\'` inside a single-quoted key to a literal single quote", function()
+      assert.equals("a'b", key_normalize.python("'a\\'b'"))
+    end)
+
+    it("unescapes `\\\\` to a single backslash", function()
+      assert.equals("a\\b", key_normalize.python([["a\\b"]]))
+    end)
+
+    it(
+      "unescapes `\\n` / `\\t` / `\\r` / `\\b` / `\\f` / `\\a` / `\\v` / `\\0` to their control bytes",
+      function()
+        assert.equals("a\nb", key_normalize.python([["a\nb"]]))
+        assert.equals("a\tb", key_normalize.python([["a\tb"]]))
+        assert.equals("a\rb", key_normalize.python([["a\rb"]]))
+        assert.equals("\b", key_normalize.python([["\b"]]))
+        assert.equals("\f", key_normalize.python([["\f"]]))
+        assert.equals("\a", key_normalize.python([["\a"]]))
+        assert.equals("\v", key_normalize.python([["\v"]]))
+        assert.equals("\0", key_normalize.python([["\0"]]))
+      end
+    )
+
+    it("decodes `\\xE9` (2 hex digits) to its UTF-8 byte sequence", function()
+      -- Python's `\xNN` is exactly two hex digits; for U+00E9 in a regular
+      -- string the runtime value is the codepoint, encoded UTF-8 as C3 A9.
+      assert.equals("\xC3\xA9", key_normalize.python('"\\xE9"'))
+    end)
+
+    it("decodes `\\u00E9` (4 hex digits) to UTF-8", function()
+      assert.equals("\xC3\xA9", key_normalize.python('"\\u00E9"'))
+    end)
+
+    it("decodes `\\U0001F600` (8 hex digits) to its 4-byte UTF-8 sequence", function()
+      -- `\U` admits astral codepoints directly (no surrogate pair encoding).
+      assert.equals("\xF0\x9F\x98\x80", key_normalize.python('"\\U0001F600"'))
+    end)
+
+    it('takes a raw string `r"..."` body verbatim without escape processing', function()
+      -- Raw strings disable escapes: `\n` is the literal two bytes `\` `n`.
+      assert.equals([[a\nb]], key_normalize.python([[r"a\nb"]]))
+    end)
+
+    it("treats the `r` prefix case-insensitively (`R'...'` is also raw)", function()
+      assert.equals([[a\tb]], key_normalize.python([[R"a\tb"]]))
+    end)
+
+    it("strips the `b` bytes prefix and still decodes simple escapes", function()
+      -- Bytes literals only accept \xNN (not \u/\U); for sort_key purposes
+      -- the simple-escape decoding is enough and stays consistent.
+      assert.equals("a\nb", key_normalize.python([[b"a\nb"]]))
+    end)
+
+    it("strips the `u` unicode prefix (no-op in Python 3, but legal syntax)", function()
+      assert.equals("foo", key_normalize.python('u"foo"'))
+    end)
+
+    it("strips the `f` f-string prefix and leaves interpolation braces verbatim", function()
+      -- f-string interpolation `{...}` is a runtime expression; v1 doesn't
+      -- evaluate it. Keeping the braces in the sort_key gives a deterministic
+      -- ordering that round-trips with the source spelling.
+      assert.equals("hi {name}", key_normalize.python([[f"hi {name}"]]))
+    end)
+
+    it("treats `rb` / `br` raw-bytes prefix as raw (no escape processing)", function()
+      assert.equals([[a\nb]], key_normalize.python([[rb"a\nb"]]))
+      assert.equals([[a\nb]], key_normalize.python([[br"a\nb"]]))
+    end)
+
+    it("treats `fr` / `rf` raw-f-string prefix as raw", function()
+      assert.equals([[hi \n {x}]], key_normalize.python([[fr"hi \n {x}"]]))
+      assert.equals([[hi \n {x}]], key_normalize.python([[rf"hi \n {x}"]]))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.python('""'))
+      assert.equals("", key_normalize.python("''"))
+      assert.equals("", key_normalize.python('""""""'))
+      assert.equals("", key_normalize.python("''''''"))
+    end)
+  end)
 end)
