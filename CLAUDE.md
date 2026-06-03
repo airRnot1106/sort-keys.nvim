@@ -248,6 +248,7 @@ Working examples (in increasing complexity):
 - `languages/lua/builder.lua` — single `table_constructor` AST for both object-like and array-like tables; container kind is decided dynamically by voting on whether any field is keyed.
 - `languages/toml/builder.lua` — multiple container shapes (`inline_table` / `array` / `table` / `table_array_element` / synthesized root pseudo-container) with different separator policies per shape.
 - `languages/nix/builder.lua` — multiple container shapes (`attrset` / `rec_attrset` / `let` / `list` / `formals` / `inherited_attrs`), AST quirk that interposes `binding_set` between container and entries (handled by `index_by_container_ancestor`), and the inherit-as-pinned-with-child container pattern.
+- `languages/rust/builder.lua` — three container shapes (`field_declaration_list` / `field_initializer_list` / `use_list`), `..base` pinned via `base_field_initializer`, and the **attribute-as-comment** trick: `attribute_item` (`#[derive(...)]`, `#[serde(...)]`) is captured as `@sortkeys.comment` so `core/comment_attach` carries it with the next field at zero policy-layer cost — same dependency inversion the doc-comment case uses. Deep recursion walks one level into the value when the entry's own node isn't a container (`field_initializer` value is a `struct_expression` wrapping the inner `field_initializer_list`; `scoped_use_list` wraps the inner `use_list`).
 
 ## Writing a builder
 

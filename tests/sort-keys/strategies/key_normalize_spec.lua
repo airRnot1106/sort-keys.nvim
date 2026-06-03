@@ -498,4 +498,45 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("", key_normalize.python("''''''"))
     end)
   end)
+
+  describe("rust(text)", function()
+    it("returns a bare identifier unchanged", function()
+      -- Rust struct fields and use_list entries arrive here as bare
+      -- identifiers; the surface text is the sort_key as-is.
+      assert.equals("foo", key_normalize.rust("foo"))
+    end)
+
+    it("keeps underscores and digits the Rust identifier grammar admits", function()
+      assert.equals("snake_case_42", key_normalize.rust("snake_case_42"))
+    end)
+
+    it("strips the `r#` raw-identifier prefix so `r#type` sorts as `type`", function()
+      -- Rust escapes keyword-collision identifiers as `r#type`, `r#match`,
+      -- etc.; the semantic name is the bare word, so the sort_key must drop
+      -- the prefix to compare correctly with non-raw siblings.
+      assert.equals("type", key_normalize.rust("r#type"))
+      assert.equals("match", key_normalize.rust("r#match"))
+    end)
+
+    it("strips `r#` at every component of a scoped path", function()
+      -- Same logical import path may be written `foo::r#type` (when the leaf
+      -- collides with a keyword) or `foo::bar`; both spellings must collapse
+      -- to the same sort_key. `#` is not a legal identifier byte in Rust, so
+      -- a global gsub cannot collide with a real identifier substring.
+      assert.equals("foo::type", key_normalize.rust("foo::r#type"))
+      assert.equals("foo::bar", key_normalize.rust("foo::r#bar"))
+    end)
+
+    it("returns a scoped use_list entry (`foo::bar`) verbatim", function()
+      -- v1 treats use_list entries as element text — scoping `::` becomes
+      -- part of the sort_key and the whole path compares lexicographically.
+      assert.equals("foo::bar", key_normalize.rust("foo::bar"))
+    end)
+
+    it("returns `self` (the use-list self-import) verbatim", function()
+      -- `use foo::{self, bar}` makes the leaf node literally `self`; it
+      -- should sort by that surface text, not be confused with an identifier.
+      assert.equals("self", key_normalize.rust("self"))
+    end)
+  end)
 end)

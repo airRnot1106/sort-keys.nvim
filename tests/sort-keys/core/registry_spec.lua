@@ -234,6 +234,31 @@ describe("sort-keys.core.registry", function()
       local handler = registry.get("python")
       assert.is_true(handler.capabilities.comment_aware)
     end)
+
+    it("returns a handler that exposes `capabilities` and `outline` for rust", function()
+      local handler = registry.get("rust")
+      assert.is_not_nil(handler)
+      assert.is_table(handler.capabilities)
+      assert.is_function(handler.outline)
+    end)
+
+    it("the rust handler declares can_sort_object / can_sort_array / can_deep", function()
+      -- `can_sort_array` is true because `use foo::{a, b, c}` is the rust
+      -- array-shape container; `enum_variant_list` and `array_expression`
+      -- are intentionally NOT covered by the same flag (the query simply
+      -- doesn't capture them).
+      local handler = registry.get("rust")
+      assert.is_true(handler.capabilities.can_sort_object)
+      assert.is_true(handler.capabilities.can_sort_array)
+      assert.is_true(handler.capabilities.can_deep)
+    end)
+
+    it("the rust handler declares comment_aware = true", function()
+      -- `attribute_item` / doc comments must travel with the next entry
+      -- when fields are reordered.
+      local handler = registry.get("rust")
+      assert.is_true(handler.capabilities.comment_aware)
+    end)
   end)
 
   describe("set_user_handlers(specs)", function()

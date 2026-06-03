@@ -60,6 +60,7 @@
             nix
             pkl
             python
+            rust
             toml
             typescript
             yaml

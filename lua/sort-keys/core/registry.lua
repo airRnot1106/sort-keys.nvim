@@ -5,6 +5,7 @@ local lua_builder = require("sort-keys.languages.lua.builder")
 local nix_builder = require("sort-keys.languages.nix.builder")
 local pkl_builder = require("sort-keys.languages.pkl.builder")
 local python_builder = require("sort-keys.languages.python.builder")
+local rust_builder = require("sort-keys.languages.rust.builder")
 local toml_builder = require("sort-keys.languages.toml.builder")
 local toml_loader = require("sort-keys.core.toml_loader")
 local yaml_builder = require("sort-keys.languages.yaml.builder")
@@ -21,6 +22,7 @@ local BUILT_IN_BUILDERS = {
   nix_builder,
   pkl_builder,
   python_builder,
+  rust_builder,
   toml_builder,
   yaml_builder,
 }

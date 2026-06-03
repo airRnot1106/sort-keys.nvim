@@ -1,0 +1,32 @@
+description = "Rust handler"
+
+# v1 sorts three Rust container shapes — all of them name-keyed:
+#   field_declaration_list   — `struct Foo { a: u32, b: u32 }`     (object)
+#   field_initializer_list   — `Foo { a: 1, b: 2 }`                (object)
+#   use_list                 — `use foo::{a, b, c}`                (array)
+# `enum_variant_list` / `match_block` / `array_expression` /
+# `tuple_expression` / `parameters` are intentionally excluded: their order
+# is semantically significant (derived `Ord`/discriminants, pattern overlap,
+# positional arity), so reordering them silently changes program behavior.
+can_sort_object = true
+can_sort_array = true
+can_deep = true
+key_quoting = "logical"
+
+# Attribute items (`#[derive(...)]`, `#[serde(...)]`) and doc comments (`///`)
+# are emitted by the query as `@sortkeys.comment` so `core/comment_attach`
+# carries them with the next entry. This is the same dependency-inversion the
+# other comment-aware languages use; no Rust-specific policy code is needed.
+comment_aware = true
+
+# Struct field names + use_list identifiers are all bare-identifier shaped at
+# the sort layer, so the heterogeneous-key path is unreached in practice. We
+# still flag this true so a future shorthand_field_initializer (an `identifier`
+# node, not a `field_identifier`) doesn't trip a future homogeneity check.
+mixed_key_types = true
+
+# Trailing commas are idiomatic everywhere a Rust container accepts a comma.
+structural_separator = ","
+trailing_separator_allowed = true
+
+query_file = "sort-keys.scm"
