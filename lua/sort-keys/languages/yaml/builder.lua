@@ -12,30 +12,18 @@ local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
 
--- Half-open range overlap; mirrors core/policy.apply_selection_overlay so a
--- visual selection picks the same containers it later marks movable. YAML's
--- indent-based syntax means a full-line `V` selection naturally starts at
--- column 0 and therefore is NOT contained inside an indented inner
--- container, so we test for intersection rather than containment when the
--- target is a selection.
-local function ranges_intersect(r1, r2)
-  local s1r, s1c, e1r, e1c = r1[1], r1[2], r1[3], r1[4]
-  local s2r, s2c, e2r, e2c = r2[1], r2[2], r2[3], r2[4]
-  if e1r < s2r or (e1r == s2r and e1c <= s2c) then
-    return false
-  end
-  if e2r < s1r or (e2r == s1r and e2c <= s1c) then
-    return false
-  end
-  return true
-end
-
+-- YAML uses overlap (`h.ranges_intersect`) instead of containment because a
+-- full-line `V` selection starts at column 0 and is NOT contained inside an
+-- indented child, but it IS overlapping it. The shared h.pick_innermost
+-- assumes containment + 1-entry minimum; YAML needs overlap + ≥2-entry
+-- minimum so that degenerate single-entry value-level mappings (e.g.
+-- `any: true` inside `vim:`) don't outshine the actually-sortable parent.
 local function count_entries_overlapping(container, entries, selection_range)
   local n = 0
   for _, e in ipairs(entries) do
     local parent = e.node:parent()
     if parent and h.node_id_key(parent) == container.node_key then
-      if ranges_intersect(e.range, selection_range) then
+      if h.ranges_intersect(e.range, selection_range) then
         n = n + 1
       end
     end
@@ -43,20 +31,13 @@ local function count_entries_overlapping(container, entries, selection_range)
   return n
 end
 
--- YAML-specific override of pick_innermost: a visual range that overlaps an
--- indented child also overlaps every single-entry value-level mapping inside
--- that child (e.g. `any: true` inside `vim:`). Those degenerate single-entry
--- containers offer nothing to sort, so we require at least two entries to
--- overlap before considering a container a sortable candidate. The shared
--- h.pick_innermost uses strict containment + 1-entry minimum, which is wrong
--- for YAML's indentation-anchored selections.
 local function pick_innermost(containers, entries, target)
   if target.kind == "cursor" then
     return container_pick.for_cursor(containers, target.pos)
   end
   local best, best_area
   for _, c in ipairs(containers) do
-    if ranges_intersect(c.range, target.range) then
+    if h.ranges_intersect(c.range, target.range) then
       if count_entries_overlapping(c, entries, target.range) >= 2 then
         local area = h.range_area(c.range)
         if not best_area or area < best_area then

@@ -46,15 +46,6 @@ local function trim_trailing_newline(bufnr, range)
   return { sr, sc, er, ec }
 end
 
-local function first_child_of_type(node, type_name)
-  for child in node:iter_children() do
-    if child:type() == type_name then
-      return child
-    end
-  end
-  return nil
-end
-
 -- ─── query traversal (local — KDL clamps container ranges and skips
 --                     sortkeys.kind / sortkeys.entry_kind metadata) ───────────
 
@@ -123,7 +114,7 @@ end
 -- optional `node_comment` `/-` and an optional `(type)` annotation, neither of
 -- which is an `identifier` node, so the node name is unambiguous).
 local function node_sort_key(node, bufnr)
-  local name = first_child_of_type(node, "identifier")
+  local name = h.first_child_of_type(node, "identifier")
   if not name then
     return ""
   end
@@ -154,7 +145,7 @@ local function build_outline(container, ctx)
       child = nil,
     }
 
-    local children = first_child_of_type(e.node, "node_children")
+    local children = h.first_child_of_type(e.node, "node_children")
     if children then
       local inner = ctx.containers_by_key[h.node_id_key(children)]
       if inner then

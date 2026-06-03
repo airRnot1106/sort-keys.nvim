@@ -83,6 +83,18 @@ describe("sort-keys.core.builder_helpers", function()
       )
       assert.equals(first, chosen)
     end)
+
+    it("delegates cursor targets to container_pick.for_cursor", function()
+      -- The cursor branch hands off to core/container_pick, whose 3-tier
+      -- rule (strict containment -> same-row leftmost -> row-span innermost)
+      -- has its own spec. We only pin that the delegation passes the cursor
+      -- position through and routes containers in source order so the same
+      -- result a builder would have got pre-extraction is preserved.
+      local outer = container({ 0, 0, 10, 0 })
+      local inner = container({ 2, 0, 5, 0 })
+      local chosen = h.pick_innermost({ outer, inner }, { kind = "cursor", pos = { 3, 4 } })
+      assert.equals(inner, chosen)
+    end)
   end)
 
   describe("normalize_element_text", function()
@@ -117,21 +129,61 @@ describe("sort-keys.core.builder_helpers", function()
         -- key_quoting omitted
       }))
     end)
+  end)
 
-    it("honors language-specific extras", function()
-      assert.is_false(h.validate_options({
-        can_sort_object = true,
-        can_sort_array = true,
-        can_deep = true,
-        key_quoting = "logical",
-      }, { "parser_lang" }))
-      assert.is_true(h.validate_options({
-        can_sort_object = true,
-        can_sort_array = true,
-        can_deep = true,
-        key_quoting = "logical",
-        parser_lang = "json",
-      }, { "parser_lang" }))
+  describe("ranges_intersect", function()
+    it("returns true when two ranges share any column", function()
+      assert.is_true(h.ranges_intersect({ 0, 0, 1, 5 }, { 1, 2, 2, 0 }))
+    end)
+
+    it("returns false for column-adjacent ranges on the same row", function()
+      -- Half-open semantics: end column of r1 == start column of r2 means
+      -- they touch, not overlap. Required by apply_selection_overlay so
+      -- neighbouring entries don't both get flagged "selected" by a single
+      -- character selection on their shared boundary.
+      assert.is_false(h.ranges_intersect({ 0, 0, 0, 5 }, { 0, 5, 0, 10 }))
+    end)
+
+    it("returns false for disjoint ranges across rows", function()
+      assert.is_false(h.ranges_intersect({ 0, 0, 1, 0 }, { 2, 0, 3, 0 }))
+    end)
+  end)
+
+  describe("first_child_of_type", function()
+    -- The treesitter integration is exercised by per-language builder
+    -- specs; here we use a duck-typed stub so the spec stays pure-Lua and
+    -- pins the iteration contract directly.
+    local function stub(children)
+      local node = { _children = children }
+      function node:iter_children()
+        local i = 0
+        return function()
+          i = i + 1
+          local c = self._children[i]
+          if c then
+            return c
+          end
+        end
+      end
+      return node
+    end
+    local function child(type_name)
+      return {
+        _type = type_name,
+        type = function(self)
+          return self._type
+        end,
+      }
+    end
+
+    it("returns the first child whose type matches", function()
+      local a, b1, b2 = child("a"), child("b"), child("b")
+      local node = stub({ a, b1, b2 })
+      assert.equals(b1, h.first_child_of_type(node, "b"))
+    end)
+
+    it("returns nil when no child matches", function()
+      assert.is_nil(h.first_child_of_type(stub({ child("a") }), "b"))
     end)
   end)
 

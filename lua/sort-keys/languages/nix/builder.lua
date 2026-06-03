@@ -88,25 +88,13 @@ end
 
 -- ─── Nix entry classification ─────────────────────────────────────────────────
 
--- Returns the first node of a given type among `node`'s direct children
--- (named or anonymous). Used to dig out the `attrpath` of a `binding` and
--- the `inherited_attrs` of an `inherit` / `inherit_from`.
-local function first_child_of_type(node, type_name)
-  for child in node:iter_children() do
-    if child:type() == type_name then
-      return child
-    end
-  end
-  return nil
-end
-
 -- Return the first identifier text inside an `inherit` / `inherit_from`
 -- node's `inherited_attrs`. Used as the entry's sort_key — even though the
 -- entry is pinned (movable=false), a sort_key keeps Outline contract happy
 -- and the value is stable across runs since the identifier order can only
 -- change via the inner sort.
 local function first_inherited_identifier_text(inherit_node, bufnr)
-  local attrs = first_child_of_type(inherit_node, "inherited_attrs")
+  local attrs = h.first_child_of_type(inherit_node, "inherited_attrs")
   if not attrs then
     return ""
   end
@@ -121,7 +109,7 @@ local function classify_entry(entry_node, bufnr)
   local t = entry_node:type()
 
   if t == "binding" then
-    local attrpath = first_child_of_type(entry_node, "attrpath")
+    local attrpath = h.first_child_of_type(entry_node, "attrpath")
     if not attrpath then
       return { sort_key = "", movable = false, value_node = nil }
     end

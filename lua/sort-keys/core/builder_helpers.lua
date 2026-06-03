@@ -33,7 +33,42 @@ function M.node_id_key(node)
   return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
 end
 
+-- ─── tree traversal ───────────────────────────────────────────────────────────
+
+---Return the first direct child of `node` whose type matches `type_name`,
+---or nil if there isn't one. Useful when an AST shape buries the meaningful
+---inner node (KDL's `node_children` body, Nix's `attrpath` / `inherited_attrs`).
+---@param node userdata
+---@param type_name string
+---@return userdata|nil
+function M.first_child_of_type(node, type_name)
+  for child in node:iter_children() do
+    if child:type() == type_name then
+      return child
+    end
+  end
+  return nil
+end
+
 -- ─── range geometry ───────────────────────────────────────────────────────────
+
+---Half-open range overlap: true iff the two ranges share any column. Mirrors
+---the policy.apply_selection_overlay rule so a visual selection picks the
+---same containers it will later mark movable.
+---@param r1 integer[]
+---@param r2 integer[]
+---@return boolean
+function M.ranges_intersect(r1, r2)
+  local s1r, s1c, e1r, e1c = r1[1], r1[2], r1[3], r1[4]
+  local s2r, s2c, e2r, e2c = r2[1], r2[2], r2[3], r2[4]
+  if e1r < s2r or (e1r == s2r and e1c <= s2c) then
+    return false
+  end
+  if e2r < s1r or (e2r == s1r and e2c <= s1c) then
+    return false
+  end
+  return true
+end
 
 ---@param range integer[]  {srow, scol, erow, ecol}
 ---@param row integer
@@ -101,13 +136,18 @@ end
 
 -- ─── query traversal ──────────────────────────────────────────────────────────
 
-local DEFAULT_CAPTURES = {
-  container = "sortkeys.container",
-  entry = "sortkeys.entry",
-  key = "sortkeys.key",
-  value = "sortkeys.value",
-  comment = "sortkeys.comment",
-}
+-- A fresh literal each call (see `default_captures` below). Sharing one
+-- module-level table would expose every caller to in-place mutation of the
+-- defaults via the returned reference.
+local function default_captures()
+  return {
+    container = "sortkeys.container",
+    entry = "sortkeys.entry",
+    key = "sortkeys.key",
+    value = "sortkeys.value",
+    comment = "sortkeys.comment",
+  }
+end
 
 local META = {
   kind = "sortkeys.kind",
@@ -130,7 +170,7 @@ local META = {
 ---@param captures? table  -- { container, entry, key, value, comment } capture names
 ---@return table[] containers, table[] entries, table[] comments, table containers_by_key
 function M.collect_matches(bufnr, root, query, captures)
-  captures = captures or DEFAULT_CAPTURES
+  captures = captures or default_captures()
 
   local cap_id = {}
   for id, name in ipairs(query.captures) do
@@ -311,23 +351,14 @@ function M.normalize_element_text(text)
 end
 
 ---Validate that the loaded language `.toml` options carry every capability
----flag the policy / applier pipeline needs. `extras` lets a language pin
----additional language-specific requirements without re-listing the baseline.
+---flag the policy / applier pipeline needs.
 ---@param options table
----@param extras? string[]
 ---@return boolean
-function M.validate_options(options, extras)
+function M.validate_options(options)
   local required = { "can_sort_object", "can_sort_array", "can_deep", "key_quoting" }
   for _, k in ipairs(required) do
     if options[k] == nil then
       return false
-    end
-  end
-  if extras then
-    for _, k in ipairs(extras) do
-      if options[k] == nil then
-        return false
-      end
     end
   end
   return true
