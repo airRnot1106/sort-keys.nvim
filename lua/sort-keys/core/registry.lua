@@ -68,8 +68,18 @@ end
 -- Loads the raw spec table (filetypes / builder / options / query_text) for
 -- a built-in handler off disk. Used directly when serving a built-in and as
 -- the base for partial-override merging when a user spec targets the same
--- config_name.
+-- config_name. Results are memoized per `config_name` because the .toml /
+-- .scm files ship with the plugin and don't change at runtime — every
+-- :SortKeys invocation went through `M.get` → here → two `nvim_get_runtime_file`
+-- + `io.open` calls on the hot path before this cache.
+local BUILT_IN_SPEC_CACHE = {}
+
 local function load_built_in_spec(builder, config_name)
+  local cached = BUILT_IN_SPEC_CACHE[config_name]
+  if cached then
+    return cached
+  end
+
   local options_path = locate_runtime(TOML_PATH_FMT:format(config_name))
   if not options_path then
     return nil
@@ -93,12 +103,14 @@ local function load_built_in_spec(builder, config_name)
     end
   end
 
-  return {
+  local spec = {
     filetypes = filetypes,
     builder = builder,
     options = options,
     query_text = query_text,
   }
+  BUILT_IN_SPEC_CACHE[config_name] = spec
+  return spec
 end
 
 -- Turn a resolved spec (whether built-in, user-only, or merged) into the

@@ -259,6 +259,23 @@ describe("sort-keys.core.registry", function()
       local handler = registry.get("rust")
       assert.is_true(handler.capabilities.comment_aware)
     end)
+
+    it(
+      "does not let a built-in spec drift between calls (built-in spec is reused, not mutated)",
+      function()
+        -- Built-in specs are cached after the first call. The cache is shared
+        -- with the partial-override merge path, so a user merging on top of
+        -- the cached base must not be able to mutate the base in place — a
+        -- subsequent registry.get for the same filetype would otherwise pick
+        -- up the user's overrides as if they were the built-in default.
+        local before_capabilities = registry.get("json").capabilities
+        registry.set_user_handlers({ json = { options = { comment_aware = true } } })
+        registry.set_user_handlers(nil)
+        local after_capabilities = registry.get("json").capabilities
+        assert.equals(before_capabilities.comment_aware, after_capabilities.comment_aware)
+        assert.is_false(after_capabilities.comment_aware)
+      end
+    )
   end)
 
   describe("set_user_handlers(specs)", function()
