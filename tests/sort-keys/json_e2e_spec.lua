@@ -338,9 +338,8 @@ describe("json end-to-end via :SortKeys / :DeepSortKeys", function()
     end)
 
     it("notifies the user when there is no handler for the filetype", function()
-      -- `sh` is deliberately picked as a filetype the plugin has no handler
-      -- for; the original test used `python`, which has since gained its own
-      -- builder and stopped triggering the no-handler notify path.
+      -- Shell syntax has no sortable key-value container, so `sh` is a
+      -- stable choice for "no handler" — the plugin will not grow one.
       local bufnr = setup_buf({ '{ "c": 3, "a": 1 }' })
       vim.bo[bufnr].filetype = "sh"
       set_cursor(bufnr, 0, 4)

@@ -249,9 +249,10 @@ describe("sort-keys.core.policy", function()
   end)
 
   describe("sort — opts.flags contract (Fail Fast)", function()
-    -- Fail-fast regression: a previous `local flags = opts.flags or {}`
-    -- swallowed missing-flags bugs. Omitting opts.flags must raise so the
-    -- caller's contract violation surfaces immediately.
+    -- opts.flags is a required input, not a soft default: silently coercing
+    -- a missing flags table to `{}` would let callers ship missing-flags
+    -- bugs that surface as wrong sort behavior much later. Raise instead so
+    -- the contract violation is loud at the call site.
     it("raises when opts.flags is omitted", function()
       local o = make_outline("object", {
         make_entry("a", 1),

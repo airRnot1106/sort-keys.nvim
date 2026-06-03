@@ -1,19 +1,15 @@
 -- Shared treesitter scaffolding for all language builders.
 --
--- Every per-language builder used to ship its own copy of ~150 lines of
--- node-range serialization, position/area geometry, query iteration, parent
--- indexing, and option validation. The copies were literally identical for
--- the most part, but two recent optimizations (Rust's O(n) min-pass
--- pick_innermost and the in-collect containers_by_key construction) only
--- landed in one builder — proving the duplication had become a place for
--- drift to hide.
+-- Centralizes the helpers that are language-agnostic: node-range
+-- serialization, range geometry, query traversal, parent indexing, and
+-- option validation. Builders import this as
+-- `local h = require("sort-keys.core.builder_helpers")` and call the
+-- canonical implementations instead of maintaining their own copies, so a
+-- fix or optimization to any of them lands in every builder at once.
 --
--- This module exposes the canonical, most-current versions. Builders import
--- it as `local h = require("sort-keys.core.builder_helpers")` and call
--- `h.collect_matches(...)`, `h.pick_innermost(...)`, etc. Language-specific
--- variations stay in the builder: YAML keeps its own pick_innermost
--- (sortable-candidate threshold), Nix keeps its own collect_matches +
--- container-ancestor indexing (binding_set interpose).
+-- Language-specific variations remain in the builder: YAML keeps its own
+-- pick_innermost (sortable-candidate threshold), Nix keeps its own
+-- collect_matches + container-ancestor indexing (binding_set interpose).
 
 local container_pick = require("sort-keys.core.container_pick")
 

@@ -8,10 +8,11 @@ local M = {}
 
 local function rebuild_entry_with_child(entry, sorted_child)
   -- entry.copy forwards every field on `entry` via pairs(), so data_range
-  -- (and any future Outline field) survives the deep-sort rebuild without
-  -- having to be remembered here. Without it, an entry that comment_attach
-  -- expanded to swallow a trailing comment would lose its pre-absorb
-  -- boundary the moment :DeepSortKeys recursed over it.
+  -- and any future Outline field survive the deep-sort rebuild without
+  -- having to be enumerated here. The applier reads data_range on a
+  -- parent entry that comment_attach expanded to swallow a trailing
+  -- comment; dropping it would push inter-entry separators to the wrong
+  -- side of that comment.
   return entry_mod.copy(entry, { child = sorted_child })
 end
 

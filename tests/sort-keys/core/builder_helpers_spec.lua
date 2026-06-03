@@ -1,5 +1,5 @@
--- builder_helpers is the shared treesitter-aware scaffolding every language
--- builder used to inline. The spec pins:
+-- builder_helpers is the shared treesitter-aware scaffolding used by every
+-- language builder. The spec pins:
 --   * pure helpers (node_range, node_id_key, pos_inside, contains_range,
 --     range_area, normalize_element_text, validate_options) — exercised
 --     with plain Lua fixtures.

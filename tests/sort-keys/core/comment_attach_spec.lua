@@ -170,11 +170,12 @@ describe("sort-keys.core.comment_attach", function()
     it(
       "keeps non-overlapping entry ranges when two adjacent entries each have a leading-comment block",
       function()
-        -- Regression: previously the second comment block (rows 6-7) below
-        -- the entry-B fell back to entry B (the previous entry) because B
-        -- had already absorbed rows 2-3 and its range[3] grew past row 6.
-        -- The correct routing is "B absorbs 2-3, C absorbs 6-7", and after
-        -- the fix B's range must not extend into C's row span.
+        -- Routing target uses each entry's PRE-ABSORB range, not its
+        -- in-progress expanded range. If a leading-comment block were
+        -- evaluated against B's already-expanded range, rows 6-7 would
+        -- look like they sit "inside B" (because absorbing rows 2-3 grew
+        -- B.range[3] past row 6) and would attach to B instead of the
+        -- correct next entry C.
         local entries = {
           entry({ 4, 0, 4, 5 }), -- B
           entry({ 8, 0, 8, 5 }), -- C

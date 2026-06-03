@@ -1,10 +1,8 @@
--- entry.copy is the single forward-compatible entry-copy helper that
--- replaces three previously-divergent implementations (comment_attach used
--- `for k,v in pairs(e)`; policy.apply_selection_overlay and
--- walker.rebuild_entry_with_child manually enumerated field names and
--- silently dropped any field not on the list). Pinning this contract here
--- prevents a future Outline field from re-introducing the drop-on-rebuild
--- bug class.
+-- entry.copy is the single forward-compatible entry-copy helper. Pinning
+-- its contract here is what guarantees that a future Outline field cannot
+-- be silently dropped when an entry is rebuilt at the call sites
+-- (comment_attach.copy_entry, policy.apply_selection_overlay,
+-- walker.rebuild_entry_with_child).
 
 describe("sort-keys.core.entry", function()
   local entry

@@ -84,15 +84,11 @@ describe("sort-keys.core.walker", function()
     end)
 
     it("preserves an entry's data_range when rebuilding it with the sorted child", function()
-      -- Latent fragility: walker.rebuild_entry_with_child used to enumerate
-      -- entry fields manually and would silently drop data_range — the
-      -- comment_attach-recorded boundary the applier needs to splice
-      -- inter-entry separators BEFORE an absorbed trailing comment. The
-      -- bug was invisible only because applier's child-branch happens to
-      -- recompute the suffix from entry.range minus child.range; any
-      -- future change to that branch (or a new applier consumer of
-      -- data_range on parent entries) would resurface the same separator
-      -- placement issue we already fixed in apply_selection_overlay.
+      -- data_range is the comment_attach-recorded boundary the applier uses
+      -- to splice inter-entry separators BEFORE an absorbed trailing
+      -- comment. The rebuild must forward it so that any applier consumer
+      -- of data_range on a parent entry sees the correct boundary; without
+      -- this the separator lands on the wrong side of the comment.
       local nested = outline_of("object", { entry("y", 1), entry("x", 2) })
       local parent = entry("b", 1, nested)
       parent.data_range = { 0, 0, 0, 1 }

@@ -91,12 +91,13 @@ describe("jsonc end-to-end via :SortKeys", function()
   end)
 
   describe("array elements with same-line trailing comments", function()
-    -- Regression: the array entry query `(array (_) @sortkeys.entry)` used to
-    -- double-capture comment nodes as entries. With comment_aware on, the
-    -- builder fed each `// trailing` comment into the sort pipeline as if it
-    -- were a data element, comment_attach then expanded an adjacent real
-    -- entry's range past the comment-as-entry's start, and the applier
-    -- crashed reading the inter-entry gap with `start_col > end_col`.
+    -- The wildcard array-entry query `(array (_) @sortkeys.entry)` admits
+    -- comment children as entries; the collect_matches dedup pass drops
+    -- any candidate whose node was also captured as a comment. Without
+    -- that drop, the comment is sorted as data AND attached as a comment,
+    -- comment_attach's range expansion pushes a real entry past it on the
+    -- same row, and the applier crashes on the resulting `start_col >
+    -- end_col` inter-entry gap.
     it("sorts string elements while keeping each trailing comment with its element", function()
       if not has_jsonc then
         pending("json treesitter parser not available (jsonc reuses it)")

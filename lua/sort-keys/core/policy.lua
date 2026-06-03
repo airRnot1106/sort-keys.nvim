@@ -241,10 +241,9 @@ end
 function M.apply_selection_overlay(outline, selection_range)
   local new_entries = {}
   for _, e in ipairs(outline.entries) do
-    -- entry.copy forwards every field present on `e` so future Outline
-    -- additions (data_range was the first; the next one will be free) do
-    -- not have to be remembered here. The only field this overlay touches
-    -- is `movable`.
+    -- entry.copy forwards every field present on `e` so any Outline field
+    -- survives the overlay without having to be enumerated here. The only
+    -- field this overlay touches is `movable`.
     new_entries[#new_entries + 1] = entry_mod.copy(e, {
       movable = ranges_overlap(e.range, selection_range),
     })

@@ -1,16 +1,14 @@
--- Single forward-compatible entry-copy helper. Replaces three previously
--- divergent implementations that all manually enumerated Outline-entry
--- field names — a pattern that silently dropped any field added later
--- (most recently `data_range`, which had to be patched twice before
--- becoming the motivation for this module).
+-- Single forward-compatible entry-copy helper.
 --
--- `copy(e)` returns a shallow copy of every key on `e` via `pairs`, so a
--- new field appears in the output the same iteration it appears in the
--- input. `copy(e, overrides)` is the "rebuild the entry with field X
--- changed" shape used by policy.apply_selection_overlay (overrides
--- `movable`) and walker.rebuild_entry_with_child (overrides `child`);
--- comment_attach uses the plain form and then deep-copies its own range
--- because it mutates ranges in place via `absorb`.
+-- `copy(e)` returns a shallow copy of every key on `e` via `pairs`, so any
+-- field present on the input round-trips to the output without the helper
+-- having to know its name — the only way to guarantee that future Outline
+-- fields cannot be silently dropped at a rebuild site. `copy(e, overrides)`
+-- is the "rebuild the entry with field X changed" shape used by
+-- policy.apply_selection_overlay (overrides `movable`) and
+-- walker.rebuild_entry_with_child (overrides `child`); comment_attach uses
+-- the plain form and then deep-copies its own range because it mutates
+-- ranges in place via `absorb`.
 --
 -- Range / data_range / attached / child are NOT deep-copied here. Callers
 -- that mutate those in place must clone first; the helper's contract is
