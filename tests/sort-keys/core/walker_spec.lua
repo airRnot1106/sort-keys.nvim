@@ -83,6 +83,32 @@ describe("sort-keys.core.walker", function()
       assert.same({ "x", "y" }, keys(b_entry.child))
     end)
 
+    it("preserves an entry's data_range when rebuilding it with the sorted child", function()
+      -- Latent fragility: walker.rebuild_entry_with_child used to enumerate
+      -- entry fields manually and would silently drop data_range — the
+      -- comment_attach-recorded boundary the applier needs to splice
+      -- inter-entry separators BEFORE an absorbed trailing comment. The
+      -- bug was invisible only because applier's child-branch happens to
+      -- recompute the suffix from entry.range minus child.range; any
+      -- future change to that branch (or a new applier consumer of
+      -- data_range on parent entries) would resurface the same separator
+      -- placement issue we already fixed in apply_selection_overlay.
+      local nested = outline_of("object", { entry("y", 1), entry("x", 2) })
+      local parent = entry("b", 1, nested)
+      parent.data_range = { 0, 0, 0, 1 }
+      local root = outline_of("object", { parent, entry("a", 2) })
+
+      local result = walker.walk(root, { deep = true, flags = {}, normalize_keys = true })
+
+      local b_entry
+      for _, e in ipairs(result.entries) do
+        if e.sort_key == "b" then
+          b_entry = e
+        end
+      end
+      assert.same({ 0, 0, 0, 1 }, b_entry.data_range)
+    end)
+
     it("propagates the same flags into nested children", function()
       local nested = outline_of("object", { entry("B", 1), entry("a", 2) })
       local root = outline_of("object", {

@@ -1,3 +1,4 @@
+local entry_mod = require("sort-keys.core.entry")
 local unicode = require("sort-keys.core.unicode")
 
 local M = {}
@@ -240,22 +241,13 @@ end
 function M.apply_selection_overlay(outline, selection_range)
   local new_entries = {}
   for _, e in ipairs(outline.entries) do
-    new_entries[#new_entries + 1] = {
-      kind = e.kind,
-      sort_key = e.sort_key,
-      range = e.range,
-      -- data_range is the comment_attach-recorded boundary between the
-      -- entry's data and an absorbed trailing comment; the applier needs it
-      -- to splice inter-entry separators BEFORE the comment instead of
-      -- after it. Forwarding it here is what keeps Visual-range :SortKeys
-      -- consistent with cursor :SortKeys when entries carry trailing
-      -- comments.
-      data_range = e.data_range,
+    -- entry.copy forwards every field present on `e` so future Outline
+    -- additions (data_range was the first; the next one will be free) do
+    -- not have to be remembered here. The only field this overlay touches
+    -- is `movable`.
+    new_entries[#new_entries + 1] = entry_mod.copy(e, {
       movable = ranges_overlap(e.range, selection_range),
-      anchor = e.anchor,
-      attached = e.attached,
-      child = e.child,
-    }
+    })
   end
   return shallow_copy_outline(outline, new_entries)
 end

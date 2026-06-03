@@ -1,20 +1,18 @@
 -- Deep sort recurses post-order: children must be sorted before their parent
 -- so that the parent's comparator sees stable, already-sorted child text.
 
+local entry_mod = require("sort-keys.core.entry")
 local policy = require("sort-keys.core.policy")
 
 local M = {}
 
 local function rebuild_entry_with_child(entry, sorted_child)
-  return {
-    kind = entry.kind,
-    sort_key = entry.sort_key,
-    range = entry.range,
-    movable = entry.movable,
-    anchor = entry.anchor,
-    attached = entry.attached,
-    child = sorted_child,
-  }
+  -- entry.copy forwards every field on `entry` via pairs(), so data_range
+  -- (and any future Outline field) survives the deep-sort rebuild without
+  -- having to be remembered here. Without it, an entry that comment_attach
+  -- expanded to swallow a trailing comment would lose its pre-absorb
+  -- boundary the moment :DeepSortKeys recursed over it.
+  return entry_mod.copy(entry, { child = sorted_child })
 end
 
 local function recurse_children(outline, opts)

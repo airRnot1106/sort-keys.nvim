@@ -1,14 +1,15 @@
+local entry_mod = require("sort-keys.core.entry")
+
 local M = {}
 
 local function copy_entry(e)
-  local out = {}
-  for k, v in pairs(e) do
-    out[k] = v
-  end
+  -- entry.copy forwards every field on `e` via pairs(); we then deep-copy
+  -- range because `absorb` mutates it in place, and overwrite data_range
+  -- with a snapshot of the pre-absorb range so downstream consumers
+  -- (applier + separator_normalize) can find where the entry's data ends
+  -- and an absorbed trailing comment begins within the expanded piece text.
+  local out = entry_mod.copy(e)
   out.range = { e.range[1], e.range[2], e.range[3], e.range[4] }
-  -- Snapshot the pre-absorb range so downstream consumers (applier +
-  -- separator_normalize) can find where the entry's data ends and an
-  -- absorbed trailing comment begins within the expanded piece text.
   out.data_range = { e.range[1], e.range[2], e.range[3], e.range[4] }
   return out
 end
