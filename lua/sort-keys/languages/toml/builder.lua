@@ -10,22 +10,11 @@
 -- Lua / YAML are the closest precedents — same outline shape, same
 -- comment_attach delegation, same per-container separator policy.
 
+local h = require("sort-keys.core.builder_helpers")
 local key_normalize = require("sort-keys.strategies.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
-local container_pick = require("sort-keys.core.container_pick")
 
 local M = {}
-
-local CAPTURE = {
-  container = "sortkeys.container",
-  entry = "sortkeys.entry",
-  comment = "sortkeys.comment",
-}
-
-local META = {
-  kind = "sortkeys.kind",
-  entry_kind = "sortkeys.entry_kind",
-}
 
 -- The synthetic key under which root-level pair entries live in
 -- entries_by_parent. The real document node's node_id_key is also computed
@@ -34,67 +23,6 @@ local META = {
 -- entries to this dedicated key instead.
 local ROOT_PSEUDO_KEY = "toml-root-pseudo"
 
-local function node_range(node)
-  local sr, sc, er, ec = node:range()
-  return { sr, sc, er, ec }
-end
-
-local function node_id_key(node)
-  local sr, sc, er, ec = node:range()
-  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
-end
-
-local function pos_inside(range, row, col)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if row < sr or row > er then
-    return false
-  end
-  if row == sr and col < sc then
-    return false
-  end
-  if row == er and col > ec then
-    return false
-  end
-  return true
-end
-
-local function contains_range(outer, inner)
-  return pos_inside(outer, inner[1], inner[2]) and pos_inside(outer, inner[3], inner[4])
-end
-
-local function range_area(r)
-  return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
-end
-
-local function pick_innermost(containers, target)
-  if target.kind == "cursor" then
-    return container_pick.for_cursor(containers, target.pos)
-  end
-  local candidates = {}
-  for _, c in ipairs(containers) do
-    if contains_range(c.range, target.range) then
-      candidates[#candidates + 1] = c
-    end
-  end
-  if #candidates == 0 then
-    return nil
-  end
-  table.sort(candidates, function(a, b)
-    return range_area(a.range) < range_area(b.range)
-  end)
-  return candidates[1]
-end
-
-local function normalize_element_text(text)
-  local trimmed = text:gsub("^%s+", ""):gsub("%s+$", "")
-  return (trimmed:gsub("%s+", " "))
-end
-
--- tree-sitter-toml routinely reports the last `table` / `table_array_element`
--- range one row past the buffer's last actual line (a phantom trailing
--- newline the grammar assumes). The applier feeds outline.range straight to
--- `nvim_buf_get_text`, which errors on out-of-bounds rows, so clamp before
--- returning. Same fix pattern as yaml_builder.
 local function clamp_range_to_buffer(bufnr, range)
   local line_count = vim.api.nvim_buf_line_count(bufnr)
   local sr, sc, er, ec = range[1], range[2], range[3], range[4]
@@ -111,114 +39,6 @@ local function clamp_range_to_buffer(bufnr, range)
   return { sr, sc, er, ec }
 end
 
--- ─── query traversal ──────────────────────────────────────────────────────────
-
-local function collect_matches(bufnr, root, query)
-  local cap_id = {}
-  for id, name in ipairs(query.captures) do
-    cap_id[name] = id
-  end
-
-  local containers = {}
-  local entry_candidates = {}
-  local comments = {}
-
-  local function first_node(match, capture_name)
-    local id = cap_id[capture_name]
-    if not id then
-      return nil
-    end
-    local nodes = match[id]
-    if not nodes then
-      return nil
-    end
-    return nodes[1]
-  end
-
-  for _, match, metadata in query:iter_matches(root, bufnr, 0, -1, { all = true }) do
-    local container_node = first_node(match, CAPTURE.container)
-    if container_node then
-      local kind = metadata[META.kind]
-      if kind then
-        containers[#containers + 1] = {
-          node = container_node,
-          range = node_range(container_node),
-          kind = kind,
-          node_key = node_id_key(container_node),
-        }
-      end
-    end
-
-    local entry_node = first_node(match, CAPTURE.entry)
-    if entry_node then
-      local entry_kind = metadata[META.entry_kind]
-      if entry_kind then
-        entry_candidates[#entry_candidates + 1] = {
-          node = entry_node,
-          range = node_range(entry_node),
-          entry_kind = entry_kind,
-        }
-      end
-    end
-
-    local comment_node = first_node(match, CAPTURE.comment)
-    if comment_node then
-      comments[#comments + 1] = {
-        node = comment_node,
-        range = node_range(comment_node),
-      }
-    end
-  end
-
-  -- The array element query is a wildcard `(array (_) @sortkeys.entry)` so
-  -- comment siblings of the array are also captured as entries. Drop any
-  -- candidate whose node was also captured as a comment, otherwise it would
-  -- be sorted as data AND attached as a comment, and comment_attach's
-  -- expansion could push a real entry past it on the same row — making the
-  -- applier crash on an out-of-order inter-entry gap.
-  local comment_ids = {}
-  for _, c in ipairs(comments) do
-    comment_ids[node_id_key(c.node)] = true
-  end
-  local entries = {}
-  for _, e in ipairs(entry_candidates) do
-    if not comment_ids[node_id_key(e.node)] then
-      entries[#entries + 1] = e
-    end
-  end
-
-  return containers, entries, comments
-end
-
--- Index by parent node_key for pair / element entries. Pair entries whose
--- parent is the document node land under that document key — the
--- synthesize_root_pseudo step below remaps them to ROOT_PSEUDO_KEY.
-local function index_entries_by_parent(entries)
-  local by_parent = {}
-  for _, item in ipairs(entries) do
-    local parent = item.node:parent()
-    if parent then
-      local pk = node_id_key(parent)
-      by_parent[pk] = by_parent[pk] or {}
-      by_parent[pk][#by_parent[pk] + 1] = item
-    end
-  end
-  return by_parent
-end
-
-local function index_comments_by_parent(comments)
-  local by_parent = {}
-  for _, item in ipairs(comments) do
-    local parent = item.node:parent()
-    if parent then
-      local pk = node_id_key(parent)
-      by_parent[pk] = by_parent[pk] or {}
-      by_parent[pk][#by_parent[pk] + 1] = item
-    end
-  end
-  return by_parent
-end
-
 -- A `document` ranges over the whole file, so adding it directly to
 -- `containers` would swallow every cursor. Instead, we synthesize a
 -- pseudo-container whose range is exactly (first_root_pair.start ..
@@ -226,7 +46,7 @@ end
 -- exist (a single root pair is not sortable, and we don't want to outshine
 -- a more-specific child container for the same row).
 local function synthesize_root_pseudo(root, entries_by_parent, comments_by_parent)
-  local root_key = node_id_key(root)
+  local root_key = h.node_id_key(root)
   local root_pairs = entries_by_parent[root_key]
   if not root_pairs or #root_pairs < 2 then
     return nil
@@ -278,7 +98,7 @@ local function synthesize_root_pseudo(root, entries_by_parent, comments_by_paren
 end
 
 local function find_container_for_node(containers_by_key, node)
-  return containers_by_key[node_id_key(node)]
+  return containers_by_key[h.node_id_key(node)]
 end
 
 -- ─── TOML entry / key extraction ──────────────────────────────────────────────
@@ -373,7 +193,7 @@ local function build_outline(container, ctx)
         end
       end
     else
-      entry.sort_key = normalize_element_text(vim.treesitter.get_node_text(e.node, ctx.bufnr))
+      entry.sort_key = h.normalize_element_text(vim.treesitter.get_node_text(e.node, ctx.bufnr))
       local inner = find_container_for_node(ctx.containers_by_key, e.node)
       if inner then
         entry.child = build_outline(inner, ctx)
@@ -413,27 +233,12 @@ local function build_outline(container, ctx)
   }
 end
 
-local function validate_options(options)
-  local required = {
-    "can_sort_object",
-    "can_sort_array",
-    "can_deep",
-    "key_quoting",
-  }
-  for _, k in ipairs(required) do
-    if options[k] == nil then
-      return false
-    end
-  end
-  return true
-end
-
 ---@param bufnr integer
 ---@param target table
 ---@param config { filetype: string, query_text: string, options: table }
 ---@return table|nil
 function M.build(bufnr, target, config)
-  if not validate_options(config.options) then
+  if not h.validate_options(config.options) then
     return nil
   end
 
@@ -447,28 +252,24 @@ function M.build(bufnr, target, config)
 
   local query = vim.treesitter.query.parse(lang, config.query_text)
 
-  local containers, entries, comments = collect_matches(bufnr, root, query)
+  local containers, entries, comments, containers_by_key = h.collect_matches(bufnr, root, query)
 
-  local entries_by_parent = index_entries_by_parent(entries)
-  local comments_by_parent = index_comments_by_parent(comments)
+  local entries_by_parent = h.index_by_parent(entries)
+  local comments_by_parent = h.index_by_parent(comments)
 
   local root_pseudo = synthesize_root_pseudo(root, entries_by_parent, comments_by_parent)
   if root_pseudo then
     containers[#containers + 1] = root_pseudo
+    containers_by_key[root_pseudo.node_key] = root_pseudo
   end
 
   if #containers == 0 then
     return nil
   end
 
-  local chosen = pick_innermost(containers, target)
+  local chosen = h.pick_innermost(containers, target)
   if not chosen then
     return nil
-  end
-
-  local containers_by_key = {}
-  for _, c in ipairs(containers) do
-    containers_by_key[c.node_key] = c
   end
 
   local ctx = {

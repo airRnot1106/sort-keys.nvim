@@ -23,174 +23,11 @@
 -- identity, so we walk one level of children when the entry's own node
 -- isn't a container but might wrap one.
 
+local h = require("sort-keys.core.builder_helpers")
 local key_normalize = require("sort-keys.strategies.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
-local container_pick = require("sort-keys.core.container_pick")
 
 local M = {}
-
-local CAPTURE = {
-  container = "sortkeys.container",
-  entry = "sortkeys.entry",
-  key = "sortkeys.key",
-  value = "sortkeys.value",
-  comment = "sortkeys.comment",
-}
-
-local META = {
-  kind = "sortkeys.kind",
-  entry_kind = "sortkeys.entry_kind",
-}
-
-local function node_range(node)
-  local sr, sc, er, ec = node:range()
-  return { sr, sc, er, ec }
-end
-
-local function node_id_key(node)
-  local sr, sc, er, ec = node:range()
-  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
-end
-
-local function pos_inside(range, row, col)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if row < sr or row > er then
-    return false
-  end
-  if row == sr and col < sc then
-    return false
-  end
-  if row == er and col > ec then
-    return false
-  end
-  return true
-end
-
-local function contains_range(outer, inner)
-  return pos_inside(outer, inner[1], inner[2]) and pos_inside(outer, inner[3], inner[4])
-end
-
-local function range_area(r)
-  return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
-end
-
-local function pick_innermost(containers, target)
-  if target.kind == "cursor" then
-    return container_pick.for_cursor(containers, target.pos)
-  end
-  -- Selection target: pick the smallest captured container that fully covers
-  -- target.range. Single linear pass, no sort.
-  local best, best_area = nil, nil
-  for _, c in ipairs(containers) do
-    if contains_range(c.range, target.range) then
-      local a = range_area(c.range)
-      if best_area == nil or a < best_area then
-        best, best_area = c, a
-      end
-    end
-  end
-  return best
-end
-
--- ─── query traversal ──────────────────────────────────────────────────────────
-
-local function collect_matches(bufnr, root, query)
-  local cap_id = {}
-  for id, name in ipairs(query.captures) do
-    cap_id[name] = id
-  end
-
-  local containers = {}
-  local entry_candidates = {}
-  local comments = {}
-
-  local function first_node(match, capture_name)
-    local id = cap_id[capture_name]
-    if not id then
-      return nil
-    end
-    local nodes = match[id]
-    if not nodes then
-      return nil
-    end
-    return nodes[1]
-  end
-
-  for _, match, metadata in query:iter_matches(root, bufnr, 0, -1, { all = true }) do
-    local container_node = first_node(match, CAPTURE.container)
-    if container_node then
-      local kind = metadata[META.kind]
-      if kind then
-        containers[#containers + 1] = {
-          node = container_node,
-          range = node_range(container_node),
-          kind = kind,
-          node_key = node_id_key(container_node),
-        }
-      end
-    end
-
-    local entry_node = first_node(match, CAPTURE.entry)
-    if entry_node then
-      local entry_kind = metadata[META.entry_kind]
-      if entry_kind then
-        entry_candidates[#entry_candidates + 1] = {
-          node = entry_node,
-          range = node_range(entry_node),
-          entry_kind = entry_kind,
-          key_node = first_node(match, CAPTURE.key),
-          value_node = first_node(match, CAPTURE.value),
-        }
-      end
-    end
-
-    local comment_node = first_node(match, CAPTURE.comment)
-    if comment_node then
-      comments[#comments + 1] = {
-        node = comment_node,
-        range = node_range(comment_node),
-      }
-    end
-  end
-
-  -- The use_list entry query is a wildcard `(use_list (_) @sortkeys.entry)`
-  -- so it also captures direct comment / attribute children. Drop entries
-  -- whose node was also captured as a comment to avoid sorting them as data
-  -- and attaching them as comments at the same time (the Python/JSON
-  -- builders use the same dedup trick).
-  local comment_ids = {}
-  for _, c in ipairs(comments) do
-    comment_ids[node_id_key(c.node)] = true
-  end
-  local entries = {}
-  for _, e in ipairs(entry_candidates) do
-    if not comment_ids[node_id_key(e.node)] then
-      entries[#entries + 1] = e
-    end
-  end
-
-  -- Built here (not at the call site) because each container already carries
-  -- its own node_key — re-walking the list in M.build was wasted work.
-  local containers_by_key = {}
-  for _, c in ipairs(containers) do
-    containers_by_key[c.node_key] = c
-  end
-
-  return containers, entries, comments, containers_by_key
-end
-
-local function index_by_parent(items)
-  local by_parent = {}
-  for _, item in ipairs(items) do
-    local parent = item.node:parent()
-    if parent then
-      local pk = node_id_key(parent)
-      by_parent[pk] = by_parent[pk] or {}
-      by_parent[pk][#by_parent[pk] + 1] = item
-    end
-  end
-  return by_parent
-end
 
 -- Look up an inner captured container reachable from `node`. Two cases the
 -- Rust grammar imposes a one-level wrapper for:
@@ -205,12 +42,12 @@ local function find_inner_container_within(containers_by_key, node)
   if not node then
     return nil
   end
-  local direct = containers_by_key[node_id_key(node)]
+  local direct = containers_by_key[h.node_id_key(node)]
   if direct then
     return direct
   end
   for child in node:iter_children() do
-    local c = containers_by_key[node_id_key(child)]
+    local c = containers_by_key[h.node_id_key(child)]
     if c then
       return c
     end
@@ -319,27 +156,12 @@ local function build_outline(container, ctx)
   }
 end
 
-local function validate_options(options)
-  local required = {
-    "can_sort_object",
-    "can_sort_array",
-    "can_deep",
-    "key_quoting",
-  }
-  for _, k in ipairs(required) do
-    if options[k] == nil then
-      return false
-    end
-  end
-  return true
-end
-
 ---@param bufnr integer
 ---@param target table
 ---@param config { filetype: string, query_text: string, options: table }
 ---@return table|nil
 function M.build(bufnr, target, config)
-  if not validate_options(config.options) then
+  if not h.validate_options(config.options) then
     return nil
   end
 
@@ -353,12 +175,12 @@ function M.build(bufnr, target, config)
 
   local query = vim.treesitter.query.parse(lang, config.query_text)
 
-  local containers, entries, comments, containers_by_key = collect_matches(bufnr, root, query)
+  local containers, entries, comments, containers_by_key = h.collect_matches(bufnr, root, query)
   if #containers == 0 then
     return nil
   end
 
-  local chosen = pick_innermost(containers, target)
+  local chosen = h.pick_innermost(containers, target)
   if not chosen then
     return nil
   end
@@ -367,8 +189,8 @@ function M.build(bufnr, target, config)
     bufnr = bufnr,
     options = config.options,
     containers_by_key = containers_by_key,
-    entries_by_parent = index_by_parent(entries),
-    comments_by_parent = index_by_parent(comments),
+    entries_by_parent = h.index_by_parent(entries),
+    comments_by_parent = h.index_by_parent(comments),
   }
 
   return build_outline(chosen, ctx)

@@ -13,157 +13,11 @@
 --      `inherited_attrs` child as another container so the identifier
 --      order inside `inherit a c b;` can still sort.
 
+local h = require("sort-keys.core.builder_helpers")
 local key_normalize = require("sort-keys.strategies.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
-local container_pick = require("sort-keys.core.container_pick")
 
 local M = {}
-
-local CAPTURE = {
-  container = "sortkeys.container",
-  entry = "sortkeys.entry",
-  comment = "sortkeys.comment",
-}
-
-local META = {
-  kind = "sortkeys.kind",
-  entry_kind = "sortkeys.entry_kind",
-}
-
-local function node_range(node)
-  local sr, sc, er, ec = node:range()
-  return { sr, sc, er, ec }
-end
-
-local function node_id_key(node)
-  local sr, sc, er, ec = node:range()
-  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
-end
-
-local function pos_inside(range, row, col)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if row < sr or row > er then
-    return false
-  end
-  if row == sr and col < sc then
-    return false
-  end
-  if row == er and col > ec then
-    return false
-  end
-  return true
-end
-
-local function contains_range(outer, inner)
-  return pos_inside(outer, inner[1], inner[2]) and pos_inside(outer, inner[3], inner[4])
-end
-
-local function range_area(r)
-  return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
-end
-
-local function pick_innermost(containers, target)
-  if target.kind == "cursor" then
-    return container_pick.for_cursor(containers, target.pos)
-  end
-  local candidates = {}
-  for _, c in ipairs(containers) do
-    if contains_range(c.range, target.range) then
-      candidates[#candidates + 1] = c
-    end
-  end
-  if #candidates == 0 then
-    return nil
-  end
-  table.sort(candidates, function(a, b)
-    return range_area(a.range) < range_area(b.range)
-  end)
-  return candidates[1]
-end
-
-local function normalize_element_text(text)
-  local trimmed = text:gsub("^%s+", ""):gsub("%s+$", "")
-  return (trimmed:gsub("%s+", " "))
-end
-
--- ─── query traversal ──────────────────────────────────────────────────────────
-
-local function collect_matches(bufnr, root, query)
-  local cap_id = {}
-  for id, name in ipairs(query.captures) do
-    cap_id[name] = id
-  end
-
-  local containers = {}
-  local entry_candidates = {}
-  local comments = {}
-
-  local function first_node(match, capture_name)
-    local id = cap_id[capture_name]
-    if not id then
-      return nil
-    end
-    local nodes = match[id]
-    if not nodes then
-      return nil
-    end
-    return nodes[1]
-  end
-
-  for _, match, metadata in query:iter_matches(root, bufnr, 0, -1, { all = true }) do
-    local container_node = first_node(match, CAPTURE.container)
-    if container_node then
-      local kind = metadata[META.kind]
-      if kind then
-        containers[#containers + 1] = {
-          node = container_node,
-          range = node_range(container_node),
-          kind = kind,
-          node_key = node_id_key(container_node),
-        }
-      end
-    end
-
-    local entry_node = first_node(match, CAPTURE.entry)
-    if entry_node then
-      local entry_kind = metadata[META.entry_kind]
-      if entry_kind then
-        entry_candidates[#entry_candidates + 1] = {
-          node = entry_node,
-          range = node_range(entry_node),
-          entry_kind = entry_kind,
-        }
-      end
-    end
-
-    local comment_node = first_node(match, CAPTURE.comment)
-    if comment_node then
-      comments[#comments + 1] = {
-        node = comment_node,
-        range = node_range(comment_node),
-      }
-    end
-  end
-
-  -- The list element query is a wildcard `(list (_) @sortkeys.entry)` so
-  -- comment siblings of the list are also captured as entries. Drop any
-  -- candidate whose node was also captured as a comment, otherwise it would
-  -- be sorted as data AND attached as a comment, and comment_attach's
-  -- expansion could push a real entry past it on the same row — making the
-  -- applier crash on an out-of-order inter-entry gap.
-  local comment_ids = {}
-  for _, c in ipairs(comments) do
-    comment_ids[node_id_key(c.node)] = true
-  end
-  local entries = {}
-  for _, e in ipairs(entry_candidates) do
-    if not comment_ids[node_id_key(e.node)] then
-      entries[#entries + 1] = e
-    end
-  end
-
-  return containers, entries, comments
-end
 
 -- Index entries by their *nearest container ancestor*. This is the variant
 -- needed for Nix because attrset / rec_attrset / let wrap their bindings in
@@ -174,7 +28,7 @@ local function index_by_container_ancestor(entries, containers_by_key)
   for _, item in ipairs(entries) do
     local cur = item.node:parent()
     while cur do
-      local key = node_id_key(cur)
+      local key = h.node_id_key(cur)
       if containers_by_key[key] then
         by_key[key] = by_key[key] or {}
         by_key[key][#by_key[key] + 1] = item
@@ -191,7 +45,7 @@ local function index_comments_by_container_ancestor(comments, containers_by_key)
   for _, item in ipairs(comments) do
     local cur = item.node:parent()
     while cur do
-      local key = node_id_key(cur)
+      local key = h.node_id_key(cur)
       if containers_by_key[key] then
         by_key[key] = by_key[key] or {}
         by_key[key][#by_key[key] + 1] = item
@@ -207,7 +61,7 @@ local function find_container_for_node(containers_by_key, node)
   if not node then
     return nil
   end
-  return containers_by_key[node_id_key(node)]
+  return containers_by_key[h.node_id_key(node)]
 end
 
 -- ─── per-container separator policy ───────────────────────────────────────────
@@ -322,7 +176,7 @@ local function classify_entry(entry_node, bufnr)
 
   -- Generic list element (variable_expression / integer_expression / etc.).
   return {
-    sort_key = normalize_element_text(vim.treesitter.get_node_text(entry_node, bufnr)),
+    sort_key = h.normalize_element_text(vim.treesitter.get_node_text(entry_node, bufnr)),
     movable = true,
     value_node = entry_node,
   }
@@ -396,27 +250,12 @@ local function build_outline(container, ctx)
   }
 end
 
-local function validate_options(options)
-  local required = {
-    "can_sort_object",
-    "can_sort_array",
-    "can_deep",
-    "key_quoting",
-  }
-  for _, k in ipairs(required) do
-    if options[k] == nil then
-      return false
-    end
-  end
-  return true
-end
-
 ---@param bufnr integer
 ---@param target table
 ---@param config { filetype: string, query_text: string, options: table }
 ---@return table|nil
 function M.build(bufnr, target, config)
-  if not validate_options(config.options) then
+  if not h.validate_options(config.options) then
     return nil
   end
 
@@ -430,19 +269,14 @@ function M.build(bufnr, target, config)
 
   local query = vim.treesitter.query.parse(lang, config.query_text)
 
-  local containers, entries, comments = collect_matches(bufnr, root, query)
+  local containers, entries, comments, containers_by_key = h.collect_matches(bufnr, root, query)
   if #containers == 0 then
     return nil
   end
 
-  local chosen = pick_innermost(containers, target)
+  local chosen = h.pick_innermost(containers, target)
   if not chosen then
     return nil
-  end
-
-  local containers_by_key = {}
-  for _, c in ipairs(containers) do
-    containers_by_key[c.node_key] = c
   end
 
   local ctx = {

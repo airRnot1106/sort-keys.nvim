@@ -16,9 +16,9 @@
 -- entries by newline/whitespace rather than a punctuation token, so the
 -- structural separator is empty and the buffer gaps carry the spacing.
 
+local h = require("sort-keys.core.builder_helpers")
 local key_normalize = require("sort-keys.strategies.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
-local container_pick = require("sort-keys.core.container_pick")
 
 local M = {}
 
@@ -28,68 +28,6 @@ local CAPTURE = {
   comment = "sortkeys.comment",
 }
 
-local function node_range(node)
-  local sr, sc, er, ec = node:range()
-  return { sr, sc, er, ec }
-end
-
-local function node_id_key(node)
-  local sr, sc, er, ec = node:range()
-  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
-end
-
-local function pos_inside(range, row, col)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if row < sr or row > er then
-    return false
-  end
-  if row == sr and col < sc then
-    return false
-  end
-  if row == er and col > ec then
-    return false
-  end
-  return true
-end
-
-local function contains_range(outer, inner)
-  return pos_inside(outer, inner[1], inner[2]) and pos_inside(outer, inner[3], inner[4])
-end
-
-local function range_area(r)
-  return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
-end
-
-local function pick_innermost(containers, target)
-  if target.kind == "cursor" then
-    return container_pick.for_cursor(containers, target.pos)
-  end
-  local candidates = {}
-  for _, c in ipairs(containers) do
-    if contains_range(c.range, target.range) then
-      candidates[#candidates + 1] = c
-    end
-  end
-  if #candidates == 0 then
-    return nil
-  end
-  table.sort(candidates, function(a, b)
-    return range_area(a.range) < range_area(b.range)
-  end)
-  return candidates[1]
-end
-
-local function normalize_element_text(text)
-  local trimmed = text:gsub("^%s+", ""):gsub("%s+$", "")
-  return (trimmed:gsub("%s+", " "))
-end
-
--- The `module` node spans the whole file and ends one row past the buffer's
--- last actual line (the phantom trailing newline the grammar assumes). The
--- applier feeds outline.range straight to `nvim_buf_get_text`, which errors
--- on out-of-bounds rows, so clamp the container range to real buffer bounds.
--- objectBody ranges sit within `{ }` and are unaffected. Same fix pattern as
--- toml_builder / yaml_builder.
 local function clamp_range_to_buffer(bufnr, range)
   local line_count = vim.api.nvim_buf_line_count(bufnr)
   local sr, sc, er, ec = range[1], range[2], range[3], range[4]
@@ -106,7 +44,8 @@ local function clamp_range_to_buffer(bufnr, range)
   return { sr, sc, er, ec }
 end
 
--- ─── query traversal ──────────────────────────────────────────────────────────
+-- ─── query traversal (local — Pkl's kind is voted post-classification, no
+--                     sortkeys.kind metadata, container range clamped) ─────
 
 local function collect_matches(bufnr, root, query)
   local cap_id = {}
@@ -133,14 +72,10 @@ local function collect_matches(bufnr, root, query)
   for _, match, _metadata in query:iter_matches(root, bufnr, 0, -1, { all = true }) do
     local container_node = first_node(match, CAPTURE.container)
     if container_node then
-      -- Kind is computed in build_outline, so containers are added
-      -- unconditionally (no sortkeys.kind metadata guard). node_key stays the
-      -- raw node identity; only the applier-facing range is clamped so the
-      -- module's phantom trailing row never reaches nvim_buf_get_text.
       containers[#containers + 1] = {
         node = container_node,
-        range = clamp_range_to_buffer(bufnr, node_range(container_node)),
-        node_key = node_id_key(container_node),
+        range = clamp_range_to_buffer(bufnr, h.node_range(container_node)),
+        node_key = h.node_id_key(container_node),
       }
     end
 
@@ -148,7 +83,7 @@ local function collect_matches(bufnr, root, query)
     if entry_node then
       entries[#entries + 1] = {
         node = entry_node,
-        range = node_range(entry_node),
+        range = h.node_range(entry_node),
       }
     end
 
@@ -156,25 +91,17 @@ local function collect_matches(bufnr, root, query)
     if comment_node then
       comments[#comments + 1] = {
         node = comment_node,
-        range = node_range(comment_node),
+        range = h.node_range(comment_node),
       }
     end
   end
 
-  return containers, entries, comments
-end
-
-local function index_by_parent(items)
-  local by_parent = {}
-  for _, item in ipairs(items) do
-    local parent = item.node:parent()
-    if parent then
-      local pk = node_id_key(parent)
-      by_parent[pk] = by_parent[pk] or {}
-      by_parent[pk][#by_parent[pk] + 1] = item
-    end
+  local containers_by_key = {}
+  for _, c in ipairs(containers) do
+    containers_by_key[c.node_key] = c
   end
-  return by_parent
+
+  return containers, entries, comments, containers_by_key
 end
 
 local function first_field(node, name)
@@ -198,11 +125,11 @@ local function body_container(value_node, containers_by_key)
     return nil
   end
   if value_node:type() == "objectBody" then
-    return containers_by_key[node_id_key(value_node)]
+    return containers_by_key[h.node_id_key(value_node)]
   end
   for child in value_node:iter_children() do
     if child:type() == "objectBody" then
-      return containers_by_key[node_id_key(child)]
+      return containers_by_key[h.node_id_key(child)]
     end
   end
   return nil
@@ -245,7 +172,7 @@ local function classify_entry(node, bufnr)
 
   if t == "objectElement" then
     return {
-      sort_key = normalize_element_text(vim.treesitter.get_node_text(node, bufnr)),
+      sort_key = h.normalize_element_text(vim.treesitter.get_node_text(node, bufnr)),
       movable = true,
       kind_vote = "array",
       value_node = node:named_child(0),
@@ -335,27 +262,12 @@ local function build_outline(container, ctx)
   }
 end
 
-local function validate_options(options)
-  local required = {
-    "can_sort_object",
-    "can_sort_array",
-    "can_deep",
-    "key_quoting",
-  }
-  for _, k in ipairs(required) do
-    if options[k] == nil then
-      return false
-    end
-  end
-  return true
-end
-
 ---@param bufnr integer
 ---@param target table
 ---@param config { filetype: string, query_text: string, options: table }
 ---@return table|nil
 function M.build(bufnr, target, config)
-  if not validate_options(config.options) then
+  if not h.validate_options(config.options) then
     return nil
   end
 
@@ -369,27 +281,22 @@ function M.build(bufnr, target, config)
 
   local query = vim.treesitter.query.parse(lang, config.query_text)
 
-  local containers, entries, comments = collect_matches(bufnr, root, query)
+  local containers, entries, comments, containers_by_key = collect_matches(bufnr, root, query)
   if #containers == 0 then
     return nil
   end
 
-  local chosen = pick_innermost(containers, target)
+  local chosen = h.pick_innermost(containers, target)
   if not chosen then
     return nil
-  end
-
-  local containers_by_key = {}
-  for _, c in ipairs(containers) do
-    containers_by_key[c.node_key] = c
   end
 
   local ctx = {
     bufnr = bufnr,
     options = config.options,
     containers_by_key = containers_by_key,
-    entries_by_parent = index_by_parent(entries),
-    comments_by_parent = index_by_parent(comments),
+    entries_by_parent = h.index_by_parent(entries),
+    comments_by_parent = h.index_by_parent(comments),
   }
 
   return build_outline(chosen, ctx)

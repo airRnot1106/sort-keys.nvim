@@ -19,9 +19,9 @@
 -- trim the phantom newline so each entry ends at its real content, matching
 -- the convention the policy layer assumes.
 
+local h = require("sort-keys.core.builder_helpers")
 local key_normalize = require("sort-keys.strategies.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
-local container_pick = require("sort-keys.core.container_pick")
 
 local M = {}
 
@@ -30,56 +30,6 @@ local CAPTURE = {
   entry = "sortkeys.entry",
   comment = "sortkeys.comment",
 }
-
-local function node_range(node)
-  local sr, sc, er, ec = node:range()
-  return { sr, sc, er, ec }
-end
-
-local function node_id_key(node)
-  local sr, sc, er, ec = node:range()
-  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
-end
-
-local function contains_range(outer, inner)
-  local function pos_inside(range, row, col)
-    local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-    if row < sr or row > er then
-      return false
-    end
-    if row == sr and col < sc then
-      return false
-    end
-    if row == er and col > ec then
-      return false
-    end
-    return true
-  end
-  return pos_inside(outer, inner[1], inner[2]) and pos_inside(outer, inner[3], inner[4])
-end
-
-local function range_area(r)
-  return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
-end
-
-local function pick_innermost(containers, target)
-  if target.kind == "cursor" then
-    return container_pick.for_cursor(containers, target.pos)
-  end
-  local candidates = {}
-  for _, c in ipairs(containers) do
-    if contains_range(c.range, target.range) then
-      candidates[#candidates + 1] = c
-    end
-  end
-  if #candidates == 0 then
-    return nil
-  end
-  table.sort(candidates, function(a, b)
-    return range_area(a.range) < range_area(b.range)
-  end)
-  return candidates[1]
-end
 
 -- The `document` node spans the whole file and ends one row past the buffer's
 -- last actual line (the phantom trailing newline the grammar assumes). The
@@ -127,7 +77,8 @@ local function first_child_of_type(node, type_name)
   return nil
 end
 
--- ─── query traversal ──────────────────────────────────────────────────────────
+-- ─── query traversal (local — KDL clamps container ranges and skips
+--                     sortkeys.kind / sortkeys.entry_kind metadata) ───────────
 
 local function collect_matches(bufnr, root, query)
   local cap_id = {}
@@ -160,8 +111,8 @@ local function collect_matches(bufnr, root, query)
       -- document's phantom trailing row never reaches nvim_buf_get_text.
       containers[#containers + 1] = {
         node = container_node,
-        range = clamp_range_to_buffer(bufnr, node_range(container_node)),
-        node_key = node_id_key(container_node),
+        range = clamp_range_to_buffer(bufnr, h.node_range(container_node)),
+        node_key = h.node_id_key(container_node),
       }
     end
 
@@ -169,7 +120,7 @@ local function collect_matches(bufnr, root, query)
     if entry_node then
       entries[#entries + 1] = {
         node = entry_node,
-        range = node_range(entry_node),
+        range = h.node_range(entry_node),
       }
     end
 
@@ -177,25 +128,17 @@ local function collect_matches(bufnr, root, query)
     if comment_node then
       comments[#comments + 1] = {
         node = comment_node,
-        range = node_range(comment_node),
+        range = h.node_range(comment_node),
       }
     end
   end
 
-  return containers, entries, comments
-end
-
-local function index_by_parent(items)
-  local by_parent = {}
-  for _, item in ipairs(items) do
-    local parent = item.node:parent()
-    if parent then
-      local pk = node_id_key(parent)
-      by_parent[pk] = by_parent[pk] or {}
-      by_parent[pk][#by_parent[pk] + 1] = item
-    end
+  local containers_by_key = {}
+  for _, c in ipairs(containers) do
+    containers_by_key[c.node_key] = c
   end
-  return by_parent
+
+  return containers, entries, comments, containers_by_key
 end
 
 -- A node's sort_key is its name: the first direct `identifier` child (after an
@@ -249,7 +192,7 @@ local function build_outline(container, ctx)
 
     local children = first_child_of_type(e.node, "node_children")
     if children then
-      local inner = ctx.containers_by_key[node_id_key(children)]
+      local inner = ctx.containers_by_key[h.node_id_key(children)]
       if inner then
         entry.child = build_outline(inner, ctx)
       end
@@ -272,27 +215,12 @@ local function build_outline(container, ctx)
   }
 end
 
-local function validate_options(options)
-  local required = {
-    "can_sort_object",
-    "can_sort_array",
-    "can_deep",
-    "key_quoting",
-  }
-  for _, k in ipairs(required) do
-    if options[k] == nil then
-      return false
-    end
-  end
-  return true
-end
-
 ---@param bufnr integer
 ---@param target table
 ---@param config { filetype: string, query_text: string, options: table }
 ---@return table|nil
 function M.build(bufnr, target, config)
-  if not validate_options(config.options) then
+  if not h.validate_options(config.options) then
     return nil
   end
 
@@ -306,27 +234,22 @@ function M.build(bufnr, target, config)
 
   local query = vim.treesitter.query.parse(lang, config.query_text)
 
-  local containers, entries, comments = collect_matches(bufnr, root, query)
+  local containers, entries, comments, containers_by_key = collect_matches(bufnr, root, query)
   if #containers == 0 then
     return nil
   end
 
-  local chosen = pick_innermost(containers, target)
+  local chosen = h.pick_innermost(containers, target)
   if not chosen then
     return nil
-  end
-
-  local containers_by_key = {}
-  for _, c in ipairs(containers) do
-    containers_by_key[c.node_key] = c
   end
 
   local ctx = {
     bufnr = bufnr,
     options = config.options,
     containers_by_key = containers_by_key,
-    entries_by_parent = index_by_parent(entries),
-    comments_by_parent = index_by_parent(comments),
+    entries_by_parent = h.index_by_parent(entries),
+    comments_by_parent = h.index_by_parent(comments),
   }
 
   return build_outline(chosen, ctx)
