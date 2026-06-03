@@ -53,6 +53,7 @@
         pkgs:
         pkgs.vimPlugins.nvim-treesitter.withPlugins (
           parsers: with parsers; [
+            go
             javascript
             json
             kdl

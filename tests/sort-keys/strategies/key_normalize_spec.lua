@@ -499,6 +499,43 @@ describe("sort-keys.strategies.key_normalize", function()
     end)
   end)
 
+  describe("go(text)", function()
+    it("returns a bare identifier (struct field) unchanged", function()
+      -- Go struct fields and shorthand keyed-element keys arrive as bare
+      -- identifiers; the surface text is the sort_key as-is.
+      assert.equals("Foo", key_normalize.go("Foo"))
+    end)
+
+    it("strips the surrounding double quotes of an interpreted_string_literal", function()
+      -- Map literal keys appear as `"key"`; strip quotes for sort_key
+      -- comparison.
+      assert.equals("foo", key_normalize.go('"foo"'))
+    end)
+
+    it("unescapes JSON-style escapes inside an interpreted_string_literal", function()
+      -- Go interpreted strings use the same backslash set as JSON for the
+      -- common escapes (\n, \t, \r, \\, \" and \uXXXX); decoding them is
+      -- what makes "a\nb" and the two-byte literal `a\nb` compare equal
+      -- under the same sort.
+      assert.equals("a\nb", key_normalize.go([["a\nb"]]))
+      assert.equals('a"b', key_normalize.go([["a\"b"]]))
+      assert.equals("a\\b", key_normalize.go([["a\\b"]]))
+    end)
+
+    it("strips the surrounding backticks of a raw_string_literal", function()
+      -- Go raw strings disable escape processing entirely: `a\nb` is the two
+      -- literal bytes `\` and `n` inside, so we strip backticks without
+      -- decoding.
+      assert.equals("foo", key_normalize.go("`foo`"))
+      assert.equals([[a\nb]], key_normalize.go("`a\\nb`"))
+    end)
+
+    it("preserves an empty quoted key", function()
+      assert.equals("", key_normalize.go('""'))
+      assert.equals("", key_normalize.go("``"))
+    end)
+  end)
+
   describe("rust(text)", function()
     it("returns a bare identifier unchanged", function()
       -- Rust struct fields and use_list entries arrive here as bare

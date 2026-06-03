@@ -260,6 +260,28 @@ describe("sort-keys.core.registry", function()
       assert.is_true(handler.capabilities.comment_aware)
     end)
 
+    it("returns a handler that exposes `capabilities` and `outline` for go", function()
+      local handler = registry.get("go")
+      assert.is_not_nil(handler)
+      assert.is_table(handler.capabilities)
+      assert.is_function(handler.outline)
+    end)
+
+    it("the go handler declares can_sort_object / can_sort_array / can_deep", function()
+      -- `can_sort_array` is true because import_spec_list is the Go
+      -- array-shape container; the query never captures slice / array
+      -- composite literals so positional structures stay out of scope.
+      local handler = registry.get("go")
+      assert.is_true(handler.capabilities.can_sort_object)
+      assert.is_true(handler.capabilities.can_sort_array)
+      assert.is_true(handler.capabilities.can_deep)
+    end)
+
+    it("the go handler declares comment_aware = true", function()
+      local handler = registry.get("go")
+      assert.is_true(handler.capabilities.comment_aware)
+    end)
+
     it(
       "does not let a built-in spec drift between calls (built-in spec is reused, not mutated)",
       function()
