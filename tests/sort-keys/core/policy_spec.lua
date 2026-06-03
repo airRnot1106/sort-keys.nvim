@@ -289,5 +289,25 @@ describe("sort-keys.core.policy", function()
       assert.is_true(entries[1].movable)
       assert.is_true(entries[2].movable)
     end)
+
+    it(
+      "preserves each entry's data_range so the applier can still locate trailing-comment boundaries",
+      function()
+        -- comment_attach assigns data_range to record where the entry's data
+        -- ends and an absorbed trailing comment begins. apply_selection_overlay
+        -- runs AFTER the builder (which delegates to comment_attach), so it
+        -- inherits entries that carry data_range. Dropping it forces the
+        -- applier into its no-suffix fallback (data_length == #piece) and
+        -- separator_normalize then splices the inter-entry separator AFTER an
+        -- absorbed line-comment instead of before it.
+        local entry = make_entry("a", 1, { range = { 0, 1, 1, 10 }, movable = true })
+        entry.data_range = { 0, 1, 0, 4 }
+        local o = make_outline("object", { entry })
+
+        local overlaid = policy.apply_selection_overlay(o, { 0, 0, 5, 0 })
+
+        assert.same({ 0, 1, 0, 4 }, overlaid.entries[1].data_range)
+      end
+    )
   end)
 end)

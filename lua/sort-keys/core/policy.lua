@@ -244,6 +244,13 @@ function M.apply_selection_overlay(outline, selection_range)
       kind = e.kind,
       sort_key = e.sort_key,
       range = e.range,
+      -- data_range is the comment_attach-recorded boundary between the
+      -- entry's data and an absorbed trailing comment; the applier needs it
+      -- to splice inter-entry separators BEFORE the comment instead of
+      -- after it. Forwarding it here is what keeps Visual-range :SortKeys
+      -- consistent with cursor :SortKeys when entries carry trailing
+      -- comments.
+      data_range = e.data_range,
       movable = ranges_overlap(e.range, selection_range),
       anchor = e.anchor,
       attached = e.attached,
