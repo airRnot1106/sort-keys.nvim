@@ -72,14 +72,17 @@ policy in:
 high-level detail        →  require              ←  low-level pure policy
 ─────────────────────────                          ─────────────────────────
 command.lua              ──require──────────►   core/{target,policy,walker,applier}, registry, config
-core/registry.lua        ──require──────────►   core/toml_loader, languages/<lang>/builder × 6
+core/registry.lua        ──require──────────►   core/toml_loader, languages/<lang>/builder × N
 core/applier.lua         ──require──────────►   core/separator_normalize
-core/walker.lua          ──require──────────►   core/policy
-core/policy.lua          ──require──────────►   core/unicode
-languages/<lang>/builder ──require──────────►   strategies/key_normalize, core/comment_attach, core/container_pick
+core/walker.lua          ──require──────────►   core/policy, core/entry
+core/policy.lua          ──require──────────►   core/unicode, core/entry
+core/comment_attach.lua  ──require──────────►   core/entry
+core/builder_helpers.lua ──require──────────►   core/container_pick
+languages/<lang>/builder ──require──────────►   core/builder_helpers, core/comment_attach,
+                                                  strategies/key_normalize
 
 (no incoming requires)                          core/{comment_attach, separator_normalize,
-                                                     container_pick, unicode}
+                                                     container_pick, unicode, entry}
 ```
 
 So `comment_attach` / `separator_normalize` / `container_pick` / `policy`
@@ -109,12 +112,14 @@ Lives in `lua/sort-keys/core/` and `lua/sort-keys/strategies/`. Operates entirel
 - `comment_attach.lua` — assigns each comment to an entry by spatial relationship (leading attaches to the next entry, same-line trailing attaches to the previous) and expands the entry range to swallow it. **Walks the original entry ranges**, not the in-progress expanded ones, so back-to-back leading-comment blocks routing into different entries don't accidentally collapse onto the previous entry.
 - `separator_normalize.lua` — inserts the inter-entry separator when missing and strips a trailing separator when the language forbids it. Treats `separator` as an opaque byte string, so whitespace separators (`"\n"` for YAML block style, `" "` for Nix lists / `inherited_attrs`) work the same as `,` / `;`.
 - `container_pick.lua` — cursor → innermost container resolution with a 3-tier fallback (strict containment → same-row leftmost start → row-span innermost area), shared by builders.
+- `entry.lua` — single forward-compatible Outline-entry copy helper (`copy(e, overrides?)` via `pairs`), used by every rebuild site (`comment_attach.copy_entry`, `policy.apply_selection_overlay`, `walker.rebuild_entry_with_child`) so a new Outline field is never silently dropped.
 - `unicode.lua`, `toml_loader.lua` — pure helpers.
 - `strategies/key_normalize.lua` — one `M.<lang>` function per supported language, each turns a raw key node text into the canonical sort_key (quote stripping + per-language escape decoding).
 
 ### Detail layer (treesitter / buffer / runtime lookup)
 
 - `lua/sort-keys/languages/<lang>/builder.lua` — runs the per-language treesitter query and returns an Outline. Each builder self-declares `M.filetypes = { <ft> = <config_name>, ... }` so the registry doesn't hardcode filetype → builder mapping.
+- `lua/sort-keys/core/builder_helpers.lua` — the shared treesitter-aware scaffolding every builder calls: `node_range` / `node_id_key` / `pos_inside` / `contains_range` / `range_area` / `pick_innermost` (O(n) selection min-pass) / `collect_matches` (returns `containers, entries, comments, containers_by_key` in one pass) / `index_by_parent` / `normalize_element_text` / `clamp_range_to_buffer` / `capability_allows` / `sort_entries_by_position` / `validate_options`. Builders import this as `local h = require("sort-keys.core.builder_helpers")`. Language-specific variations stay in the builder (YAML's overlap-based `pick_innermost`, Nix's `index_by_container_ancestor`, KDL / Lua / Pkl local `collect_matches` without kind metadata).
 - `lua/sort-keys/core/applier.lua` — reads piece / gap text from the buffer, delegates inter-entry separator emission to `separator_normalize` when `outline.structural_separator` is set, writes back via `nvim_buf_set_text`.
 - `lua/sort-keys/core/registry.lua` — built-in handlers come from `languages/<config_name>/config.toml` + `languages/<config_name>/sort-keys.scm` on `&runtimepath`. User handlers come from `set_user_handlers(specs)` (called from `config.setup`). Same-config-name overrides deep-merge over the built-in spec.
 - `lua/sort-keys/command.lua` + `plugin/sort-keys.lua` — flag parsing and `:SortKeys` / `:DeepSortKeys` dispatch.
@@ -141,6 +146,12 @@ outline = {
       kind     = "pair" | "element",
       sort_key = "...",                       -- logical key after normalize
       range    = { srow, scol, erow, ecol },  -- may be expanded by comment_attach
+      data_range = { srow, scol, erow, ecol }, -- set by comment_attach: the pre-absorb
+                                              --   range, recording where the entry's
+                                              --   data ends and an absorbed trailing
+                                              --   comment begins. applier reads this to
+                                              --   splice inter-entry separators BEFORE
+                                              --   the comment.
       movable  = true,                        -- false = pinned at its anchor slot
       anchor   = 1,                           -- 1-based source-order index; policy uses
                                               --   this to keep non-movable entries put
@@ -153,6 +164,8 @@ outline = {
 ```
 
 `walker.recurse_children` and `policy.shallow_copy_outline` propagate `structural_separator` and `trailing_separator_allowed` through child copies. Drop those copies and the applier silently skips separator normalization at the affected level.
+
+Every entry rebuild (overlay, deep-sort recursion, comment_attach copy) goes through `core/entry.copy`, which forwards all keys via `pairs` so additions like `data_range` survive without per-site enumeration.
 
 `movable = false` entries stay at their `anchor` index after sorting; the movable entries fill the remaining slots in sort_key order. This is what powers (a) language-specific pins (Lua positional fields, JS spread, Nix `inherit`, `...` ellipses), (b) the visual-range overlay (entries outside the selection get `movable = false` so only the selected ones reorder).
 
@@ -241,7 +254,7 @@ Working examples: `strategies/key_normalize.{yaml,lua,toml,nix}` — each handle
 
 ### Case D — entirely different AST shape (Lua tables `{ a = 1, b = 2 }`, Nix attrset / formals / inherit, TOML inline_table + standard table + root-level pseudo-container)
 
-Implement `lua/sort-keys/languages/<lang>/builder.lua` honoring the `build(bufnr, target, config) → outline | nil` contract. Register the builder by appending it to `BUILT_IN_BUILDERS` in `registry.lua` (and self-declare its `M.filetypes`). Policy modules stay untouched — they only depend on the Outline shape.
+Implement `lua/sort-keys/languages/<lang>/builder.lua` honoring the `build(bufnr, target, config) → outline | nil` contract by composing `core/builder_helpers`. Register the builder by appending it to `BUILT_IN_BUILDERS` in `registry.lua` (and self-declare its `M.filetypes`). Policy modules stay untouched — they only depend on the Outline shape; the shared `h.*` helpers cover all generic treesitter scaffolding so per-language code shrinks to the parts that are genuinely language-specific (entry classification, value→inner-container resolution, separator policy, deep-recursion strategy).
 
 Working examples (in increasing complexity):
 
@@ -269,18 +282,52 @@ config = {
 
 ### Standard `M.build` flow
 
-1. **Validate options** — return `nil` early if required fields are missing.
-2. **Get parser** — use `pcall`; return `nil` (not an error) if the parser is absent. Missing parsers are environmental, not plugin bugs.
-   ```lua
-   local lang = config.options.parser_lang or config.filetype
-   local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
-   if not ok or parser == nil then return nil end
-   local root = parser:parse()[1]:root()
-   ```
-3. **Run the query** — `vim.treesitter.query.parse(lang, config.query_text)`, then `query:iter_matches(root, bufnr, 0, -1, { all = true })`.
-4. **Collect containers / entries / comments** from the matches using the `sortkeys.*` capture convention (see below).
-5. **Pick the target container** — `container_pick.for_cursor(containers, target.pos)` for cursor targets; for selection targets, find the innermost container whose range contains `target.range`.
-6. **Build the Outline** recursively for the chosen container and return it. Return `nil` if no container is found or its kind is disabled by `options`.
+The shared helpers cover steps 1, 3-5, and 6's gate. A builder typically looks like:
+
+```lua
+local h = require("sort-keys.core.builder_helpers")
+local comment_attach = require("sort-keys.core.comment_attach")
+local key_normalize = require("sort-keys.strategies.key_normalize")
+
+function M.build(bufnr, target, config)
+  -- 1. Validate. h.validate_options checks the baseline capability flags;
+  --    pass `extras` to require language-specific options.
+  if not h.validate_options(config.options) then return nil end
+
+  -- 2. Get parser. Missing parsers are environmental → nil, not error.
+  local lang = config.options.parser_lang or config.filetype
+  local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
+  if not ok or parser == nil then return nil end
+  local root = parser:parse()[1]:root()
+
+  -- 3-4. Run the query and triage matches. collect_matches returns the
+  --      already-deduped entries plus a containers_by_key index.
+  local query = vim.treesitter.query.parse(lang, config.query_text)
+  local containers, entries, comments, containers_by_key =
+    h.collect_matches(bufnr, root, query)
+  if #containers == 0 then return nil end
+
+  -- 5. Pick the target container. Cursor → 3-tier container_pick; selection
+  --    → smallest container whose range covers target.range.
+  local chosen = h.pick_innermost(containers, target)
+  if not chosen then return nil end
+
+  -- 6. Build the Outline. capability_allows is checked inside build_outline.
+  return build_outline(chosen, {
+    bufnr = bufnr,
+    options = config.options,
+    containers_by_key = containers_by_key,
+    entries_by_parent = h.index_by_parent(entries),
+    comments_by_parent = h.index_by_parent(comments),
+  })
+end
+```
+
+Language-specific overrides keep the same shape: YAML calls a local
+`pick_innermost(containers, entries, target)` for its 2-entry-overlap rule;
+Nix swaps `index_by_parent` for a local `index_by_container_ancestor`
+(walks past `binding_set`); KDL / Lua / Pkl keep a local `collect_matches`
+because their queries don't tag containers with `sortkeys.kind`.
 
 ### Capture convention
 
@@ -298,36 +345,31 @@ Languages whose container kind cannot be determined statically (e.g. Lua `table_
 
 ### Grouping nodes by parent
 
-Entries and comments are collected flat and grouped by their immediate parent via a string identity key:
+`h.index_by_parent(items)` groups by each item's `node:parent()` via the shared `h.node_id_key` serialization, returning `node_id_key → list`. Builders consume it as `ctx.entries_by_parent[container.node_key]` and `ctx.comments_by_parent[container.node_key]`.
 
-```lua
-local function node_id_key(node)
-  local sr, sc, er, ec = node:range()
-  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
-end
--- entries_by_parent[container.node_key]  → list of raw entry tables
--- comments_by_parent[container.node_key] → list of comment tables
-```
-
-Builders that interpose an extra AST level between container and entries (e.g. Nix `binding_set`) use `index_by_container_ancestor` instead of `index_by_parent`.
+Builders that interpose an extra AST level between container and entries (e.g. Nix `binding_set`) keep a local `index_by_container_ancestor` that walks `node:parent()` upward until a captured container is hit; it still calls `h.node_id_key` for the lookup key.
 
 ### Building entries
 
-Iterate entries in source-position order (the loop index becomes `anchor`):
+Iterate entries in source-position order via `h.sort_entries_by_position(raw)` (the loop index becomes `anchor`):
 
 ```lua
-local entry = {
-  kind     = "pair" | "element",
-  range    = node_range(entry_node),
-  sort_key = key_normalize.<lang>(raw_key_text),
-  movable  = true,   -- false for pinned entries (positional, spread, inherit, computed keys)
-  anchor   = i,      -- 1-based source-order index
-  attached = {},
-  child    = nil,
-}
--- Recurse for :DeepSortKeys:
-local inner = containers_by_key[node_id_key(value_node)]
-if inner then entry.child = build_outline(inner, ctx) end
+local sorted_raw = h.sort_entries_by_position(raw)
+for i, e in ipairs(sorted_raw) do
+  local entry = {
+    kind     = e.entry_kind,            -- "pair" | "element"
+    range    = e.range,                 -- comment_attach may expand later
+    sort_key = key_normalize.<lang>(...),
+    movable  = true,                    -- false for pinned entries (positional, spread,
+                                        --   inherit, computed keys)
+    anchor   = i,                       -- 1-based source-order index
+    attached = {},
+    child    = nil,
+  }
+  -- Recurse for :DeepSortKeys:
+  local inner = ctx.containers_by_key[h.node_id_key(value_node)]
+  if inner then entry.child = build_outline(inner, ctx) end
+end
 ```
 
 ### Comment attachment
@@ -353,7 +395,7 @@ return {
 }
 ```
 
-Return `nil` (never a partial outline) when the container's kind is disabled by `options.can_sort_object` / `options.can_sort_array`.
+Return `nil` (never a partial outline) when the container's kind is disabled. Use `h.capability_allows(container.kind, ctx.options)` at the top of `build_outline` for the standard gate; languages with dynamic kind voting (Lua, Pkl) call it after the vote completes.
 
 ### Registering the builder
 
@@ -372,6 +414,6 @@ The registry aggregates each builder's `M.filetypes` at startup — there is no 
 
 ## Conventions
 
-- **Code comments and test name strings**: English, WHY-only — hidden constraints, intentional choices, non-obvious invariants. The plain "what" should be carried by identifiers and tests; comments must stand on their own without external references (no "see commit X" / "as per discussion in ADR Y" pointers — those rot when the surrounding context changes).
+- **Code comments and test name strings**: English, WHY-only — hidden constraints, intentional choices, non-obvious invariants. The plain "what" should be carried by identifiers and tests; comments must stand on their own without external references (no "see commit X" / "as per discussion in ADR Y" pointers — those rot when the surrounding context changes). Same rule against historical narrative: state the current invariant, not "previously X, now Y" or "we used to ship Z" — those rot the moment the next refactor lands.
 - **Commit messages**: English, Conventional Commits style. Same self-contained rule (no ADR refs).
 - **LSP noise**: busted globals (`pending`, `assert.is_*`, `describe`, `it`) and stylua-formatted but lua-language-server-flagged constructs are intentionally not chased with addon clones or settings hacks. Leave the diagnostics alone.
