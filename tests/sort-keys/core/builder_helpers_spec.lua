@@ -135,6 +135,84 @@ describe("sort-keys.core.builder_helpers", function()
     end)
   end)
 
+  describe("capability_allows", function()
+    it("permits object containers when can_sort_object is true", function()
+      assert.is_true(h.capability_allows("object", { can_sort_object = true }))
+      assert.is_false(h.capability_allows("object", { can_sort_object = false }))
+    end)
+
+    it("permits array containers when can_sort_array is true", function()
+      assert.is_true(h.capability_allows("array", { can_sort_array = true }))
+      assert.is_false(h.capability_allows("array", { can_sort_array = false }))
+    end)
+
+    it("refuses any unknown kind regardless of options", function()
+      -- Outline contract names exactly two kinds; a builder that invented a
+      -- third would silently slip through if this gate were permissive.
+      assert.is_false(h.capability_allows("set", { can_sort_object = true, can_sort_array = true }))
+    end)
+  end)
+
+  describe("sort_entries_by_position", function()
+    local function entry(range)
+      return { range = range, sort_key = tostring(range[1] * 100 + range[2]) }
+    end
+
+    it("orders entries by (start row, start col) ascending", function()
+      local sorted = h.sort_entries_by_position({
+        entry({ 2, 0, 2, 5 }),
+        entry({ 0, 4, 0, 9 }),
+        entry({ 0, 0, 0, 3 }),
+        entry({ 1, 0, 1, 5 }),
+      })
+      assert.equals(0, sorted[1].range[1])
+      assert.equals(0, sorted[1].range[2])
+      assert.equals(0, sorted[2].range[1])
+      assert.equals(4, sorted[2].range[2])
+      assert.equals(1, sorted[3].range[1])
+      assert.equals(2, sorted[4].range[1])
+    end)
+
+    it("does not mutate the input list", function()
+      local input = {
+        entry({ 5, 0, 5, 1 }),
+        entry({ 0, 0, 0, 1 }),
+      }
+      h.sort_entries_by_position(input)
+      assert.equals(5, input[1].range[1])
+      assert.equals(0, input[2].range[1])
+    end)
+  end)
+
+  describe("clamp_range_to_buffer (smoke)", function()
+    local function make_buf(lines)
+      local bufnr = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+      return bufnr
+    end
+
+    it("pulls a past-EOF end row back to the last real line's length", function()
+      -- Treesitter reports a container range whose erow is line_count (one
+      -- past the last real row). The applier feeds this straight to
+      -- nvim_buf_get_text, which errors on out-of-bounds rows.
+      local bufnr = make_buf({ "abc", "defgh" })
+      local clamped = h.clamp_range_to_buffer(bufnr, { 0, 0, 2, 0 })
+      assert.same({ 0, 0, 1, 5 }, clamped)
+    end)
+
+    it("trims an end column that overruns the row's actual length", function()
+      local bufnr = make_buf({ "abc", "defgh" })
+      local clamped = h.clamp_range_to_buffer(bufnr, { 0, 0, 1, 999 })
+      assert.same({ 0, 0, 1, 5 }, clamped)
+    end)
+
+    it("returns the range untouched when it sits within the buffer", function()
+      local bufnr = make_buf({ "abc", "defgh" })
+      local clamped = h.clamp_range_to_buffer(bufnr, { 0, 1, 1, 3 })
+      assert.same({ 0, 1, 1, 3 }, clamped)
+    end)
+  end)
+
   describe("collect_matches (smoke against the real JSON parser)", function()
     local function make_buf(lines)
       local bufnr = vim.api.nvim_create_buf(false, true)

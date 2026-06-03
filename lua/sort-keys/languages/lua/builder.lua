@@ -144,30 +144,11 @@ local function value_node_of(field_node)
   return field_node:named_child(n - 1)
 end
 
--- ─── capability + build_outline ───────────────────────────────────────────────
-
-local function capability_allows(kind, options)
-  if kind == "object" then
-    return options.can_sort_object == true
-  end
-  if kind == "array" then
-    return options.can_sort_array == true
-  end
-  return false
-end
+-- ─── build_outline ────────────────────────────────────────────────────────────
 
 local function build_outline(container, ctx)
   local raw = ctx.entries_by_parent[container.node_key] or {}
-  local sorted_raw = {}
-  for _, e in ipairs(raw) do
-    sorted_raw[#sorted_raw + 1] = e
-  end
-  table.sort(sorted_raw, function(a, b)
-    if a.range[1] ~= b.range[1] then
-      return a.range[1] < b.range[1]
-    end
-    return a.range[2] < b.range[2]
-  end)
+  local sorted_raw = h.sort_entries_by_position(raw)
 
   local outline_entries = {}
   local votes_object = 0
@@ -201,7 +182,7 @@ local function build_outline(container, ctx)
   end
 
   local kind = (votes_object == 0) and "array" or "object"
-  if not capability_allows(kind, ctx.options) then
+  if not h.capability_allows(kind, ctx.options) then
     return nil
   end
 

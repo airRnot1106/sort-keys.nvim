@@ -177,61 +177,21 @@ local function descend_to_container(containers_by_key, node)
   return nil
 end
 
--- tree-sitter-yaml routinely reports container ranges that extend one row
--- past the buffer's last actual line (a phantom trailing newline the grammar
--- assumes is there). The applier feeds outline.range straight to
--- `nvim_buf_get_text`, which errors on those out-of-bounds rows, so we clamp
--- the range to the buffer extent before returning.
-local function clamp_range_to_buffer(bufnr, range)
-  local line_count = vim.api.nvim_buf_line_count(bufnr)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if er > line_count - 1 then
-    er = line_count - 1
-    local last_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    ec = #last_line
-  else
-    local row_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    if ec > #row_line then
-      ec = #row_line
-    end
-  end
-  return { sr, sc, er, ec }
-end
-
--- ─── capability + build_outline ───────────────────────────────────────────────
-
-local function capability_allows(kind, options)
-  if kind == "object" then
-    return options.can_sort_object == true
-  end
-  if kind == "array" then
-    return options.can_sort_array == true
-  end
-  return false
-end
+-- ─── build_outline ────────────────────────────────────────────────────────────
 
 local function build_outline(container, ctx)
-  if not capability_allows(container.kind, ctx.options) then
+  if not h.capability_allows(container.kind, ctx.options) then
     return nil
   end
 
   local raw = ctx.entries_by_parent[container.node_key] or {}
-  local sorted_raw = {}
-  for _, e in ipairs(raw) do
-    sorted_raw[#sorted_raw + 1] = e
-  end
-  table.sort(sorted_raw, function(a, b)
-    if a.range[1] ~= b.range[1] then
-      return a.range[1] < b.range[1]
-    end
-    return a.range[2] < b.range[2]
-  end)
+  local sorted_raw = h.sort_entries_by_position(raw)
 
   local outline_entries = {}
   for i, e in ipairs(sorted_raw) do
     local entry = {
       kind = e.entry_kind,
-      range = clamp_range_to_buffer(ctx.bufnr, e.range),
+      range = h.clamp_range_to_buffer(ctx.bufnr, e.range),
       movable = not subtree_has_anchor_or_alias(e.node),
       anchor = i,
       attached = {},
@@ -276,7 +236,7 @@ local function build_outline(container, ctx)
   -- pulls that entry's range above the container's own start. Extend the
   -- outline range to cover every entry so the applier can compute a valid
   -- prefix / suffix without "start > end" errors.
-  local outline_range = clamp_range_to_buffer(ctx.bufnr, container.range)
+  local outline_range = h.clamp_range_to_buffer(ctx.bufnr, container.range)
   for _, e in ipairs(outline_entries) do
     local er = e.range
     if er[1] < outline_range[1] or (er[1] == outline_range[1] and er[2] < outline_range[2]) then

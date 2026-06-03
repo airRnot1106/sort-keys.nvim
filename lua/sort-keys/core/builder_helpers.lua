@@ -238,6 +238,67 @@ function M.index_by_parent(items)
   return by_parent
 end
 
+-- ─── range, capability, entry-order helpers ──────────────────────────────────
+
+---Cap a captured container's range against the buffer's actual extent.
+---tree-sitter grammars routinely report container ranges that end one row
+---past the buffer's last line (a phantom trailing newline they assume), and
+---the applier feeds outline.range straight to `nvim_buf_get_text`, which
+---errors on out-of-bounds rows.
+---@param bufnr integer
+---@param range integer[]
+---@return integer[]
+function M.clamp_range_to_buffer(bufnr, range)
+  local line_count = vim.api.nvim_buf_line_count(bufnr)
+  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
+  if er > line_count - 1 then
+    er = line_count - 1
+    local last_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
+    ec = #last_line
+  else
+    local row_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
+    if ec > #row_line then
+      ec = #row_line
+    end
+  end
+  return { sr, sc, er, ec }
+end
+
+---Standard capability gate every builder applies before emitting an Outline.
+---`object` / `array` are the only two kinds; languages that vote dynamically
+---(Lua, Pkl) call this with the voted kind.
+---@param kind "object"|"array"
+---@param options table
+---@return boolean
+function M.capability_allows(kind, options)
+  if kind == "object" then
+    return options.can_sort_object == true
+  end
+  if kind == "array" then
+    return options.can_sort_array == true
+  end
+  return false
+end
+
+---Return a shallow copy of `entries` sorted by source position (row, then
+---column). Used inside build_outline so an entry's `anchor` index reflects
+---declared source order independent of how iter_matches enumerated it.
+---@param entries table[]
+---@return table[]
+function M.sort_entries_by_position(entries)
+  local out = {}
+  for _, e in ipairs(entries) do
+    out[#out + 1] = e
+  end
+  table.sort(out, function(a, b)
+    if a.range[1] ~= b.range[1] then
+      return a.range[1] < b.range[1]
+    end
+    return a.range[2] < b.range[2]
+  end)
+  return out
+end
+
 -- ─── text & option helpers ────────────────────────────────────────────────────
 
 ---Trim leading / trailing whitespace and collapse runs of internal whitespace

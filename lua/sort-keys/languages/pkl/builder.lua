@@ -28,22 +28,6 @@ local CAPTURE = {
   comment = "sortkeys.comment",
 }
 
-local function clamp_range_to_buffer(bufnr, range)
-  local line_count = vim.api.nvim_buf_line_count(bufnr)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if er > line_count - 1 then
-    er = line_count - 1
-    local last_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    ec = #last_line
-  else
-    local row_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    if ec > #row_line then
-      ec = #row_line
-    end
-  end
-  return { sr, sc, er, ec }
-end
-
 -- ─── query traversal (local — Pkl's kind is voted post-classification, no
 --                     sortkeys.kind metadata, container range clamped) ─────
 
@@ -74,7 +58,7 @@ local function collect_matches(bufnr, root, query)
     if container_node then
       containers[#containers + 1] = {
         node = container_node,
-        range = clamp_range_to_buffer(bufnr, h.node_range(container_node)),
+        range = h.clamp_range_to_buffer(bufnr, h.node_range(container_node)),
         node_key = h.node_id_key(container_node),
       }
     end
@@ -182,30 +166,11 @@ local function classify_entry(node, bufnr)
   return { sort_key = "", movable = false, kind_vote = "object", value_node = nil }
 end
 
--- ─── capability + build_outline ───────────────────────────────────────────────
-
-local function capability_allows(kind, options)
-  if kind == "object" then
-    return options.can_sort_object == true
-  end
-  if kind == "array" then
-    return options.can_sort_array == true
-  end
-  return false
-end
+-- ─── build_outline ────────────────────────────────────────────────────────────
 
 local function build_outline(container, ctx)
   local raw = ctx.entries_by_parent[container.node_key] or {}
-  local sorted_raw = {}
-  for _, e in ipairs(raw) do
-    sorted_raw[#sorted_raw + 1] = e
-  end
-  table.sort(sorted_raw, function(a, b)
-    if a.range[1] ~= b.range[1] then
-      return a.range[1] < b.range[1]
-    end
-    return a.range[2] < b.range[2]
-  end)
+  local sorted_raw = h.sort_entries_by_position(raw)
 
   local outline_entries = {}
   local votes_object = 0
@@ -236,7 +201,7 @@ local function build_outline(container, ctx)
   end
 
   local kind = (votes_object == 0) and "array" or "object"
-  if not capability_allows(kind, ctx.options) then
+  if not h.capability_allows(kind, ctx.options) then
     return nil
   end
 

@@ -6,9 +6,8 @@
 -- gives no node that *only* covers the document-direct pairs, so this
 -- builder synthesizes a pseudo-container for them when ≥2 root-level pairs
 -- exist (`# comment` and `[section]` siblings naturally fall outside).
---
--- Lua / YAML are the closest precedents — same outline shape, same
--- comment_attach delegation, same per-container separator policy.
+-- Separator policy therefore differs per container: see
+-- `separator_for_container` below.
 
 local h = require("sort-keys.core.builder_helpers")
 local key_normalize = require("sort-keys.strategies.key_normalize")
@@ -22,22 +21,6 @@ local M = {}
 -- collide-by-area logic would pull every cursor into it; we attach root
 -- entries to this dedicated key instead.
 local ROOT_PSEUDO_KEY = "toml-root-pseudo"
-
-local function clamp_range_to_buffer(bufnr, range)
-  local line_count = vim.api.nvim_buf_line_count(bufnr)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if er > line_count - 1 then
-    er = line_count - 1
-    local last_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    ec = #last_line
-  else
-    local row_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    if ec > #row_line then
-      ec = #row_line
-    end
-  end
-  return { sr, sc, er, ec }
-end
 
 -- A `document` ranges over the whole file, so adding it directly to
 -- `containers` would swallow every cursor. Instead, we synthesize a
@@ -141,40 +124,21 @@ local function separator_for_container(container)
   return separator_for_container_node_type(container.node:type())
 end
 
--- ─── capability + build_outline ───────────────────────────────────────────────
-
-local function capability_allows(kind, options)
-  if kind == "object" then
-    return options.can_sort_object == true
-  end
-  if kind == "array" then
-    return options.can_sort_array == true
-  end
-  return false
-end
+-- ─── build_outline ────────────────────────────────────────────────────────────
 
 local function build_outline(container, ctx)
-  if not capability_allows(container.kind, ctx.options) then
+  if not h.capability_allows(container.kind, ctx.options) then
     return nil
   end
 
   local raw = ctx.entries_by_parent[container.node_key] or {}
-  local sorted_raw = {}
-  for _, e in ipairs(raw) do
-    sorted_raw[#sorted_raw + 1] = e
-  end
-  table.sort(sorted_raw, function(a, b)
-    if a.range[1] ~= b.range[1] then
-      return a.range[1] < b.range[1]
-    end
-    return a.range[2] < b.range[2]
-  end)
+  local sorted_raw = h.sort_entries_by_position(raw)
 
   local outline_entries = {}
   for i, e in ipairs(sorted_raw) do
     local entry = {
       kind = e.entry_kind,
-      range = clamp_range_to_buffer(ctx.bufnr, e.range),
+      range = h.clamp_range_to_buffer(ctx.bufnr, e.range),
       movable = true,
       anchor = i,
       attached = {},
@@ -209,7 +173,7 @@ local function build_outline(container, ctx)
   end
 
   local sep, trailing = separator_for_container(container)
-  local outline_range = clamp_range_to_buffer(ctx.bufnr, container.range)
+  local outline_range = h.clamp_range_to_buffer(ctx.bufnr, container.range)
 
   -- A leading sibling comment may pull the first entry's range above the
   -- container's own start; extend the outline range so the applier always

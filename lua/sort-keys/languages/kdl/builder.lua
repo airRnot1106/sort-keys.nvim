@@ -31,28 +31,6 @@ local CAPTURE = {
   comment = "sortkeys.comment",
 }
 
--- The `document` node spans the whole file and ends one row past the buffer's
--- last actual line (the phantom trailing newline the grammar assumes). The
--- applier feeds outline.range straight to `nvim_buf_get_text`, which errors on
--- out-of-bounds rows, so clamp the container range to real buffer bounds.
--- `node_children` ranges sit within `{ }` and are unaffected. Same fix pattern
--- as pkl_builder / toml_builder / yaml_builder.
-local function clamp_range_to_buffer(bufnr, range)
-  local line_count = vim.api.nvim_buf_line_count(bufnr)
-  local sr, sc, er, ec = range[1], range[2], range[3], range[4]
-  if er > line_count - 1 then
-    er = line_count - 1
-    local last_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    ec = #last_line
-  else
-    local row_line = vim.api.nvim_buf_get_lines(bufnr, er, er + 1, false)[1] or ""
-    if ec > #row_line then
-      ec = #row_line
-    end
-  end
-  return { sr, sc, er, ec }
-end
-
 -- Drop the node-terminating newline a KDL node range absorbs so the entry
 -- ends at its real content (see the file header). A node range ending at
 -- column 0 of a later row means the content ends at the end of the previous
@@ -111,7 +89,7 @@ local function collect_matches(bufnr, root, query)
       -- document's phantom trailing row never reaches nvim_buf_get_text.
       containers[#containers + 1] = {
         node = container_node,
-        range = clamp_range_to_buffer(bufnr, h.node_range(container_node)),
+        range = h.clamp_range_to_buffer(bufnr, h.node_range(container_node)),
         node_key = h.node_id_key(container_node),
       }
     end
@@ -152,31 +130,17 @@ local function node_sort_key(node, bufnr)
   return key_normalize.kdl(vim.treesitter.get_node_text(name, bufnr))
 end
 
--- ─── capability + build_outline ───────────────────────────────────────────────
-
-local function capability_allows(kind, options)
-  if kind == "object" then
-    return options.can_sort_object == true
-  end
-  return false
-end
+-- ─── build_outline ────────────────────────────────────────────────────────────
 
 local function build_outline(container, ctx)
-  if not capability_allows("object", ctx.options) then
+  -- KDL has no array-shaped container (positional node args are
+  -- order-significant); only `can_sort_object` is consulted.
+  if not h.capability_allows("object", ctx.options) then
     return nil
   end
 
   local raw = ctx.entries_by_parent[container.node_key] or {}
-  local sorted_raw = {}
-  for _, e in ipairs(raw) do
-    sorted_raw[#sorted_raw + 1] = e
-  end
-  table.sort(sorted_raw, function(a, b)
-    if a.range[1] ~= b.range[1] then
-      return a.range[1] < b.range[1]
-    end
-    return a.range[2] < b.range[2]
-  end)
+  local sorted_raw = h.sort_entries_by_position(raw)
 
   local outline_entries = {}
   for i, e in ipairs(sorted_raw) do

@@ -8,37 +8,15 @@ local function find_container_for_node(containers_by_key, node)
   return containers_by_key[h.node_id_key(node)]
 end
 
--- ─── capability validation ─────────────────────────────────────────────
-
-local function capability_allows(kind, options)
-  if kind == "object" then
-    return options.can_sort_object == true
-  end
-  if kind == "array" then
-    return options.can_sort_array == true
-  end
-  return false
-end
-
 -- ─── outline construction ──────────────────────────────────────────────
 
 local function build_outline(container, ctx)
-  if not capability_allows(container.kind, ctx.options) then
+  if not h.capability_allows(container.kind, ctx.options) then
     return nil
   end
 
   local raw = ctx.entries_by_parent[container.node_key] or {}
-  -- Sort entries by source position to fix `anchor` independent of query order.
-  local sorted_raw = {}
-  for _, e in ipairs(raw) do
-    sorted_raw[#sorted_raw + 1] = e
-  end
-  table.sort(sorted_raw, function(a, b)
-    if a.range[1] ~= b.range[1] then
-      return a.range[1] < b.range[1]
-    end
-    return a.range[2] < b.range[2]
-  end)
+  local sorted_raw = h.sort_entries_by_position(raw)
 
   local outline_entries = {}
   for i, e in ipairs(sorted_raw) do
