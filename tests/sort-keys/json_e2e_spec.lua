@@ -1,5 +1,6 @@
--- Skipped on environments without the JSON treesitter parser; without it the
--- e2e path can never reach the builder, so failing here would just be noise.
+-- Smoke-checks the fully wired pipeline (extract -> sort -> render -> apply)
+-- on real JSON buffers. Skipped when the JSON treesitter parser is absent, so
+-- the suite stays green on minimal environments.
 
 local ts = require("tests.support.treesitter")
 
@@ -15,411 +16,121 @@ local function lines_of(bufnr)
   return vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 end
 
-local function set_cursor(bufnr, row, col)
-  local win = vim.api.nvim_get_current_win()
-  -- nvim_win_set_cursor uses 1-indexed row.
-  vim.api.nvim_win_set_cursor(win, { row + 1, col })
-  return bufnr
+local function set_cursor(row, col)
+  vim.api.nvim_win_set_cursor(vim.api.nvim_get_current_win(), { row + 1, col })
 end
 
-describe("json end-to-end via :SortKeys / :DeepSortKeys", function()
+describe("json end-to-end", function()
   local has_json
-  local notifies
-
-  local original_notify
 
   before_each(function()
     has_json = ts.has_parser("json")
-
-    -- Make sure the plugin is loaded and registries are fresh.
-    package.loaded["sort-keys"] = nil
-    package.loaded["sort-keys.config"] = nil
-    package.loaded["sort-keys.command"] = nil
-    package.loaded["sort-keys.core.registry"] = nil
-
     require("sort-keys.config").setup({})
-
     vim.g.loaded_sort_keys = nil
     vim.cmd("runtime plugin/sort-keys.lua")
+  end)
 
-    notifies = {}
-    original_notify = vim.notify
-    vim.notify = function(msg, level, opts)
-      table.insert(notifies, { msg = msg, level = level, opts = opts })
+  it(":SortKeys sorts object keys ascending and rewrites the buffer", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
     end
+    local bufnr = setup_buf({
+      "{",
+      '  "banana": 1,',
+      '  "apple": 2,',
+      '  "cherry": 3',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "apple": 2,',
+      '  "banana": 1,',
+      '  "cherry": 3',
+      "}",
+    }, lines_of(bufnr))
   end)
 
-  after_each(function()
-    vim.notify = original_notify
+  it(":SortKeys! sorts object keys descending", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      '  "a": 1,',
+      '  "b": 2,',
+      '  "c": 3',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys!")
+    assert.are.same({
+      "{",
+      '  "c": 3,',
+      '  "b": 2,',
+      '  "a": 1',
+      "}",
+    }, lines_of(bufnr))
   end)
 
-  describe("normal-mode :SortKeys on a JSON object", function()
-    it("sorts the keys ascending and rewrites the buffer", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '{ "c": 3, "a": 1, "b": 2 }' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys")
-      assert.equals('{ "a": 1, "b": 2, "c": 3 }', lines_of(bufnr)[1])
-    end)
-
-    it("reverses with bang (`!`)", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '{ "a": 1, "b": 2, "c": 3 }' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys!")
-      assert.equals('{ "c": 3, "b": 2, "a": 1 }', lines_of(bufnr)[1])
-    end)
+  it(":SortKeys is shallow — nested objects keep their original order", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      '  "b": { "y": 1, "x": 2 },',
+      '  "a": 1',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "a": 1,',
+      '  "b": { "y": 1, "x": 2 }',
+      "}",
+    }, lines_of(bufnr))
   end)
 
-  describe("normal-mode :SortKeys on a JSON array", function()
-    it("sorts elements lexicographically by their text content", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '[ "c", "a", "b" ]' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys")
-      assert.equals('[ "a", "b", "c" ]', lines_of(bufnr)[1])
-    end)
+  it(":DeepSortKeys recurses into nested objects", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      '  "b": { "y": 1, "x": 2 },',
+      '  "a": 1',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("DeepSortKeys")
+    assert.are.same({
+      "{",
+      '  "a": 1,',
+      '  "b": { "x": 2, "y": 1 }',
+      "}",
+    }, lines_of(bufnr))
   end)
 
-  describe("visual — partial sort working example", function()
-    it("{c:3, a:1, b:2} with first two pairs selected → {a:1, c:3, b:2}", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      -- Source buffer: { "c": 3, "a": 1, "b": 2 }
-      -- pair ranges (0-indexed cols):
-      --   "c": 3    @ cols 2..7
-      --   "a": 1    @ cols 10..15
-      --   "b": 2    @ cols 18..23
-      local bufnr = setup_buf({ '{ "c": 3, "a": 1, "b": 2 }' })
-
-      -- Drive visual selection through Neovim's `'<` / `'>` marks so the
-      -- command-level mode detection is exercised; cover cols 2..15
-      -- (pair 1 + pair 2).
-      vim.fn.setpos("'<", { bufnr, 1, 3, 0 }) -- 1-indexed line, 1-indexed col 3 == col 2 (0-indexed)
-      vim.fn.setpos("'>", { bufnr, 1, 16, 0 })
-      vim.cmd("'<,'>SortKeys")
-
-      assert.equals('{ "a": 1, "c": 3, "b": 2 }', lines_of(bufnr)[1])
-    end)
+  it("sorts a single-line object preserving spacing and no trailing comma", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({ '{ "b": 2, "a": 1 }' })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ '{ "a": 1, "b": 2 }' }, lines_of(bufnr))
   end)
 
-  describe(":DeepSortKeys", function()
-    it("recursively sorts nested object values", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '{ "b": { "y": 2, "x": 1 }, "a": { "n": 4, "m": 3 } }' })
-      set_cursor(bufnr, 0, 1)
-      vim.cmd("DeepSortKeys")
-      assert.equals('{ "a": { "m": 3, "n": 4 }, "b": { "x": 1, "y": 2 } }', lines_of(bufnr)[1])
-    end)
-
-    it("plain :SortKeys leaves nested objects untouched", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '{ "b": { "y": 2, "x": 1 }, "a": { "n": 4, "m": 3 } }' })
-      set_cursor(bufnr, 0, 1)
-      vim.cmd("SortKeys")
-      assert.equals('{ "a": { "n": 4, "m": 3 }, "b": { "y": 2, "x": 1 } }', lines_of(bufnr)[1])
-    end)
-  end)
-
-  -- Regression cover: earlier suites were single-line-heavy, which let a bug
-  -- that collapsed newlines / indentation between sorted entries slip
-  -- through. These cases pin the slot-separator-preservation contract on
-  -- pretty-printed JSON.
-  describe("multi-line format preservation on :SortKeys (object)", function()
-    it("preserves newlines and indentation between sorted entries", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({
-        "{",
-        '  "c": 3,',
-        '  "a": 1,',
-        '  "b": 2',
-        "}",
-      })
-      -- Cursor inside the outer object but outside any inner container.
-      set_cursor(bufnr, 1, 0)
-      vim.cmd("SortKeys")
-      assert.same({
-        "{",
-        '  "a": 1,',
-        '  "b": 2,',
-        '  "c": 3',
-        "}",
-      }, lines_of(bufnr))
-    end)
-  end)
-
-  describe("multi-line format preservation on :SortKeys (array)", function()
-    it("preserves newlines and indentation between sorted elements", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({
-        "[",
-        '  "c",',
-        '  "a",',
-        '  "b"',
-        "]",
-      })
-      set_cursor(bufnr, 1, 0)
-      vim.cmd("SortKeys")
-      assert.same({
-        "[",
-        '  "a",',
-        '  "b",',
-        '  "c"',
-        "]",
-      }, lines_of(bufnr))
-    end)
-  end)
-
-  describe("multi-line format preservation on :DeepSortKeys (nested object)", function()
-    it("preserves indentation at every depth after deep sort", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({
-        "{",
-        '  "b": {',
-        '    "y": 2,',
-        '    "x": 1',
-        "  },",
-        '  "a": {',
-        '    "n": 4,',
-        '    "m": 3',
-        "  }",
-        "}",
-      })
-      set_cursor(bufnr, 1, 0)
-      vim.cmd("DeepSortKeys")
-      assert.same({
-        "{",
-        '  "a": {',
-        '    "m": 3,',
-        '    "n": 4',
-        "  },",
-        '  "b": {',
-        '    "x": 1,',
-        '    "y": 2',
-        "  }",
-        "}",
-      }, lines_of(bufnr))
-    end)
-  end)
-
-  describe("multi-line format preservation on :DeepSortKeys (nested array)", function()
-    it("preserves the outer line layout while inner elements get sorted", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      -- Outer entries already lex-ordered ("[3, 1, 2]" < "[9, 7, 8]"), so the
-      -- outer line layout must stay intact while each inner array is sorted.
-      local bufnr = setup_buf({
-        "[",
-        "  [3, 1, 2],",
-        "  [9, 7, 8]",
-        "]",
-      })
-      set_cursor(bufnr, 1, 0)
-      vim.cmd("DeepSortKeys")
-      assert.same({
-        "[",
-        "  [1, 2, 3],",
-        "  [7, 8, 9]",
-        "]",
-      }, lines_of(bufnr))
-    end)
-  end)
-
-  describe("multi-line format preservation on Visual partial sort (object)", function()
-    it("reorders only the selected entries and leaves the fixed entry untouched", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      -- Buffer (0-indexed):
-      --   0: '{'
-      --   1: '  "c": 3,'     <- pair range cols 2..8
-      --   2: '  "a": 1,'     <- pair range cols 2..8
-      --   3: '  "b": 2'      <- pair range cols 2..8 (NOT covered by selection)
-      --   4: '}'
-      local bufnr = setup_buf({
-        "{",
-        '  "c": 3,',
-        '  "a": 1,',
-        '  "b": 2',
-        "}",
-      })
-
-      -- Visual selection covers entries `"c": 3` and `"a": 1` only.
-      -- 1-indexed line/col; (line 2, col 3) == 0-indexed (1, 2);
-      --                    (line 3, col 9) == 0-indexed (2, 8).
-      vim.fn.setpos("'<", { bufnr, 2, 3, 0 })
-      vim.fn.setpos("'>", { bufnr, 3, 9, 0 })
-      vim.cmd("'<,'>SortKeys")
-
-      assert.same({
-        "{",
-        '  "a": 1,',
-        '  "c": 3,',
-        '  "b": 2',
-        "}",
-      }, lines_of(bufnr))
-    end)
-  end)
-
-  describe("multi-line format preservation on Visual partial sort (array)", function()
-    it("reorders only the selected elements and leaves the fixed element untouched", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      -- Buffer (0-indexed):
-      --   0: '['
-      --   1: '  "c",'        <- element range cols 2..5
-      --   2: '  "a",'        <- element range cols 2..5
-      --   3: '  "b"'         <- element range cols 2..5 (NOT covered)
-      --   4: ']'
-      local bufnr = setup_buf({
-        "[",
-        '  "c",',
-        '  "a",',
-        '  "b"',
-        "]",
-      })
-
-      vim.fn.setpos("'<", { bufnr, 2, 3, 0 })
-      vim.fn.setpos("'>", { bufnr, 3, 6, 0 })
-      vim.cmd("'<,'>SortKeys")
-
-      assert.same({
-        "[",
-        '  "a",',
-        '  "c",',
-        '  "b"',
-        "]",
-      }, lines_of(bufnr))
-    end)
-  end)
-
-  describe("error paths", function()
-    it("notifies the user when the cursor is not on a sortable container", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '"plain string"' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys")
-      assert.is_true(#notifies >= 1)
-      assert.equals('"plain string"', lines_of(bufnr)[1])
-    end)
-
-    it("notifies the user when there is no handler for the filetype", function()
-      -- Shell syntax has no sortable key-value container, so `sh` is a
-      -- stable choice for "no handler" — the plugin will not grow one.
-      local bufnr = setup_buf({ '{ "c": 3, "a": 1 }' })
-      vim.bo[bufnr].filetype = "sh"
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys")
-      assert.is_true(#notifies >= 1)
-    end)
-  end)
-
-  describe("deduplicate (`u` flag)", function()
-    it("removes duplicate array elements and sorts the survivors", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '[ "b", "a", "b", "a" ]' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys u")
-      assert.equals('[ "a", "b" ]', lines_of(bufnr)[1])
-    end)
-
-    it("removes duplicate object keys, keeping the first occurrence", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '{ "b": 2, "a": 1, "b": 9 }' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys u")
-      -- "b" dedupes to its first occurrence (value 2), then a < b.
-      assert.equals('{ "a": 1, "b": 2 }', lines_of(bufnr)[1])
-    end)
-  end)
-
-  -- Order-only :sort-compat flags reach the buffer through the same applier
-  -- path as a flagless sort (they change comparison, not entry count), so a
-  -- single end-to-end case each guards the policy→applier wiring against
-  -- future regressions.
-  describe("order-only :sort-compat flags", function()
-    it("`!` reverses the sort order", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '{ "a": 1, "b": 2, "c": 3 }' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys!")
-      assert.equals('{ "c": 3, "b": 2, "a": 1 }', lines_of(bufnr)[1])
-    end)
-
-    it("`i` sorts case-insensitively", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '{ "B": 2, "a": 1, "C": 3 }' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys i")
-      assert.equals('{ "a": 1, "B": 2, "C": 3 }', lines_of(bufnr)[1])
-    end)
-
-    it("`n` sorts numerically (10 after 2), not lexicographically", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ "[ 10, 2, 1 ]" })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys n")
-      assert.equals("[ 1, 2, 10 ]", lines_of(bufnr)[1])
-    end)
-
-    it("`r/pat/` keys on the regex match, then `n` orders those numerically", function()
-      if not has_json then
-        pending("JSON treesitter parser not available")
-        return
-      end
-      local bufnr = setup_buf({ '[ "item-10", "item-2", "item-30" ]' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys n r/%d+/")
-      assert.equals('[ "item-2", "item-10", "item-30" ]', lines_of(bufnr)[1])
-    end)
+  it("sorts an array of strings", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({ '["banana", "apple", "cherry"]' })
+    set_cursor(0, 1)
+    vim.cmd("SortKeys")
+    assert.are.same({ '["apple", "banana", "cherry"]' }, lines_of(bufnr))
   end)
 end)

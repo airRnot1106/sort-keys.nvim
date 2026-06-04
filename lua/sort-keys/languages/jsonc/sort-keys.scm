@@ -1,6 +1,6 @@
-;; Captures and `#set! sortkeys.*` metadata follow the sortkeys.* convention
-;; that the declarative builder reads; renaming them would silently break
-;; every filetype's query.
+;; JSONC rides on the json parser (which accepts comments). Same captures as
+;; json, plus the comment capture so core.comment_fold can carry a comment
+;; with the pair it documents instead of letting it drift after :SortKeys.
 
 ;; ─── containers ───
 ((object) @sortkeys.container
@@ -22,7 +22,4 @@
  (#set! sortkeys.entry_kind "element"))
 
 ;; ─── comments ───
-;; JSONC line and block comments must be carried across the sort so that a
-;; comment authored to document a specific pair does not silently drift to a
-;; different pair after :SortKeys.
 ((comment) @sortkeys.comment)

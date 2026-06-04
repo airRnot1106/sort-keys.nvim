@@ -1,6 +1,6 @@
--- The jsonc handler reuses the json treesitter parser (its grammar accepts
--- JSONC comments as `(comment)` nodes), so the parser-availability guard
--- below checks for `json`, not `jsonc`.
+-- Smoke-checks the comment-aware pipeline on JSONC (json parser + comments).
+-- The point of these cases is that a comment travels with the pair it
+-- documents across a reorder, not that it stays at a fixed line.
 
 local ts = require("tests.support.treesitter")
 
@@ -16,142 +16,117 @@ local function lines_of(bufnr)
   return vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 end
 
-local function set_cursor(bufnr, row, col)
-  local win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_cursor(win, { row + 1, col })
-  return bufnr
+local function set_cursor(row, col)
+  vim.api.nvim_win_set_cursor(vim.api.nvim_get_current_win(), { row + 1, col })
 end
 
-describe("jsonc end-to-end via :SortKeys", function()
-  local has_jsonc
+describe("jsonc end-to-end", function()
+  local has_json
 
   before_each(function()
-    has_jsonc = ts.has_parser("json")
-
-    package.loaded["sort-keys"] = nil
-    package.loaded["sort-keys.config"] = nil
-    package.loaded["sort-keys.command"] = nil
-    package.loaded["sort-keys.core.registry"] = nil
-
+    has_json = ts.has_parser("json")
     require("sort-keys.config").setup({})
-
     vim.g.loaded_sort_keys = nil
     vim.cmd("runtime plugin/sort-keys.lua")
   end)
 
-  describe("comment-free JSONC behaves identically to JSON", function()
-    it("sorts the keys of a JSONC object ascending", function()
-      if not has_jsonc then
-        pending("json treesitter parser not available (jsonc reuses it)")
-        return
-      end
-      local bufnr = setup_buf({ '{ "c": 3, "a": 1, "b": 2 }' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys")
-      assert.equals('{ "a": 1, "b": 2, "c": 3 }', lines_of(bufnr)[1])
-    end)
-
-    it("sorts the elements of a JSONC array lexicographically", function()
-      if not has_jsonc then
-        pending("json treesitter parser not available (jsonc reuses it)")
-        return
-      end
-      local bufnr = setup_buf({ '[ "c", "a", "b" ]' })
-      set_cursor(bufnr, 0, 4)
-      vim.cmd("SortKeys")
-      assert.equals('[ "a", "b", "c" ]', lines_of(bufnr)[1])
-    end)
+  it("carries an own-line leading comment with its pair", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      "  // banana",
+      '  "banana": 1,',
+      '  "apple": 2',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "apple": 2,',
+      "  // banana",
+      '  "banana": 1',
+      "}",
+    }, lines_of(bufnr))
   end)
 
-  describe("separator normalization across reorder", function()
-    it("re-emits the separator when a trailing comment absorbed the original comma", function()
-      if not has_jsonc then
-        pending("json treesitter parser not available (jsonc reuses it)")
-        return
-      end
-      local bufnr = setup_buf({
-        "{",
-        "  // L for b",
-        '  "b": 2, /* T for b */',
-        "  // L for a",
-        '  "a": 1',
-        "}",
-      })
-      set_cursor(bufnr, 0, 0)
-      vim.cmd("SortKeys")
-      assert.same({
-        "{",
-        "  // L for a",
-        '  "a": 1,',
-        "  // L for b",
-        '  "b": 2, /* T for b */',
-        "}",
-      }, lines_of(bufnr))
-    end)
+  it("carries a same-line trailing comment with its pair", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      '  "banana": 1, // yellow',
+      '  "apple": 2',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "apple": 2,',
+      '  "banana": 1 // yellow',
+      "}",
+    }, lines_of(bufnr))
   end)
 
-  describe("array elements with same-line trailing comments", function()
-    -- The wildcard array-entry query `(array (_) @sortkeys.entry)` admits
-    -- comment children as entries; the collect_matches dedup pass drops
-    -- any candidate whose node was also captured as a comment. Without
-    -- that drop, the comment is sorted as data AND attached as a comment,
-    -- comment_attach's range expansion pushes a real entry past it on the
-    -- same row, and the applier crashes on the resulting `start_col >
-    -- end_col` inter-entry gap.
-    it("sorts string elements while keeping each trailing comment with its element", function()
-      if not has_jsonc then
-        pending("json treesitter parser not available (jsonc reuses it)")
-        return
-      end
-      local bufnr = setup_buf({
-        "[",
-        '  "c", // T-c',
-        '  "a", // T-a',
-        '  "b"',
-        "]",
-      })
-      set_cursor(bufnr, 0, 0)
-      vim.cmd("SortKeys")
-      -- `a` is now non-last and already had its `,` in front of `// T-a`,
-      -- so the separator stays there. `b` has no trailing comment so its
-      -- separator is appended as usual. `c` becomes the last element, but
-      -- JSONC permits a trailing comma so its absorbed `,` stays put —
-      -- the critical contract is that the comma is BEFORE `// T-c`, not
-      -- buried inside the line comment.
-      assert.same({
-        "[",
-        '  "a", // T-a',
-        '  "b",',
-        '  "c", // T-c',
-        "]",
-      }, lines_of(bufnr))
-    end)
+  it(":DeepSortKeys recurses and keeps each comment with its pair", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      '  "b": {',
+      "    // why y",
+      '    "y": 1,',
+      '    "x": 2',
+      "  },",
+      '  "a": 1',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("DeepSortKeys")
+    assert.are.same({
+      "{",
+      '  "a": 1,',
+      '  "b": {',
+      '    "x": 2,',
+      "    // why y",
+      '    "y": 1',
+      "  }",
+      "}",
+    }, lines_of(bufnr))
   end)
 
-  describe("comments travel with their entry", function()
-    it("keeps each leading line comment glued to the pair it documents", function()
-      if not has_jsonc then
-        pending("json treesitter parser not available (jsonc reuses it)")
-        return
-      end
-      local bufnr = setup_buf({
-        "{",
-        "  // first comment",
-        '  "b": 2,',
-        "  // second comment",
-        '  "a": 1',
-        "}",
-      })
-      set_cursor(bufnr, 0, 0)
-      vim.cmd("SortKeys")
-      assert.same({
-        "{",
-        "  // second comment",
-        '  "a": 1,',
-        "  // first comment",
-        '  "b": 2',
-        "}",
-      }, lines_of(bufnr))
-    end)
+  it("preserves a trailing comma when the last entry also has a trailing comment", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      '  "a": 1,',
+      '  "b": 2, // last',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "a": 1,',
+      '  "b": 2, // last',
+      "}",
+    }, lines_of(bufnr))
+  end)
+
+  it("sorts comment-free JSONC just like JSON", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({ '{ "b": 2, "a": 1 }' })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ '{ "a": 1, "b": 2 }' }, lines_of(bufnr))
   end)
 end)

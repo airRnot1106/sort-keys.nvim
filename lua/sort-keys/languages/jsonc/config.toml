@@ -1,24 +1,14 @@
 description = "JSONC handler"
 
-# tree-sitter-json's grammar already accepts JSONC's // and /* */ comments
-# as `(comment)` nodes, so we reuse the json parser rather than requiring
-# users to install a separate jsonc parser binary.
-parser_lang = "json"
-
 can_sort_object = true
 can_sort_array = true
 can_deep = true
-key_quoting = "logical"
 
+# JSONC carries line/block comments; extract folds them into entry lead/tail
+# via core.comment_fold so they travel with the pair they document.
 comment_aware = true
 
-mixed_key_types = false
-
-# Inter-entry separator as a literal character (mirrors json.toml).
-structural_separator = ","
-
-# JSONC explicitly allows the optional trailing comma; preserve it across
-# reorder rather than silently rewriting the user's style.
-trailing_separator_allowed = true
+# Reuse the json tree-sitter parser, which accepts comments.
+parser_lang = "json"
 
 query_file = "sort-keys.scm"

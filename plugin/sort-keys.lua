@@ -1,22 +1,31 @@
-if vim.g.loaded_sort_keys == 1 then
+if vim.g.loaded_sort_keys then
   return
 end
-vim.g.loaded_sort_keys = 1
+vim.g.loaded_sort_keys = true
 
-vim.api.nvim_create_user_command("SortKeys", function(opts)
-  require("sort-keys.command").execute(opts, false)
-end, {
+local command = require("sort-keys.command")
+
+-- :SortKeys sorts the container at the cursor (or the Visual selection);
+-- :DeepSortKeys additionally recurses into nested containers. Both accept a
+-- `:sort`-compatible bang + flags.
+local function sort_keys(opts)
+  command.run(opts, false)
+end
+
+local function deep_sort_keys(opts)
+  command.run(opts, true)
+end
+
+vim.api.nvim_create_user_command("SortKeys", sort_keys, {
   range = true,
   bang = true,
   nargs = "?",
-  desc = "Sort keys in the current buffer or selection",
+  desc = "Sort keys in the container at the cursor/selection",
 })
 
-vim.api.nvim_create_user_command("DeepSortKeys", function(opts)
-  require("sort-keys.command").execute(opts, true)
-end, {
+vim.api.nvim_create_user_command("DeepSortKeys", deep_sort_keys, {
   range = true,
   bang = true,
   nargs = "?",
-  desc = "Recursively sort keys in the current buffer or selection",
+  desc = "Sort keys recursively into nested containers",
 })

@@ -3,18 +3,13 @@ description = "JSON handler"
 can_sort_object = true
 can_sort_array = true
 can_deep = true
-key_quoting = "logical"
 
+# JSON has no comments; the extractor skips comment folding when false.
 comment_aware = false
 
-mixed_key_types = false
-
-# Inter-entry separator as a literal character; languages like Lua / Nix
-# that use `;` declare their own here.
-structural_separator = ","
-
-# Strict JSON forbids a trailing comma on the last entry; the applier strips
-# one if the source happens to have it after a reorder.
-trailing_separator_allowed = false
+# The separator (",") and trailing-comma policy are NOT configured: extract
+# observes them from the source and render reproduces them. Only the parser
+# and capabilities live here.
+parser_lang = "json"
 
 query_file = "sort-keys.scm"
