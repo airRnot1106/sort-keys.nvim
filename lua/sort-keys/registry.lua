@@ -82,11 +82,29 @@ function M.set_user_handlers(specs)
   user_handlers = specs or {}
 end
 
--- filetype -> user spec, built from the user handlers' declared filetypes.
+-- The built-in filetypes a config_name serves (reverse of BUILT_IN_FILETYPES).
+local function builtin_filetypes_for(config_name)
+  local fts = {}
+  for ft, cn in pairs(BUILT_IN_FILETYPES) do
+    if cn == config_name then
+      fts[#fts + 1] = ft
+    end
+  end
+  return fts
+end
+
+-- filetype -> user spec. A spec keyed by a built-in config_name with no
+-- explicit filetypes is a partial override and inherits the built-in's
+-- filetypes, so supplying only `options` actually binds. An explicit
+-- `filetypes` list always wins (extend/replace specific filetypes).
 local function user_filetype_index()
   local index = {}
   for config_name, spec in pairs(user_handlers) do
-    for _, ft in ipairs(spec.filetypes or {}) do
+    local fts = spec.filetypes
+    if not fts or #fts == 0 then
+      fts = builtin_filetypes_for(config_name)
+    end
+    for _, ft in ipairs(fts) do
       index[ft] = { config_name = config_name, spec = spec }
     end
   end
