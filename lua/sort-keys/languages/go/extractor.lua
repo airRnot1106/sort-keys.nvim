@@ -20,20 +20,33 @@ local function first(match, cap_id, name)
   return type(v) == "table" and v[1] or v
 end
 
--- The container nested under a keyed_element's value, for deep recursion: a
--- value is a literal_element wrapping a composite_literal whose body is the
--- inner literal_value. Returns that literal_value, or nil.
+-- The container nested under a keyed_element's value, for deep recursion: the
+-- value wraps a composite_literal (directly for `T{...}`, under a
+-- unary_expression for `&T{...}`) whose body is the inner literal_value.
 local function inner_literal_value(keyed)
   local value = keyed:field("value")[1]
   if not value then
     return nil
   end
-  for child in value:iter_children() do
-    if child:type() == "composite_literal" then
-      return child:field("body")[1]
+  local function find_composite(node, depth)
+    if node:type() == "composite_literal" then
+      return node
     end
+    if depth >= 2 then
+      return nil
+    end
+    for child in node:iter_children() do
+      if child:named() then
+        local found = find_composite(child, depth + 1)
+        if found then
+          return found
+        end
+      end
+    end
+    return nil
   end
-  return nil
+  local cl = find_composite(value, 0)
+  return cl and cl:field("body")[1] or nil
 end
 
 local function collect(bufnr, root, query)
@@ -119,17 +132,24 @@ local function collect(bufnr, root, query)
     end
   end
 
-  -- struct definitions: newline-separated named fields.
+  -- struct definitions: newline-separated named fields. An embedded field
+  -- (`io.Reader`) has no name; pin it (element, movable=false) so it round-trips
+  -- in place — never dropped, and its method-promotion order is unchanged —
+  -- while named fields sort around it.
   for key, fl in pairs(field_lists) do
     local fields = fields_by_parent[key] or {}
     add_container(fl, "object", fields, function(f)
-      return {
-        node = f,
-        range = { f:range() },
-        entry_kind = "pair",
-        key_node = f:field("name")[1],
-        movable = true,
-      }
+      local name = f:field("name")[1]
+      if name then
+        return {
+          node = f,
+          range = { f:range() },
+          entry_kind = "pair",
+          key_node = name,
+          movable = true,
+        }
+      end
+      return { node = f, range = { f:range() }, entry_kind = "element", movable = false }
     end)
   end
 

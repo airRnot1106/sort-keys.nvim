@@ -56,6 +56,29 @@ describe("go end-to-end", function()
     assert.are.same({ "import (", '  "a"', '  "b"', ")" }, lines_of(bufnr))
   end)
 
+  it("pins an embedded field and sorts the named fields around it", function()
+    if not has_go then
+      return pending("go treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "type T struct {", "  io.Reader", "  Z string", "  A int", "}" })
+    set_cursor(1, 2)
+    vim.cmd("SortKeys")
+    assert.are.same(
+      { "type T struct {", "  io.Reader", "  A int", "  Z string", "}" },
+      lines_of(bufnr)
+    )
+  end)
+
+  it(":DeepSortKeys recurses into a pointer struct literal &T{...}", function()
+    if not has_go then
+      return pending("go treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "var x = Outer{Inner: &T{B: 1, A: 2}, Apple: 3}" })
+    set_cursor(0, 14)
+    vim.cmd("DeepSortKeys")
+    assert.are.same({ "var x = Outer{Apple: 3, Inner: &T{A: 2, B: 1}}" }, lines_of(bufnr))
+  end)
+
   it("leaves a positional/slice literal untouched (order is meaningful)", function()
     if not has_go then
       return pending("go treesitter parser not available")
