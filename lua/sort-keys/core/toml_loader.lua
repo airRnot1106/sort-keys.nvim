@@ -5,18 +5,24 @@
 local M = {}
 
 local function parse_value(raw, lnum)
-  if raw == "true" then
-    return true
-  end
-  if raw == "false" then
-    return false
-  end
+  -- String values may carry a trailing ` # comment`. Match up to the first
+  -- closing quote, then require the remainder to be blank or a comment so a
+  -- `#` between the quotes stays part of the value.
   if raw:sub(1, 1) == '"' then
-    local content = raw:match('^"(.-)"%s*$')
-    if not content then
+    local content, rest = raw:match('^"(.-)"%s*(.*)$')
+    if not content or (rest ~= "" and rest:sub(1, 1) ~= "#") then
       error(string.format("toml_loader.parse: unterminated string on line %d: %s", lnum, raw))
     end
     return content
+  end
+  -- Non-string scalars: strip an inline comment (TOML requires whitespace
+  -- before `#`) before matching the keyword.
+  local scalar = raw:gsub("%s+#.*$", "")
+  if scalar == "true" then
+    return true
+  end
+  if scalar == "false" then
+    return false
   end
   error(string.format("toml_loader.parse: unsupported value on line %d: %s", lnum, raw))
 end

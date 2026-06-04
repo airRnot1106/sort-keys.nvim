@@ -53,6 +53,23 @@ describe("sort-keys.core.toml_loader", function()
       assert.equals(", ", t.structural_separator)
     end)
 
+    it("strips an inline `#` comment after a string value", function()
+      local t = loader.parse('structural_separator = "," # trailing comment\n')
+      assert.equals(",", t.structural_separator)
+    end)
+
+    it("strips an inline `#` comment after a boolean value", function()
+      local t = loader.parse("can_deep = true # only when nested\n")
+      assert.is_true(t.can_deep)
+    end)
+
+    it("keeps a `#` that sits inside the string value", function()
+      -- The inline-comment stripper must not fire on a `#` between the quotes;
+      -- it is part of the value, not a comment.
+      local t = loader.parse('key_quoting = "a # b"\n')
+      assert.equals("a # b", t.key_quoting)
+    end)
+
     it("errors on malformed input (no `=`)", function()
       assert.has_error(function()
         loader.parse("can_sort_object true\n")
