@@ -38,11 +38,15 @@ local function collect(bufnr, root, query)
   end
 
   for _, match in query:iter_matches(root, bufnr, 0, -1) do
-    local args = first(match, cap_id, "sortkeys.args") or first(match, cap_id, "sortkeys.def_args")
+    local args = first(match, cap_id, "sortkeys.args")
+      or first(match, cap_id, "sortkeys.def_args")
+      or first(match, cap_id, "sortkeys.update_args")
     if args then
       container_nodes[node_id_key(args)] = args
     end
-    local arg = first(match, cap_id, "sortkeys.arg") or first(match, cap_id, "sortkeys.def_arg")
+    local arg = first(match, cap_id, "sortkeys.arg")
+      or first(match, cap_id, "sortkeys.def_arg")
+      or first(match, cap_id, "sortkeys.update_arg")
     if arg then
       push(arg:parent(), arg)
     end
@@ -74,9 +78,16 @@ local function collect(bufnr, root, query)
           movable = true,
         }
       else
-        -- a positional argument binds by position: pin it in place.
-        entries[#entries + 1] =
-          { node = arg, range = { arg:range() }, entry_kind = "element", movable = false }
+        -- a positional argument binds by position: pin it in place. Still set
+        -- value_node so :DeepSortKeys can recurse into a labelled record passed
+        -- positionally.
+        entries[#entries + 1] = {
+          node = arg,
+          range = { arg:range() },
+          entry_kind = "element",
+          value_node = arg:field("value")[1],
+          movable = false,
+        }
       end
     end
     if has_label then

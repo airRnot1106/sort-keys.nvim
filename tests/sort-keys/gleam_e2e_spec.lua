@@ -55,4 +55,24 @@ describe("gleam end-to-end", function()
     vim.cmd("SortKeys")
     assert.are.same({ "pub type Foo {", "  Foo(a: String, b: Int)", "}" }, lines_of(bufnr))
   end)
+
+  it("sorts a record update, keeping the ..spread", function()
+    if not has_gleam then
+      return pending("gleam treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "pub fn x() { Foo(..base, c: 1, a: 2) }" })
+    set_cursor(0, 25)
+    vim.cmd("SortKeys")
+    assert.are.same({ "pub fn x() { Foo(..base, a: 2, c: 1) }" }, lines_of(bufnr))
+  end)
+
+  it(":DeepSortKeys recurses into a record passed positionally", function()
+    if not has_gleam then
+      return pending("gleam treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "pub fn x() { outer(Bar(x: 1, w: 2), z: 3, y: 4) }" })
+    set_cursor(0, 19)
+    vim.cmd("DeepSortKeys")
+    assert.are.same({ "pub fn x() { outer(Bar(w: 2, x: 1), y: 4, z: 3) }" }, lines_of(bufnr))
+  end)
 end)
