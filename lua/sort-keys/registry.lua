@@ -27,6 +27,7 @@ local BUILT_IN_FILETYPES = {
   toml = "toml",
   rust = "rust",
   go = "go",
+  kdl = "kdl",
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"

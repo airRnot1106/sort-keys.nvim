@@ -1,0 +1,9 @@
+description = "KDL handler"
+
+can_sort_object = true
+can_sort_array = false
+can_deep = false
+
+comment_aware = true
+
+query_file = "sort-keys.scm"
