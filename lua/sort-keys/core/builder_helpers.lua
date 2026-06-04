@@ -235,13 +235,22 @@ function M.collect_matches(bufnr, root, query, captures)
   -- was also captured as a comment, otherwise comment_attach's expansion
   -- could push a real entry past it on the same row and the applier would
   -- crash on an out-of-order inter-entry gap.
+  --
+  -- A single node can also be captured as an entry by more than one match
+  -- (Go's `Name, Age string` makes `(field_declaration (field_identifier))`
+  -- match once per identifier). Keep only the first per node, otherwise the
+  -- applier sees two entries with identical ranges and crashes on the
+  -- zero-width inter-entry gap.
   local comment_ids = {}
   for _, c in ipairs(comments) do
     comment_ids[M.node_id_key(c.node)] = true
   end
   local entries = {}
+  local seen_entry_ids = {}
   for _, e in ipairs(entry_candidates) do
-    if not comment_ids[M.node_id_key(e.node)] then
+    local id = M.node_id_key(e.node)
+    if not comment_ids[id] and not seen_entry_ids[id] then
+      seen_entry_ids[id] = true
       entries[#entries + 1] = e
     end
   end

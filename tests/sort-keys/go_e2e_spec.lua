@@ -67,6 +67,35 @@ describe("go end-to-end via :SortKeys", function()
         "}",
       }, lines_of(bufnr))
     end)
+
+    -- A grouped declaration (`Name, Age string`) is one field_declaration node;
+    -- the query matches it once per identifier. The whole group sorts as a
+    -- single unit keyed by its first identifier — and must not crash on the
+    -- duplicate match.
+    it("treats a multi-identifier field declaration as one sortable unit", function()
+      if not has_go then
+        pending("go treesitter parser not available")
+        return
+      end
+      local bufnr = setup_buf({
+        "package main",
+        "",
+        "type Foo struct {",
+        "\tZed       int",
+        "\tName, Age string",
+        "}",
+      })
+      set_cursor(bufnr, 3, 4)
+      vim.cmd("SortKeys")
+      assert.same({
+        "package main",
+        "",
+        "type Foo struct {",
+        "\tName, Age string",
+        "\tZed       int",
+        "}",
+      }, lines_of(bufnr))
+    end)
   end)
 
   describe("struct literal", function()

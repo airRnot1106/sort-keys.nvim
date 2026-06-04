@@ -246,6 +246,21 @@ describe("sort-keys.core.policy", function()
       assert.equals(4, #sorted.entries)
       assert.same({ "a", "b", "d", "e" }, keys(sorted))
     end)
+
+    -- Pinned entries (JS spreads, computed keys, Rust `..base`) carry an empty
+    -- sort_key. Several can coexist in one container (`{ ...a, x: 1, ...b }`),
+    -- so `u` must never treat two non-movable entries as duplicates of each
+    -- other — dropping the second would delete it from the buffer.
+    it("never deduplicates non-movable entries that share a sort_key", function()
+      local o = make_outline("object", {
+        make_entry("", 1, { movable = false }),
+        make_entry("x", 2, { movable = true }),
+        make_entry("", 3, { movable = false }),
+      })
+      local sorted = policy.sort(o, { flags = { unique = true }, normalize_keys = true })
+      assert.equals(3, #sorted.entries)
+      assert.equals(0, #sorted.dropped)
+    end)
   end)
 
   describe("sort — opts.flags contract (Fail Fast)", function()

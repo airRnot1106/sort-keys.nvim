@@ -73,10 +73,18 @@ local function deduplicate(entries, flags, normalize_keys)
   end)
 
   for _, e in ipairs(by_anchor) do
-    local k = logical_key(e.sort_key, flags, normalize_keys)
-    if not seen[k] then
-      seen[k] = true
+    -- Pinned entries (spreads, computed keys, `..base`) share an empty
+    -- sort_key but are not interchangeable: several can coexist in one
+    -- container, so they bypass the duplicate check entirely. Dropping one
+    -- would delete it from the buffer.
+    if not e.movable then
       kept_in_decl_order[#kept_in_decl_order + 1] = e
+    else
+      local k = logical_key(e.sort_key, flags, normalize_keys)
+      if not seen[k] then
+        seen[k] = true
+        kept_in_decl_order[#kept_in_decl_order + 1] = e
+      end
     end
   end
 

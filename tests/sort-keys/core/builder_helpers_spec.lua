@@ -304,5 +304,37 @@ describe("sort-keys.core.builder_helpers", function()
       local only = containers[1]
       assert.equals(only, by_key[only.node_key])
     end)
+
+    -- A `field_declaration` with several `field_identifier` children
+    -- (`Name, Age string`) makes the entry query match that one node once
+    -- per identifier. Both matches name the same entry node, so collect_matches
+    -- must dedup them to a single entry — otherwise the applier sees two
+    -- entries with identical ranges and crashes building the inter-entry gap.
+    it("dedups a single node captured as an entry by multiple matches", function()
+      if not ts.has_parser("go") then
+        pending("go treesitter parser not available")
+        return
+      end
+      local go_query = [[
+(field_declaration_list) @sortkeys.container
+ (#set! sortkeys.kind "object")
+
+((field_declaration
+   (field_identifier) @sortkeys.key) @sortkeys.entry
+ (#set! sortkeys.entry_kind "pair"))
+]]
+      local bufnr = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+        "type T struct {",
+        "\tName, Age string",
+        "}",
+      })
+      vim.bo[bufnr].filetype = "go"
+      local parser = vim.treesitter.get_parser(bufnr, "go")
+      local root = parser:parse()[1]:root()
+      local query = vim.treesitter.query.parse("go", go_query)
+      local _, entries = h.collect_matches(bufnr, root, query)
+      assert.equals(1, #entries)
+    end)
   end)
 end)
