@@ -29,6 +29,7 @@ local BUILT_IN_FILETYPES = {
   go = "go",
   kdl = "kdl",
   elixir = "elixir",
+  gleam = "gleam",
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"
