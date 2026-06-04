@@ -17,6 +17,7 @@ local BUILT_IN_FILETYPES = {
   json = "json",
   jsonc = "jsonc",
   lua = "lua",
+  javascript = "javascript",
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"

@@ -205,6 +205,13 @@ Tree-sitter query captures ~
                                                           recursion)
   @sortkeys.comment      —                                comment node, only
                                                           when comment_aware
+  @sortkeys.pin          —                                pin a captured entry
+                                                          (holds its slot;
+                                                          permeable)
+  @sortkeys.fence        —                                pin + block crossing
+                                                          (order-sensitive
+                                                          members: spread,
+                                                          computed key, **splat)
 
 ------------------------------------------------------------------------------
                                           *sort-keys-language-packs-normalize*

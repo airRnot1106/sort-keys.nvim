@@ -1,0 +1,9 @@
+description = "JavaScript handler"
+
+can_sort_object = true
+can_sort_array = true
+can_deep = true
+
+comment_aware = true
+
+query_file = "sort-keys.scm"

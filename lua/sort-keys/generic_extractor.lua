@@ -39,6 +39,13 @@ local function collect(bufnr, root, query)
   local raw_entries = {}
   local comments = {}
   local comment_ids = {}
+  -- Pins and fences are collected as node-id SETS via their own captures,
+  -- independent of which pattern captured the entry. So an order-sensitive
+  -- member (a JS spread / computed key, a Ruby `**splat`) marked
+  -- `@sortkeys.fence` keeps its flag even when a wildcard pattern also captures
+  -- it as a plain entry and the dedup keeps the other copy.
+  local pin_ids = {}
+  local fence_ids = {}
   local seen_entry = {}
 
   for _, match, metadata in query:iter_matches(root, bufnr, 0, -1) do
@@ -64,6 +71,15 @@ local function collect(bufnr, root, query)
       end
     end
 
+    local pin_node = first_node(match, "sortkeys.pin")
+    if pin_node then
+      pin_ids[node_id_key(pin_node)] = true
+    end
+    local fence_node = first_node(match, "sortkeys.fence")
+    if fence_node then
+      fence_ids[node_id_key(fence_node)] = true
+    end
+
     local enode = first_node(match, "sortkeys.entry")
     if enode and metadata["sortkeys.entry_kind"] then
       raw_entries[#raw_entries + 1] = {
@@ -78,12 +94,15 @@ local function collect(bufnr, root, query)
 
   -- The wildcard array-element pattern `(array (_) @sortkeys.entry)` also
   -- captures comment children; drop those, and dedup entries captured twice,
-  -- so a container never sees two entries with the same range.
+  -- so a container never sees two entries with the same range. A fence is also
+  -- a pin (it holds its slot and additionally blocks crossing).
   local entries_by_parent = {}
   for _, e in ipairs(raw_entries) do
     local id = node_id_key(e.node)
     if not comment_ids[id] and not seen_entry[id] then
       seen_entry[id] = true
+      e.fence = fence_ids[id] or nil
+      e.movable = not (pin_ids[id] or fence_ids[id])
       local parent = e.node:parent()
       if parent then
         local pkey = node_id_key(parent)
