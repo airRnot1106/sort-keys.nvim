@@ -1,20 +1,30 @@
 -- Normalize a Ruby hash key so the symbol form `b:`, the symbol literal `:b`,
--- and the string form `"b"` all collate as `b`. hash_key_symbol nodes are
--- already the bare name; strip a leading `:` (simple_symbol) or surrounding
--- quotes (string), decoding the escapes a quoted key shares with JSON.
+-- the quoted symbol `:"b"`, and the string form `"b"` all collate as `b`.
 local escapes = require("sort-keys.core.key_escapes")
+
+-- Strip surrounding quotes. Double quotes decode the JSON-shared escape set;
+-- Ruby single quotes are literal (only \\ and \' are escapes).
+local function strip_quotes(s)
+  if #s < 2 then
+    return s
+  end
+  local q = s:sub(1, 1)
+  if q == '"' and s:sub(-1) == '"' then
+    return escapes.unescape_json(s:sub(2, -2))
+  end
+  if q == "'" and s:sub(-1) == "'" then
+    return (s:sub(2, -2):gsub("\\([\\'])", "%1"))
+  end
+  return s
+end
 
 ---@param text string
 ---@return string
 return function(text)
-  if #text >= 2 then
-    local first = text:sub(1, 1)
-    if (first == '"' or first == "'") and text:sub(-1) == first then
-      return escapes.unescape_json(text:sub(2, -2))
-    end
-    if first == ":" then
-      return text:sub(2)
-    end
+  -- A symbol literal (:b, :"a b", :'a') keeps its name after the colon; the
+  -- same quote-stripping then applies so :"abc" collates with abc:.
+  if text:sub(1, 1) == ":" then
+    text = text:sub(2)
   end
-  return text
+  return strip_quotes(text)
 end

@@ -9,9 +9,11 @@
  (#set! sortkeys.kind "array"))
 
 ;; ─── hash pairs (key is a symbol / string / simple_symbol) ───
+;; The value is optional so a Ruby 3.1 shorthand pair `{ x:, y: }` (key, no
+;; value) is still captured and sorts by its key.
 ((pair
-   key:   (_) @sortkeys.key
-   value: (_) @sortkeys.value
+   key:   (_)  @sortkeys.key
+   value: (_)? @sortkeys.value
  ) @sortkeys.entry
  (#set! sortkeys.entry_kind "pair"))
 
@@ -23,6 +25,11 @@
 ((array
    (_) @sortkeys.entry)
  (#set! sortkeys.entry_kind "element"))
+
+;; A `*a` array splat splices at its position, so its order is meaningful: fence
+;; it (also captured as an element above; the fence flag is keyed by node id).
+((array
+   (splat_argument) @sortkeys.fence))
 
 ;; ─── comments ───
 ((comment) @sortkeys.comment)

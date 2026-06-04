@@ -55,4 +55,14 @@ describe("ruby end-to-end", function()
     vim.cmd("SortKeys")
     assert.are.same({ "x = [1, 2, 3]" }, lines_of(bufnr))
   end)
+
+  it("fences a *splat in an array so elements don't cross it", function()
+    if not has_rb then
+      return pending("ruby treesitter parser not available")
+    end
+    local bufnr = setup_buf({ 'x = ["c", "a", *mid]' })
+    set_cursor(0, 5)
+    vim.cmd("SortKeys")
+    assert.are.same({ 'x = ["a", "c", *mid]' }, lines_of(bufnr))
+  end)
 end)
