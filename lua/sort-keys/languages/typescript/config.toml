@@ -1,0 +1,13 @@
+description = "TypeScript handler"
+
+can_sort_object = true
+can_sort_array = true
+can_deep = true
+
+comment_aware = true
+
+# TypeScript's grammar inherits JavaScript's object/array/pair shapes, so it
+# reuses the JS query and normalizer; only the parser differs.
+parser_lang = "typescript"
+
+query_file = "sort-keys.scm"
