@@ -354,6 +354,32 @@ function M.capability_allows(kind, options)
   return false
 end
 
+---Resolve a container's inter-entry separator policy through one seam every
+---builder shares. `options.structural_separator` / `trailing_separator_allowed`
+---are the declarative default (the only source for uniform-separator languages,
+---and the public handler-spec field). A language whose separator varies by
+---container shape passes `resolve`, a `fun(container) -> sep|nil, trailing|nil`;
+---returning `nil` for either defers that field to the option default, so a
+---user-supplied option is never silently dropped.
+---@param container table   the chosen container (carries `.node` / `.node_key`)
+---@param options table     parsed `.toml` options (or user handler `options`)
+---@param resolve nil|fun(container: table): (string?, boolean?)
+---@return string? separator
+---@return boolean trailing_separator_allowed
+function M.separator_for(container, options, resolve)
+  local sep, trailing
+  if resolve then
+    sep, trailing = resolve(container)
+  end
+  if sep == nil then
+    sep = options.structural_separator
+  end
+  if trailing == nil then
+    trailing = options.trailing_separator_allowed
+  end
+  return sep, trailing == true
+end
+
 ---Return a shallow copy of `entries` sorted by source position (row, then
 ---column). Used inside build_outline so an entry's `anchor` index reflects
 ---declared source order independent of how iter_matches enumerated it.

@@ -210,7 +210,9 @@ local function build_outline(container, ctx)
     outline_entries = comment_attach.attach(outline_entries, container_comments)
   end
 
-  local sep, trailing = separator_for_container(container.node:type())
+  local sep, trailing = h.separator_for(container, ctx.options, function(c)
+    return separator_for_container(c.node:type())
+  end)
 
   -- A leading sibling comment (e.g., a top-level `# foo` above the first
   -- pair) is absorbed into the first entry by comment_attach and therefore

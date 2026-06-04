@@ -172,7 +172,7 @@ local function build_outline(container, ctx)
     outline_entries = comment_attach.attach(outline_entries, container_comments)
   end
 
-  local sep, trailing = separator_for_container(container)
+  local sep, trailing = h.separator_for(container, ctx.options, separator_for_container)
   local outline_range = h.clamp_range_to_buffer(ctx.bufnr, container.range)
 
   -- A leading sibling comment may pull the first entry's range above the

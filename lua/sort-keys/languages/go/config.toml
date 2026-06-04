@@ -26,14 +26,11 @@ comment_aware = true
 # (e.g. `map[any]int`).
 mixed_key_types = true
 
-# Per-container separator policy lives in the builder because the language
-# uses two distinct conventions: composite-literal bodies are `,`-separated
-# with trailing comma REQUIRED when the closing brace is on its own line,
-# while struct-definition / import-block bodies are newline-separated with
-# no inline separator. The fields below carry the composite-literal default;
-# the builder overrides them per container shape via
-# `separator_for_container_node_type`.
-structural_separator = ","
-trailing_separator_allowed = true
+# `structural_separator` / `trailing_separator_allowed` are decided per
+# container shape by the builder, not declared here: Go uses two distinct
+# conventions — composite-literal bodies are `,`-separated (trailing comma
+# required when the closing brace is on its own line), while struct-definition
+# / import-block bodies are newline-separated with no inline separator. The
+# builder owns this via `separator_for_container_node_type`.
 
 query_file = "sort-keys.scm"

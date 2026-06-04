@@ -70,11 +70,12 @@ local function build_outline(container, ctx)
     outline_entries = comment_attach.attach(outline_entries, container_comments)
   end
 
+  local sep, trailing = h.separator_for(container, ctx.options)
   return {
     kind = container.kind,
     range = container.range,
-    structural_separator = ctx.options.structural_separator,
-    trailing_separator_allowed = ctx.options.trailing_separator_allowed == true,
+    structural_separator = sep,
+    trailing_separator_allowed = trailing,
     entries = outline_entries,
   }
 end
