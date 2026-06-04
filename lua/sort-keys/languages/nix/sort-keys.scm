@@ -19,5 +19,10 @@
 ((inherit) @sortkeys.entry @sortkeys.pin
  (#set! sortkeys.entry_kind "element"))
 
+;; `inherit (scope) a b;` is a distinct node (inherit_from); pin it too so it is
+;; never dropped and keyed bindings sort around it.
+((inherit_from) @sortkeys.entry @sortkeys.pin
+ (#set! sortkeys.entry_kind "element"))
+
 ;; ─── comments ───
 ((comment) @sortkeys.comment)

@@ -46,6 +46,16 @@ describe("nix end-to-end", function()
     assert.are.same({ "x = { a = 2; inherit z; c = 1; }" }, lines_of(bufnr))
   end)
 
+  it("pins inherit (scope) ...; (inherit_from) so it is never dropped", function()
+    if not has_nix then
+      return pending("nix treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "x = { c = 3; b = 2; inherit (pkgs) hello; a = 1; }" })
+    set_cursor(0, 6)
+    vim.cmd("SortKeys")
+    assert.are.same({ "x = { a = 1; b = 2; inherit (pkgs) hello; c = 3; }" }, lines_of(bufnr))
+  end)
+
   it(":DeepSortKeys recurses into a nested attrset", function()
     if not has_nix then
       return pending("nix treesitter parser not available")
