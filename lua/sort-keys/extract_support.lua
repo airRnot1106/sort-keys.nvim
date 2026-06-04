@@ -238,7 +238,11 @@ function M.build_container(container, ctx)
     if ctx.deep and inner then
       local child = M.build_container(inner, ctx)
       if child then
-        local vr = M.clamp_range(ctx.bufnr, { subject_node:range() })
+        -- Slice pre/post around the INNER container's range, not the subject
+        -- node's: when the value wraps the container (find_inner_container went
+        -- one level down), the wrapper's leading text (a Pkl key, a YAML
+        -- block_node indent) must be preserved as `pre`.
+        local vr = child.range
         entry.child = child
         entry.pre = get_text(ctx.bufnr, dr[1], dr[2], vr[1], vr[2])
         entry.post = get_text(ctx.bufnr, vr[3], vr[4], dr[3], dr[4])

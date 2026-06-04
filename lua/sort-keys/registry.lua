@@ -22,6 +22,7 @@ local BUILT_IN_FILETYPES = {
   python = "python",
   ruby = "ruby",
   yaml = "yaml",
+  pkl = "pkl",
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"
