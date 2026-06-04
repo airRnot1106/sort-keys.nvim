@@ -40,15 +40,13 @@ function M.parse_order(args, bang)
 end
 
 -- Build the Target from the command invocation: a real range (Visual / :line1,line2)
--- becomes a line-wise selection; otherwise the cursor position is used.
----@param bufnr integer
+-- becomes a line-wise selection (extract interprets the row span); otherwise the
+-- cursor position is used.
 ---@param opts table
 ---@return table
-local function target_of(bufnr, opts)
+local function target_of(opts)
   if opts.range and opts.range > 0 then
-    local last_line = opts.line2 - 1
-    local last = vim.api.nvim_buf_get_lines(bufnr, last_line, last_line + 1, false)[1] or ""
-    return { kind = "selection", range = { opts.line1 - 1, 0, last_line, #last } }
+    return { kind = "selection", srow = opts.line1 - 1, erow = opts.line2 - 1 }
   end
   local cursor = vim.api.nvim_win_get_cursor(0)
   return { kind = "cursor", pos = { cursor[1] - 1, cursor[2] } }
@@ -75,7 +73,7 @@ function M.run(opts, deep)
     notify("ignoring invalid sort pattern /" .. request.order.pattern .. "/", vim.log.levels.WARN)
   end
 
-  local outline = extract.extract(bufnr, target_of(bufnr, opts), pack, request.deep)
+  local outline = extract.extract(bufnr, target_of(opts), pack, request.deep)
   if not outline then
     notify("no sortable container here", vim.log.levels.WARN)
     return

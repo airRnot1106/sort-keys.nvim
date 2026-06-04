@@ -10,6 +10,7 @@
 -- render.lua then reproduces everything with one rule.
 
 local comment_fold = require("sort-keys.core.comment_fold")
+local pos = require("sort-keys.core.pos")
 
 local M = {}
 
@@ -31,44 +32,41 @@ local function range_area(r)
   return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
 end
 
-local function pos_le(ar, ac, br, bc)
-  return ar < br or (ar == br and ac <= bc)
-end
-
-local function range_contains_pos(r, row, col)
-  if row < r[1] or row > r[3] then
-    return false
-  end
-  if row == r[1] and col < r[2] then
-    return false
-  end
-  if row == r[3] and col > r[4] then
-    return false
-  end
-  return true
-end
-
-local function range_covers_range(outer, inner)
-  return pos_le(outer[1], outer[2], inner[1], inner[2])
-    and pos_le(inner[3], inner[4], outer[3], outer[4])
-end
-
--- Innermost container = smallest-area container that still contains the
--- cursor (or covers the selection range).
+-- Innermost container for the target. Cursor: smallest container containing the
+-- position. Selection (line-wise): smallest container whose rows cover the
+-- whole selection; if none (e.g. the selection runs past the closing bracket),
+-- fall back to the smallest container whose rows contain the selection's first
+-- line. This keeps :'<,'>SortKeys working even when the selected lines don't
+-- align with the container's exact start/end columns.
 local function pick_container(containers, target)
   local best, best_area
-  for _, c in ipairs(containers) do
-    local ok
-    if target.kind == "cursor" then
-      ok = range_contains_pos(c.range, target.pos[1], target.pos[2])
-    else
-      ok = range_covers_range(c.range, target.range)
+  local function consider(c)
+    local area = range_area(c.range)
+    if best_area == nil or area < best_area then
+      best, best_area = c, area
     end
-    if ok then
-      local area = range_area(c.range)
-      if best_area == nil or area < best_area then
-        best, best_area = c, area
+  end
+
+  if target.kind == "cursor" then
+    for _, c in ipairs(containers) do
+      if pos.contains(c.range, target.pos[1], target.pos[2]) then
+        consider(c)
       end
+    end
+    return best
+  end
+
+  for _, c in ipairs(containers) do
+    if pos.rows_cover(c.range, target.srow, target.erow) then
+      consider(c)
+    end
+  end
+  if best then
+    return best
+  end
+  for _, c in ipairs(containers) do
+    if pos.row_in_span(c.range, target.srow) then
+      consider(c)
     end
   end
   return best
@@ -194,19 +192,33 @@ local function build_container(container, ctx)
   end
   local blocks = comment_fold.fold(raw, container_comments)
 
-  -- Separator: the leading non-whitespace run right after the first entry's
-  -- DATA (so it is observed even when a trailing comment follows the data).
+  -- Separator: the first non-whitespace run after the first entry's DATA. The
+  -- leading-whitespace skip means a delimiter that is not byte-adjacent (e.g. a
+  -- comma at the start of the next line) is still observed; probing from the
+  -- data end means a trailing comment after the data does not hide it.
   local separator = ""
   if #raw >= 2 then
     local probe =
       get_text(ctx.bufnr, raw[1].range[3], raw[1].range[4], raw[2].range[1], raw[2].range[2])
-    separator = probe:match("^(%S*)") or ""
+    separator = probe:match("^%s*(%S*)") or ""
   end
-  local function strip_separator(s)
-    if separator ~= "" and s:sub(1, #separator) == separator then
-      return s:sub(#separator + 1)
+  -- Peel one separator off s -> (rest, had_separator). The separator is
+  -- slot-bound, so it is stripped from tails / inter-block gaps here and
+  -- re-emitted by render; trailing detection reuses the same peel. It is peeled
+  -- from whichever end carries it: the front for the usual trailing-delimiter
+  -- style ("a": 1,\n) and the back for a leading-delimiter style (\n  ,"b"),
+  -- which render then normalizes to the trailing style.
+  local function peel_separator(s)
+    if separator == "" then
+      return s, false
     end
-    return s
+    if s:sub(1, #separator) == separator then
+      return s:sub(#separator + 1), true
+    end
+    if #s >= #separator and s:sub(-#separator) == separator then
+      return s:sub(1, -#separator - 1), true
+    end
+    return s, false
   end
 
   local entries = {}
@@ -218,9 +230,7 @@ local function build_container(container, ctx)
       movable = true,
       range = { b.start[1], b.start[2], b.finish[1], b.finish[2] },
       lead = get_text(ctx.bufnr, b.start[1], b.start[2], dr[1], dr[2]),
-      -- The separator sits between the data and a trailing comment; it is
-      -- slot-bound, so strip it from the tail and let render re-emit it.
-      tail = strip_separator(get_text(ctx.bufnr, dr[3], dr[4], b.finish[1], b.finish[2])),
+      tail = (peel_separator(get_text(ctx.bufnr, dr[3], dr[4], b.finish[1], b.finish[2]))),
     }
 
     local subject_node = e.node
@@ -257,25 +267,31 @@ local function build_container(container, ctx)
 
   local joint = " "
   if #raw >= 2 then
-    joint = strip_separator(
-      get_text(ctx.bufnr, b1.finish[1], b1.finish[2], blocks[2].start[1], blocks[2].start[2])
+    joint = (
+      peel_separator(
+        get_text(ctx.bufnr, b1.finish[1], b1.finish[2], blocks[2].start[1], blocks[2].start[2])
+      )
     )
   end
 
   -- A trailing separator on the last entry can sit in two places: in the bytes
   -- before the close (no trailing comment), or absorbed before the last entry's
-  -- trailing comment (where strip_separator already removed it from the tail).
-  -- Either one means render must re-emit a separator after the last entry.
+  -- trailing comment (already peeled out of its tail). Either means render must
+  -- re-emit a separator after the last entry.
   local after_last = get_text(ctx.bufnr, bl.finish[1], bl.finish[2], cr[3], cr[4])
   local last_dr = raw[#raw].range
-  local last_absorbed = get_text(ctx.bufnr, last_dr[3], last_dr[4], bl.finish[1], bl.finish[2])
+  local _, absorbed_separator =
+    peel_separator(get_text(ctx.bufnr, last_dr[3], last_dr[4], bl.finish[1], bl.finish[2]))
   local trailing = false
   local suffix = after_last
-  if separator ~= "" and last_absorbed:sub(1, #separator) == separator then
+  if absorbed_separator then
     trailing = true
-  elseif separator ~= "" and after_last:sub(1, #separator) == separator then
-    trailing = true
-    suffix = after_last:sub(#separator + 1)
+  else
+    local rest, had = peel_separator(after_last)
+    if had then
+      trailing = true
+      suffix = rest
+    end
   end
 
   return {
@@ -290,11 +306,11 @@ local function build_container(container, ctx)
   }
 end
 
--- Visual partial sort: flip top-level entries outside the selection to
--- movable=false so placement keeps them put and only the selected ones move.
-local function apply_selection_overlay(outline, selection_range)
+-- Visual partial sort: pin entries whose lines fall outside the selection so
+-- placement keeps them put and only the selected ones reorder.
+local function apply_selection_overlay(outline, target)
   for _, entry in ipairs(outline.entries) do
-    if not range_covers_range(selection_range, entry.range) then
+    if not pos.rows_overlap(entry.range, target.srow, target.erow) then
       entry.movable = false
     end
   end
@@ -303,7 +319,7 @@ end
 -- ─── public entry point ─────────────────────────────────────────────────────
 
 ---@param bufnr integer
----@param target table  -- { kind="cursor", pos={row,col} } | { kind="selection", range={...} }
+---@param target table  -- { kind="cursor", pos={row,col} } | { kind="selection", srow, erow }
 ---@param pack table    -- { options, query_text, key_normalizer }
 ---@param deep boolean
 ---@return table|nil outline
@@ -345,7 +361,7 @@ function M.extract(bufnr, target, pack, deep)
   end
 
   if target.kind == "selection" then
-    apply_selection_overlay(outline, target.range)
+    apply_selection_overlay(outline, target)
   end
 
   return outline

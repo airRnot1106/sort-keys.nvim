@@ -15,11 +15,11 @@
 -- trailing comment stays slot-bound (extract strips it back out), so the sort
 -- and render layers never see comments as anything but `lead`/`tail` strings.
 
+local pos = require("sort-keys.core.pos")
+
 local M = {}
 
-local function pos_lt(ar, ac, br, bc)
-  return ar < br or (ar == br and ac < bc)
-end
+local pos_lt = pos.lt
 
 ---@param entries table[]   -- each { range = { sr, sc, er, ec } }, source order
 ---@param comments table[]  -- each { range = { sr, sc, er, ec } }

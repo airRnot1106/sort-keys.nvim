@@ -161,4 +161,73 @@ describe("json end-to-end", function()
     vim.cmd("SortKeys")
     assert.are.same({ '["apple", "banana", "cherry"]' }, lines_of(bufnr))
   end)
+
+  it("range :SortKeys sorts only the entries on the selected lines, pinning the rest", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "{",
+      '  "c": 3,',
+      '  "b": 2,',
+      '  "a": 1',
+      "}",
+    })
+    -- select lines 2-3 ("c","b"); "a" on line 4 stays pinned.
+    vim.cmd("2,3SortKeys")
+    assert.are.same({
+      "{",
+      '  "b": 2,',
+      '  "c": 3,',
+      '  "a": 1',
+      "}",
+    }, lines_of(bufnr))
+  end)
+
+  it("range selection covering the indented opening brace still resolves the container", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    -- The inner object's "{" is indented (not at column 0); a line-wise
+    -- selection of its lines must still resolve it by row span.
+    local bufnr = setup_buf({
+      "{",
+      '  "z": {',
+      '    "b": 2,',
+      '    "a": 1',
+      "  }",
+      "}",
+    })
+    vim.cmd("2,5SortKeys")
+    assert.are.same({
+      "{",
+      '  "z": {',
+      '    "a": 1,',
+      '    "b": 2',
+      "  }",
+      "}",
+    }, lines_of(bufnr))
+  end)
+
+  it("normalizes a leading-comma layout while still sorting", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    -- The comma sits at the start of the next line; the separator is still
+    -- observed and render emits it in the usual trailing position.
+    local bufnr = setup_buf({
+      "{",
+      '  "b": 2',
+      '  ,"a": 1',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "a": 1,',
+      '  "b": 2',
+      "}",
+    }, lines_of(bufnr))
+  end)
 end)

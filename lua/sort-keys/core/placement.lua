@@ -40,22 +40,17 @@ end
 function M.arrange(entries, compare)
   local n = #entries
 
-  -- Segment id for a source position = number of fences strictly before it.
-  -- Movable entries and free slots in the same segment sort among themselves.
-  local fence_positions = {}
-  for pos, entry in ipairs(entries) do
+  -- segment[pos] = number of fences strictly before pos. Movable entries and
+  -- free slots in the same segment sort among themselves. Precomputed in one
+  -- forward pass so the placement loops below stay O(n), not O(n*fences).
+  local segment = {}
+  local seen_fences = 0
+  for pos = 1, n do
+    segment[pos] = seen_fences
+    local entry = entries[pos]
     if entry.movable == false and entry.fence then
-      fence_positions[#fence_positions + 1] = pos
+      seen_fences = seen_fences + 1
     end
-  end
-  local function segment_of(pos)
-    local seg = 0
-    for _, fpos in ipairs(fence_positions) do
-      if fpos < pos then
-        seg = seg + 1
-      end
-    end
-    return seg
   end
 
   local result = {}
@@ -66,7 +61,7 @@ function M.arrange(entries, compare)
       result[pos] = entry
     else
       free_slots[#free_slots + 1] = pos
-      local seg = segment_of(pos)
+      local seg = segment[pos]
       movables_by_segment[seg] = movables_by_segment[seg] or {}
       table.insert(movables_by_segment[seg], entry)
     end
@@ -78,7 +73,7 @@ function M.arrange(entries, compare)
 
   local cursor_by_segment = {}
   for _, pos in ipairs(free_slots) do
-    local seg = segment_of(pos)
+    local seg = segment[pos]
     cursor_by_segment[seg] = (cursor_by_segment[seg] or 0) + 1
     result[pos] = movables_by_segment[seg][cursor_by_segment[seg]]
   end
