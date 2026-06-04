@@ -73,7 +73,10 @@ function M.run(opts, deep)
     notify("ignoring invalid sort pattern /" .. request.order.pattern .. "/", vim.log.levels.WARN)
   end
 
-  local outline = extract.extract(bufnr, target_of(opts), pack, request.deep)
+  -- A pack may ship a custom extractor for an irregular AST; otherwise the
+  -- generic, query-driven extractor handles it.
+  local extractor = pack.extractor or extract
+  local outline = extractor.extract(bufnr, target_of(opts), pack, request.deep)
   if not outline then
     notify("no sortable container here", vim.log.levels.WARN)
     return

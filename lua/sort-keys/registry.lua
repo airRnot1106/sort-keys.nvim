@@ -16,11 +16,13 @@ local M = {}
 local BUILT_IN_FILETYPES = {
   json = "json",
   jsonc = "jsonc",
+  lua = "lua",
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"
 local QUERY_PATH_FMT = "lua/sort-keys/languages/%s/%s"
 local NORMALIZE_MODULE_FMT = "sort-keys.languages.%s.normalize"
+local EXTRACTOR_MODULE_FMT = "sort-keys.languages.%s.extractor"
 
 local user_handlers = {}
 
@@ -64,11 +66,21 @@ local function load_builtin(config_name)
     key_normalizer = mod
   end
 
+  -- An irregular AST whose container/entry shape the generic query can't tag
+  -- ships a custom extractor `languages/<config_name>/extractor.lua`; the
+  -- generic extractor is used when there is none.
+  local extractor
+  local eok, emod = pcall(require, string.format(EXTRACTOR_MODULE_FMT, config_name))
+  if eok and type(emod) == "table" and type(emod.extract) == "function" then
+    extractor = emod
+  end
+
   local pack = {
     config_name = config_name,
     options = options,
     query_text = read_file(query_path),
     key_normalizer = key_normalizer,
+    extractor = extractor,
   }
   builtin_cache[config_name] = pack
   return pack
@@ -125,6 +137,7 @@ function M.resolve(filetype)
       options = vim.tbl_deep_extend("force", base.options or {}, spec.options or {}),
       query_text = spec.query_text or base.query_text,
       key_normalizer = spec.key_normalizer or base.key_normalizer,
+      extractor = spec.extractor or base.extractor,
     }
   end
 
