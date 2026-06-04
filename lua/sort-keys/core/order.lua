@@ -46,7 +46,11 @@ function M.valid_pattern(pattern)
   return (pcall(string.match, "", pattern))
 end
 
----Build a 3-way comparator from an order spec.
+---Build a 3-way comparator from an order spec. `spec.comparator` (per the
+---ORDER axis of the architecture: "custom comparator injects here — swap the
+---base") replaces the default key comparison; it is `fun(a, b, ctx) ->
+---boolean|nil` returning whether a sorts before b, or nil to fall back to the
+---default. Flags wrap the base: `reverse` still flips the final result.
 ---@param spec table?
 ---@return fun(a: table, b: table): integer
 function M.build(spec)
@@ -60,10 +64,28 @@ function M.build(spec)
     numeric = spec.numeric,
     pattern = M.valid_pattern(spec.pattern) and spec.pattern or nil,
   }
-  return function(a, b)
+  local comparator = spec.comparator
+  local ctx = {}
+
+  local function default_3way(a, b)
     local ka = M.key_of(a.sort_key, effective)
     local kb = M.key_of(b.sort_key, effective)
-    local c = (ka < kb and -1) or (ka > kb and 1) or 0
+    return (ka < kb and -1) or (ka > kb and 1) or 0
+  end
+
+  return function(a, b)
+    local c
+    if comparator then
+      local ab = comparator(a, b, ctx)
+      if ab ~= nil then
+        -- Two probes give a stable 3-way (and an equality case) from a
+        -- boolean "a before b" comparator.
+        c = ab and -1 or (comparator(b, a, ctx) and 1 or 0)
+      end
+    end
+    if c == nil then
+      c = default_3way(a, b)
+    end
     if effective.reverse then
       c = -c
     end

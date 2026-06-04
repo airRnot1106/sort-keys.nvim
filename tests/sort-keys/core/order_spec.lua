@@ -48,6 +48,38 @@ describe("core.order", function()
     assert.are.equal(-1, cmp(e("apple"), e("banana")))
   end)
 
+  it("uses a custom comparator as the base, swapping the default key comparison", function()
+    -- per architecture_sort_axes: a custom comparator injects at the ORDER base.
+    -- Here it orders by key length instead of lexicographically.
+    local cmp = order.build({
+      comparator = function(a, b)
+        return #a.sort_key < #b.sort_key
+      end,
+    })
+    assert.are.equal(-1, cmp(e("a"), e("bbb")))
+    assert.are.equal(1, cmp(e("bbb"), e("a")))
+    assert.are.equal(0, cmp(e("xy"), e("zw")))
+  end)
+
+  it("falls back to the default comparison when the custom comparator returns nil", function()
+    local cmp = order.build({
+      comparator = function()
+        return nil
+      end,
+    })
+    assert.are.equal(-1, cmp(e("apple"), e("banana")))
+  end)
+
+  it("applies reverse (!) on top of a custom comparator", function()
+    local cmp = order.build({
+      reverse = true,
+      comparator = function(a, b)
+        return #a.sort_key < #b.sort_key
+      end,
+    })
+    assert.are.equal(1, cmp(e("a"), e("bbb")))
+  end)
+
   it("valid_pattern rejects malformed and empty patterns", function()
     assert.is_true(order.valid_pattern("%d+"))
     assert.is_false(order.valid_pattern("("))

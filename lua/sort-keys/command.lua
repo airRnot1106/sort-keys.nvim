@@ -2,6 +2,7 @@
 -- pure pipeline parse(extract) -> transform(sort) -> print(render) -> apply.
 -- This is the only place the four stages are wired together.
 
+local config = require("sort-keys.config")
 local registry = require("sort-keys.registry")
 local extract = require("sort-keys.extract")
 local sort = require("sort-keys.core.sort")
@@ -63,8 +64,11 @@ function M.run(opts, deep)
     return
   end
 
+  local order_spec = M.parse_order(opts.args or "", opts.bang)
+  -- The configured comparator is the ORDER-axis base swap (see core/order).
+  order_spec.comparator = config.options.comparator
   local request = {
-    order = M.parse_order(opts.args or "", opts.bang),
+    order = order_spec,
     deep = deep == true,
   }
   if request.order.pattern and not order.valid_pattern(request.order.pattern) then

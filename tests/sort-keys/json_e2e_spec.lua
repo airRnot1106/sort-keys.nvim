@@ -124,6 +124,34 @@ describe("json end-to-end", function()
     assert.are.same({ '{ "a": 1, "b": 2 }' }, lines_of(bufnr))
   end)
 
+  it("honors a custom comparator supplied via setup()", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    -- order by key length, not lexicographically (1 < 2 < 3 chars).
+    require("sort-keys.config").setup({
+      comparator = function(a, b)
+        return #a.sort_key < #b.sort_key
+      end,
+    })
+    local bufnr = setup_buf({
+      "{",
+      '  "bbb": 1,',
+      '  "a": 2,',
+      '  "cc": 3',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "a": 2,',
+      '  "cc": 3,',
+      '  "bbb": 1',
+      "}",
+    }, lines_of(bufnr))
+  end)
+
   it("sorts an array of strings", function()
     if not has_json then
       return pending("JSON treesitter parser not available")

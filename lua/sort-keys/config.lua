@@ -5,16 +5,21 @@ local registry = require("sort-keys.registry")
 
 local M = {}
 
-M.options = {
-  normalize_keys = true,
+-- Key normalization is an always-on parse-stage helper in the architecture, so
+-- there is no normalize toggle here; `comparator` is the ORDER-axis base swap.
+local DEFAULTS = {
   comparator = nil,
   handlers = {},
 }
 
+M.options = vim.deepcopy(DEFAULTS)
+
+---Idempotent: each call rebuilds from defaults, so options and the user-handler
+---map are replaced wholesale rather than accumulated across calls.
 ---@param opts table?
 function M.setup(opts)
   opts = opts or {}
-  M.options = vim.tbl_deep_extend("force", M.options, opts)
+  M.options = vim.tbl_deep_extend("force", vim.deepcopy(DEFAULTS), opts)
   registry.set_user_handlers(opts.handlers or {})
 end
 
