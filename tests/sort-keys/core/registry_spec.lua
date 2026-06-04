@@ -282,6 +282,28 @@ describe("sort-keys.core.registry", function()
       assert.is_true(handler.capabilities.comment_aware)
     end)
 
+    it("returns a handler that exposes `capabilities` and `outline` for elixir", function()
+      local handler = registry.get("elixir")
+      assert.is_not_nil(handler)
+      assert.is_table(handler.capabilities)
+      assert.is_function(handler.outline)
+    end)
+
+    it("the elixir handler declares can_sort_object / can_deep (and no array shape)", function()
+      -- Keyword lists are syntactically `list` but key-keyed, so they are
+      -- exposed as the object shape; a plain positional list is never
+      -- captured, so there is no array shape.
+      local handler = registry.get("elixir")
+      assert.is_true(handler.capabilities.can_sort_object)
+      assert.is_false(handler.capabilities.can_sort_array)
+      assert.is_true(handler.capabilities.can_deep)
+    end)
+
+    it("the elixir handler declares comment_aware = true", function()
+      local handler = registry.get("elixir")
+      assert.is_true(handler.capabilities.comment_aware)
+    end)
+
     it(
       "does not let a built-in spec drift between calls (built-in spec is reused, not mutated)",
       function()

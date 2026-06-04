@@ -1,3 +1,4 @@
+local elixir_builder = require("sort-keys.languages.elixir.builder")
 local go_builder = require("sort-keys.languages.go.builder")
 local javascript_builder = require("sort-keys.languages.javascript.builder")
 local json_builder = require("sort-keys.languages.json.builder")
@@ -16,6 +17,7 @@ local M = {}
 -- Each built-in builder self-declares the filetypes it serves and the
 -- canonical config name each filetype maps to (see `builder.filetypes`).
 local BUILT_IN_BUILDERS = {
+  elixir_builder,
   go_builder,
   javascript_builder,
   json_builder,

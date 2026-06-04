@@ -1,0 +1,32 @@
+description = "Elixir handler"
+
+# Two sortable container shapes reach this layer, both key-keyed:
+#   map  (`%{...}` and `%Struct{...}`) — atom-shorthand `k: v` pairs and
+#        arrow `k => v` binary operators
+#   list that holds a `keywords` child (a keyword list `[k: v]`)
+#
+# A plain list (`[1, 2, 3]`) carries no `keywords` child and is positional, so
+# the query never captures it and the cursor falls through to "no sortable
+# structure". Bare keyword arguments (`config :app, k: v`) are out of scope in
+# v1: their pairs hang off `arguments`, not a map / list the comment level can
+# anchor to.
+can_sort_object = true
+can_sort_array = false
+can_deep = true
+key_quoting = "logical"
+
+# `#` line comments hang off the enclosing `map` / `list`, one AST level above
+# the pairs; the builder resolves both pairs and comments to their nearest
+# captured container ancestor so the standard comment_attach path applies.
+comment_aware = true
+
+# A single container can mix atom-shorthand keys, quoted keyword keys, and
+# arrow string / atom keys, so per-pair normalization is required.
+mixed_key_types = true
+
+# Map and keyword-list entries are `,`-separated; a trailing comma before the
+# closing delimiter is legal Elixir, so it is preserved when present.
+structural_separator = ","
+trailing_separator_allowed = true
+
+query_file = "sort-keys.scm"

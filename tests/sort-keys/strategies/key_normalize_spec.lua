@@ -576,4 +576,36 @@ describe("sort-keys.strategies.key_normalize", function()
       assert.equals("self", key_normalize.rust("self"))
     end)
   end)
+
+  describe("elixir(text)", function()
+    it("strips the trailing colon of a keyword key (`name: ` → `name`)", function()
+      -- The `keyword` node text carries the `:` and the space that follows it
+      -- in `name: value`; the logical key is just the identifier.
+      assert.equals("name", key_normalize.elixir("name: "))
+      assert.equals("name", key_normalize.elixir("name:"))
+    end)
+
+    it('unquotes a quoted keyword key (`"foo bar": ` → `foo bar`)', function()
+      assert.equals("foo bar", key_normalize.elixir('"foo bar": '))
+    end)
+
+    it("strips the leading colon of an atom key (`:foo` → `foo`)", function()
+      -- Arrow-style map entries (`:foo => 1`) reach this layer as the raw
+      -- atom text; the leading `:` is syntax, not part of the key.
+      assert.equals("foo", key_normalize.elixir(":foo"))
+    end)
+
+    it('unquotes a quoted atom key (`:"foo bar"` → `foo bar`)', function()
+      assert.equals("foo bar", key_normalize.elixir(':"foo bar"'))
+    end)
+
+    it('unquotes a bare string key (`"a"` → `a`)', function()
+      -- Arrow-style entries with string keys (`\"a\" => 1`).
+      assert.equals("a", key_normalize.elixir('"a"'))
+    end)
+
+    it("returns a bare identifier verbatim", function()
+      assert.equals("snake_case_1", key_normalize.elixir("snake_case_1"))
+    end)
+  end)
 end)
