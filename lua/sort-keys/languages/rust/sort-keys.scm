@@ -34,6 +34,10 @@
 ((use_list (_) @sortkeys.entry)
  (#set! sortkeys.entry_kind "element"))
 
+;; `self` in `use a::{self, ...}` conventionally stays first; pin it so it does
+;; not alphabetize away from its slot.
+((use_list (self) @sortkeys.pin))
+
 ;; ─── comments (attributes ride as comments) ───
 ((attribute_item) @sortkeys.comment)
 ((line_comment) @sortkeys.comment)

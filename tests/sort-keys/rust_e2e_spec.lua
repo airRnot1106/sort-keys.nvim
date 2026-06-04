@@ -65,4 +65,14 @@ describe("rust end-to-end", function()
     vim.cmd("SortKeys")
     assert.are.same({ "use a::{b, c, d};" }, lines_of(bufnr))
   end)
+
+  it("keeps `self` pinned in a use list", function()
+    if not has_rust then
+      return pending("rust treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "use a::{self, foo, bar};" })
+    set_cursor(0, 8)
+    vim.cmd("SortKeys")
+    assert.are.same({ "use a::{self, bar, foo};" }, lines_of(bufnr))
+  end)
 end)
