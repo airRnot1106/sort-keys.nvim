@@ -10,17 +10,18 @@ CONTENTS                                                  *sort-keys-contents*
   2. Commands ................................. |sort-keys-commands|
   3. Configuration ............................ |sort-keys-configuration|
   4. Handlers ................................. |sort-keys-handlers|
-  5. Writing a builder ........................ |sort-keys-builder|
-  6. Health ................................... |sort-keys-health|
+  5. Language packs ........................... |sort-keys-language-packs|
 
 ==============================================================================
 1. INTRODUCTION                                       *sort-keys-introduction*
 
-sort-keys.nvim sorts object/table keys in the current buffer or a visual
-range using tree-sitter, similar to Vim's built-in |:sort| command.
+sort-keys.nvim sorts object keys and array elements in the current buffer or a
+range using tree-sitter, similar to Vim's built-in |:sort| command — but it
+reorders structured entries (preserving commas, comments, and nesting) instead
+of plain lines.
 
-Built-in handlers cover all languages listed in the bundled handlers
-directory. Additional languages can be added — see |sort-keys-handlers|.
+Supported filetypes: json and jsonc. Additional languages can be registered
+declaratively — see |sort-keys-handlers| and |sort-keys-language-packs|.
 
 ==============================================================================
 2. COMMANDS                                               *sort-keys-commands*
@@ -28,75 +29,80 @@ directory. Additional languages can be added — see |sort-keys-handlers|.
                                                                     *:SortKeys*
 :[range]SortKeys[!] [flags]
                 Sort the innermost container under the cursor (shallow).
-                With [range], only entries inside the selection reorder.
-                Accepts the same trailing flags as |:sort|:
+                With [range] (including a Visual selection), only the entries
+                on the selected lines reorder; the rest stay pinned.
+                Accepts trailing flags like |:sort|:
 
                   !         Reverse the comparison (descending).
                   i         Case-insensitive comparison.
-                  n         Numeric comparison (falls back to string).
-                  r/{pat}/  Compare the substring matched by {pat}.
-                  u         Deduplicate: keep first occurrence per key.
+                  n         Numeric comparison (lines without a number sort
+                            as 0).
+                  r/{pat}/  Compare the substring matched by the Lua pattern
+                            {pat}. A malformed pattern is ignored (with a
+                            warning) rather than raising.
 
                                                                 *:DeepSortKeys*
-:DeepSortKeys[!] [flags]
+:[range]DeepSortKeys[!] [flags]
                 Like |:SortKeys| but recurses into nested containers
                 post-order: children are sorted before their parent.
 
 ==============================================================================
 3. CONFIGURATION                                     *sort-keys-configuration*
 
-Call `require("sort-keys").setup()` once during Neovim initialization.
-All fields are optional; the function merges your options on top of the
-defaults.
+Call `require("sort-keys").setup()` once during Neovim initialization. All
+fields are optional. setup() is idempotent: each call replaces your options
+and handler map wholesale; built-in packs are never mutated.
 
 >lua
     require("sort-keys").setup({
-      normalize_keys = true,  -- decode escapes when computing sort_key
-      comparator     = nil,   -- function(a, b, ctx) -> bool|nil
-      handlers       = {},    -- map of config_name -> handler spec
+      comparator = nil,   -- function(a, b, ctx) -> bool|nil
+      handlers   = {},    -- map of config_name -> language-pack spec
     })
 <
 
 Fields ~
 
-normalize_keys (boolean, default: true)
-  When true, the sort key is the decoded logical value, so `"a\nb"` and
-  the two-character literal `a\nb` compare as equal.
+comparator (function|nil, default: nil)                 *sort-keys-comparator*
+  Custom comparison. Receives the two entries `(a, b, ctx)` and returns true
+  if `a` sorts before `b`, or nil to fall through to the default key
+  comparison. It replaces the comparison base; the `!` flag still reverses
+  the final result. Each entry exposes `entry.sort_key` (the normalized key).
 
-comparator (function|nil, default: nil)
-  Custom comparison function. Receives `(a_entry, b_entry, ctx)` and
-  returns true if `a < b`. Return nil to fall through to the default.
+>lua
+    -- order by key length instead of lexicographically
+    require("sort-keys").setup({
+      comparator = function(a, b)
+        return #a.sort_key < #b.sort_key
+      end,
+    })
+<
 
 handlers (table, default: {})
-  User handler specs. See |sort-keys-handlers|.
+  User language-pack specs. See |sort-keys-handlers|.
+
+Key normalization (decoding escapes so `"a\nb"` and the literal two-character
+key compare equal) is always on; there is no toggle.
 
 ==============================================================================
 4. HANDLERS                                               *sort-keys-handlers*
 
-Languages are served by handlers keyed off |'filetype'|. You can override
-any built-in or register a new language from your config via
-`setup({ handlers = { ... } })`.
+Languages are served by packs keyed off |'filetype'|. You can override a
+built-in or register a new language from your config via
+`setup({ handlers = { ... } })`. Every pack is processed by the same generic
+extractor — there is no per-language builder to write.
 
 ------------------------------------------------------------------------------
                                               *sort-keys-handlers-override*
 Override a field of a built-in ~
 
 When the handlers key matches a built-in config name, only the fields you
-supply are overlaid. Everything else (builder, query, remaining options)
-is inherited.
+supply are overlaid; everything else is inherited.
 
 >lua
-    -- Enable comment handling for the built-in JSON handler.
+    -- Tweak the built-in JSON options.
     require("sort-keys").setup({
       handlers = {
-        json = { options = { comment_aware = true } },
-      },
-    })
-
-    -- Replace just the builder, keeping the built-in options + query.
-    require("sort-keys").setup({
-      handlers = {
-        nix = { builder = require("my.fancier_nix_builder") },
+        json = { options = { can_deep = false } },
       },
     })
 <
@@ -105,264 +111,113 @@ is inherited.
                                             *sort-keys-handlers-new-lang*
 Register a new language ~
 
-Use a handlers key that does NOT match any built-in. All four fields are
-required: filetypes, builder, options, query_text.
+Use a handlers key that does NOT match a built-in. `filetypes`, `options`,
+and `query_text` are required; `key_normalizer` is optional.
 
 >lua
     require("sort-keys").setup({
       handlers = {
         my_lang = {
           filetypes = { "my_lang", "ml" },
-          builder   = require("my.sort_keys_my_lang"),
           options   = {
-            can_sort_object            = true,
-            can_sort_array             = true,
-            can_deep                   = true,
-            key_quoting                = "logical",
-            comment_aware              = true,
-            structural_separator       = ",",
-            trailing_separator_allowed = true,
+            can_sort_object = true,
+            can_sort_array  = true,
+            can_deep        = true,
+            comment_aware   = true,
+            parser_lang     = "my_lang",  -- defaults to the filetype name
           },
           query_text = [[
             ((container_node) @sortkeys.container
               (#set! sortkeys.kind "object"))
-            ((entry_node) @sortkeys.entry
+            ((pair_node
+               key:   (_) @sortkeys.key
+               value: (_) @sortkeys.value) @sortkeys.entry
               (#set! sortkeys.entry_kind "pair"))
             ((comment) @sortkeys.comment)
           ]],
+          key_normalizer = function(text)
+            return text:gsub('^"(.*)"$', "%1")
+          end,
         },
       },
     })
 <
 
-The builder module must expose `build(bufnr, target, config) -> outline|nil`.
-See |sort-keys-builder|.
+See |sort-keys-language-packs| for the option and capture reference.
 
 ------------------------------------------------------------------------------
                                       *sort-keys-handlers-override-rules*
 Override rules ~
 
 handlers key matches a built-in config name:
-  Partial override. options is deep-merged on top of the built-in.
-  builder / query_text / filetypes are replaced only if supplied.
+  Partial override. options is deep-merged on top of the built-in;
+  query_text / key_normalizer replace only if supplied.
 
-Different key, but filetypes collide with a built-in:
-  User handler wins entirely for that filetype. No field-level merge;
-  the built-in is hidden.
+Different key, but a filetype collides with a built-in:
+  The user pack wins for that filetype.
 
-Different key + new filetypes:
-  New language. filetypes, builder, query_text, and options are all
-  required.
+Different key + new filetype:
+  New language. filetypes, options, and query_text are all required.
 
 Notes ~
-- Calling `setup({ handlers = ... })` again replaces the user-handler map
-  wholesale. Built-in handlers are never mutated.
+- Calling setup() again replaces the user-handler map wholesale. Built-in
+  packs are never mutated.
+- There is no `builder` field. Languages whose AST the `sortkeys.*` query
+  cannot express (irregular shapes) are not yet supported.
 
 ==============================================================================
-5. WRITING A BUILDER                                      *sort-keys-builder*
+5. LANGUAGE PACKS                                   *sort-keys-language-packs*
 
-A builder is any Lua module that exposes:
-
->lua
-    M.build(bufnr, target, config) -> outline | nil
-<
-
-Pass it as the `builder` field of a handler spec. See
-|sort-keys-handlers-new-lang|.
+A built-in pack is a directory `lua/sort-keys/languages/<config_name>/` with a
+`config.toml`, a `sort-keys.scm` query, and an optional `normalize.lua`. A user
+pack supplies the same data through the handler spec fields. Both are driven by
+the single generic extractor.
 
 ------------------------------------------------------------------------------
-                                                 *sort-keys-builder-args*
-Arguments ~
+                                              *sort-keys-language-packs-options*
+Options ~
 
->lua
-    -- target: where the user invoked the command
-    target = { kind = "cursor",    pos   = { row, col } }
-    target = { kind = "selection", range = { srow, scol, erow, ecol } }
+  can_sort_object (boolean)   allow sorting object/map containers
+  can_sort_array  (boolean)   allow sorting array/list containers
+  can_deep        (boolean)   allow |:DeepSortKeys| recursion
+  comment_aware   (boolean)   fold comments onto adjacent entries so they
+                              travel with the entry they document
+  parser_lang     (string)    tree-sitter language to parse with; defaults to
+                              the filetype name. Set it to reuse another
+                              grammar (jsonc reuses "json").
+  query_file      (string)    query filename, default "sort-keys.scm"
 
-    -- config: resolved from the handler spec
-    config = {
-      filetype   = "mylang",  -- vim.bo.filetype of the buffer
-      query_text = "...",     -- tree-sitter query from the spec
-      options    = { ... },   -- options table from the spec
-    }
-<
-
-------------------------------------------------------------------------------
-                                                 *sort-keys-builder-flow*
-Typical flow ~
-
-The shared module `sort-keys.core.builder_helpers` carries the canonical
-implementations of every treesitter-aware scaffolding step. A builder
-composes them; only the language-specific parts stay local.
-
->lua
-    local h = require("sort-keys.core.builder_helpers")
-    local comment_attach = require("sort-keys.core.comment_attach")
-    local key_normalize  = require("sort-keys.languages.<lang>.key_normalize")
-
-    function M.build(bufnr, target, config)
-      -- 1. Validate options. Pass `extras` if the language needs more.
-      if not h.validate_options(config.options) then return nil end
-
-      -- 2. Get the parser. Missing parsers are environmental, not bugs.
-      local lang = config.options.parser_lang or config.filetype
-      local ok, parser = pcall(vim.treesitter.get_parser, bufnr, lang)
-      if not ok or parser == nil then return nil end
-      local root = parser:parse()[1]:root()
-
-      -- 3-4. Run the query and triage matches. Returns already-deduped
-      --      entries plus a node_id -> container index in one pass.
-      local query = vim.treesitter.query.parse(lang, config.query_text)
-      local containers, entries, comments, containers_by_key =
-        h.collect_matches(bufnr, root, query)
-      if #containers == 0 then return nil end
-
-      -- 5. Pick the target container. Cursor -> 3-tier container_pick;
-      --    selection -> smallest container whose range covers it.
-      local chosen = h.pick_innermost(containers, target)
-      if not chosen then return nil end
-
-      -- 6. Build the Outline. h.capability_allows gates by kind.
-      return build_outline(chosen, {
-        bufnr = bufnr,
-        options = config.options,
-        containers_by_key = containers_by_key,
-        entries_by_parent = h.index_by_parent(entries),
-        comments_by_parent = h.index_by_parent(comments),
-      })
-    end
-<
-
-Inside `build_outline`, common patterns:
-
->lua
-    if not h.capability_allows(container.kind, ctx.options) then
-      return nil
-    end
-    local raw        = ctx.entries_by_parent[container.node_key] or {}
-    local sorted_raw = h.sort_entries_by_position(raw)
-    -- ...build outline_entries from sorted_raw...
-    if ctx.options.comment_aware then
-      outline_entries = comment_attach.attach(
-        outline_entries,
-        ctx.comments_by_parent[container.node_key] or {}
-      )
-    end
-<
-
-Languages that need a different selection-side rule keep a local
-`pick_innermost` (YAML requires a 2-entry overlap inside the candidate);
-languages with an extra AST level between container and entries keep a
-local `index_by_container_ancestor` (Nix walks past `binding_set`).
+The inter-entry separator, trailing-separator policy, and surrounding
+whitespace are NOT configured: they are observed from the source and
+reproduced on write-back, so unusual but valid layouts round-trip.
 
 ------------------------------------------------------------------------------
-                                              *sort-keys-builder-captures*
+                                             *sort-keys-language-packs-captures*
 Tree-sitter query captures ~
 
   Capture                Metadata                         Role ~
   @sortkeys.container    sortkeys.kind "object"|"array"   sortable container
   @sortkeys.entry        sortkeys.entry_kind              item inside
                            "pair"|"element"
-  @sortkeys.key          —                                key node of pair
-  @sortkeys.value        —                                value node of pair
-  @sortkeys.comment      —                                comment node
-
-If container kind cannot be determined statically (e.g. Lua
-`table_constructor`), omit `sortkeys.kind` and compute the kind in your
-builder after inspecting the entries.
-
-------------------------------------------------------------------------------
-                                              *sort-keys-builder-outline*
-Outline shape ~
-
->lua
-    {
-      kind                       = "object" | "array",
-      range                      = { srow, scol, erow, ecol },
-      structural_separator       = ",",   -- "" for whitespace-gapped
-      trailing_separator_allowed = true,
-
-      entries = {
-        {
-          kind       = "pair" | "element",
-          sort_key   = "...",
-          range      = { srow, scol, erow, ecol },
-          data_range = { srow, scol, erow, ecol },  -- optional; see below
-          movable    = true,   -- false = stays at its anchor slot
-          anchor     = 1,      -- 1-based source-order index
-          attached   = {},
-          child      = nil,    -- nested outline for :DeepSortKeys
-        },
-      },
-    }
-<
-
-movable = false
-  Keeps an entry pinned at its anchor position. Use for entries that must
-  not reorder: positional fields, spread elements (...), computed keys,
-  inherit bindings, etc.
-
-child
-  Set to a recursively built Outline when the entry's value is itself a
-  sortable container. Required for |:DeepSortKeys| recursion.
-
-data_range
-  Set by `comment_attach`: the entry's range BEFORE it absorbed a trailing
-  comment. The applier uses it to splice inter-entry separators between
-  data and the absorbed comment instead of after it. Builders normally
-  don't set this themselves; every rebuild site goes through
-  `sort-keys.core.entry.copy`, which forwards every field via `pairs` so
-  data_range survives without per-site enumeration.
+  @sortkeys.key          —                                key node of a pair
+  @sortkeys.value        —                                value node of a pair
+                                                          (used for deep
+                                                          recursion)
+  @sortkeys.comment      —                                comment node, only
+                                                          when comment_aware
 
 ------------------------------------------------------------------------------
-                                             *sort-keys-builder-helpers*
-Built-in helpers ~
+                                          *sort-keys-language-packs-normalize*
+Key normalization ~
 
-`require("sort-keys.core.builder_helpers")` (alias `h`)
-  The shared treesitter-aware scaffolding. Exposes:
-    h.node_range(node)                     -- {srow, scol, erow, ecol}
-    h.node_id_key(node)                    -- stable string identity
-    h.pos_inside(range, row, col)          -- bool
-    h.contains_range(outer, inner)         -- bool
-    h.range_area(range)                    -- integer for innermost picking
-    h.pick_innermost(containers, target)   -- cursor or selection target
-    h.collect_matches(bufnr, root, query, captures?)
-                                           -- returns containers, entries,
-                                           --   comments, containers_by_key
-    h.index_by_parent(items)               -- node_id -> list
-    h.normalize_element_text(text)         -- trim + collapse whitespace
-    h.clamp_range_to_buffer(bufnr, range)  -- pull past-EOF row back
-    h.capability_allows(kind, options)     -- standard "object"/"array" gate
-    h.sort_entries_by_position(entries)    -- shallow copy, source order
-    h.validate_options(options, extras?)   -- required-flag check
+`normalize.lua` returns a single `fun(text:string):string` turning a raw key
+node's text into the sort key (quote stripping, escape decoding). Shared escape
+decoders live in `require("sort-keys.core.key_escapes")`. Omit the file to
+inherit another pack's normalizer (jsonc re-exports json's) or fall back to the
+identity function. A user pack overrides it via the `key_normalizer` field.
 
-`require("sort-keys.core.comment_attach").attach(entries, comments)`
-  Assigns comments to adjacent entries and expands their ranges. Call
-  after building all entries when options.comment_aware is true.
-
-`require("sort-keys.core.container_pick").for_cursor(containers, pos)`
-  3-tier innermost-container resolution for cursor targets. Used
-  internally by `h.pick_innermost` for the cursor branch.
-
-`require("sort-keys.core.entry").copy(e, overrides?)`
-  Forward-compatible shallow entry copy. Every rebuild site (overlay,
-  deep-sort recursion, comment_attach) goes through this so a new Outline
-  field is never silently dropped.
-
-`require("sort-keys.languages.<lang>.key_normalize")`
-  Per-language sort-key normalization: one `fun(text):string` per
-  language, colocated with that language's builder. Shared escape
-  decoders live in `require("sort-keys.core.key_escapes")`. Builders
-  consume the injected `config.key_normalizer` rather than requiring a
-  concrete module directly.
-
-The built-in handlers in `lua/sort-keys/languages/*/builder.lua` are the
-canonical reference implementations.
-
-==============================================================================
-6. HEALTH                                                   *sort-keys-health*
-
-Run `:checkhealth sort-keys` to verify the plugin is loaded correctly.
+The built-in packs in `lua/sort-keys/languages/{json,jsonc}/` are the
+canonical reference.
 
 ==============================================================================
 vim:tw=78:ts=8:noet:ft=help:norl:
