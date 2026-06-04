@@ -41,27 +41,34 @@ local function utf8_encode(cp)
   end
 end
 
+-- Returns the parsed code point, or nil when the 4 hex digits are truncated /
+-- malformed. Decoders treat nil as "leave this escape verbatim" rather than
+-- raising — a key is only ever turned into a sort_key, so a bad escape must
+-- never abort sorting.
 local function read_hex4(body, start)
   local hex = body:sub(start, start + 3)
   if #hex ~= 4 then
-    error("key_normalize.json: truncated \\u escape: " .. body)
+    return nil
   end
-  local n = tonumber(hex, 16)
-  if not n then
-    error("key_normalize.json: invalid \\u escape: " .. body)
-  end
-  return n
+  return tonumber(hex, 16)
 end
 
+-- Returns (decoded_utf8, bytes_consumed) for a `\uXXXX` (optionally a surrogate
+-- pair), or nil when the escape is truncated / a lone or mismatched surrogate.
+-- cp1 is at most 0xFFFF and a combined pair at most 0x10FFFF, so utf8_encode is
+-- always in range here.
 local function decode_unicode_escape(body, i)
   local cp1 = read_hex4(body, i + 2)
+  if cp1 == nil then
+    return nil
+  end
   if cp1 >= 0xD800 and cp1 <= 0xDBFF then
     if body:sub(i + 6, i + 7) ~= "\\u" then
-      error("key_normalize.json: lone high surrogate: " .. body)
+      return nil
     end
     local cp2 = read_hex4(body, i + 8)
-    if cp2 < 0xDC00 or cp2 > 0xDFFF then
-      error("key_normalize.json: invalid surrogate pair: " .. body)
+    if cp2 == nil or cp2 < 0xDC00 or cp2 > 0xDFFF then
+      return nil
     end
     local combined = 0x10000 + (cp1 - 0xD800) * 0x400 + (cp2 - 0xDC00)
     return utf8_encode(combined), 12
@@ -85,10 +92,21 @@ function M.unescape_json(body)
         i = i + 2
       elseif nxt == "u" then
         local decoded, consumed = decode_unicode_escape(body, i)
-        out[#out + 1] = decoded
-        i = i + consumed
+        if decoded then
+          out[#out + 1] = decoded
+          i = i + consumed
+        else
+          -- Malformed `\u` in a host language whose grammar still accepts the
+          -- key (e.g. a truncated escape): keep the backslash verbatim instead
+          -- of raising, so a sortable key can never crash :SortKeys.
+          out[#out + 1] = c
+          i = i + 1
+        end
       else
-        error("key_normalize.json: invalid escape \\" .. nxt)
+        -- An escape JSON forbids but the host language permits (YAML `\x`,
+        -- TOML `\U`, ...): preserve it verbatim rather than raising.
+        out[#out + 1] = c
+        i = i + 1
       end
     else
       out[#out + 1] = c
@@ -134,18 +152,25 @@ function M.unescape_js(body)
       elseif nxt == "u" and body:sub(i + 2, i + 2) == "{" then
         local close = body:find("}", i + 3, true)
         local cp = close and tonumber(body:sub(i + 3, close - 1), 16)
-        if cp then
+        if cp and cp <= 0x10FFFF then
           out[#out + 1] = utf8_encode(cp)
           i = close + 1
         else
-          -- malformed `\u{` — keep the `u` leniently rather than raising
+          -- malformed or out-of-range `\u{...}` — keep the `u` leniently
+          -- (utf8_encode would raise on a code point above U+10FFFF)
           out[#out + 1] = nxt
           i = i + 2
         end
       elseif nxt == "u" then
         local decoded, consumed = decode_unicode_escape(body, i)
-        out[#out + 1] = decoded
-        i = i + consumed
+        if decoded then
+          out[#out + 1] = decoded
+          i = i + consumed
+        else
+          -- malformed `\uXXXX` — JS treats an unparseable escape as the char
+          out[#out + 1] = nxt
+          i = i + 2
+        end
       elseif nxt == "x" then
         local cp = tonumber(body:sub(i + 2, i + 3), 16)
         if cp then

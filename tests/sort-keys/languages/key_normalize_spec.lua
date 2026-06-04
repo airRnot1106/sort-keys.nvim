@@ -700,4 +700,33 @@ describe("sort-keys key normalizers", function()
       assert.equals("\\101", key_normalize.ruby([["\101"]]))
     end)
   end)
+
+  describe("lenient escape decoding (host-language-valid escapes never crash)", function()
+    -- A key can use an escape that is valid in its own grammar but forbidden by
+    -- JSON (`\x`, `\U`, a truncated `\u`, an over-range `\u{...}`). Normalization
+    -- only derives a sort_key, so it must yield a stable string and NEVER raise:
+    -- a raise from one key aborts :SortKeys on the entire buffer.
+
+    it("js: a malformed `\\uXXXX` decodes to the bare char for both quote styles", function()
+      assert.equals("auXYb", key_normalize.js([["a\uXYb"]]))
+      assert.equals("auZZb", key_normalize.js("'a\\uZZb'"))
+    end)
+
+    it("js: a `\\u{...}` code point above U+10FFFF does not raise", function()
+      assert.equals("u{FFFFFFFF}", key_normalize.js([["\u{FFFFFFFF}"]]))
+    end)
+
+    it("json: an escape JSON forbids is kept verbatim instead of raising", function()
+      assert.equals("a\\x20b", key_normalize.json([["a\x20b"]]))
+      assert.equals("a\\uXYb", key_normalize.json([["a\uXYb"]]))
+    end)
+
+    it("yaml/toml/go double-quoted keys never raise on a non-JSON escape", function()
+      -- YAML `\x`, TOML `\U` (8-digit), Go `\xNN` are valid in their grammars
+      -- but absent from JSON; the shared decoder must not abort on them.
+      assert.equals("a\\x20b", key_normalize.yaml('"a\\x20b"'))
+      assert.equals("\\U0001F600", key_normalize.toml([["\U0001F600"]]))
+      assert.equals("a\\x41b", key_normalize.go([["a\x41b"]]))
+    end)
+  end)
 end)
