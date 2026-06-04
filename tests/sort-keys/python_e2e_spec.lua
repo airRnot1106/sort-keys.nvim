@@ -46,6 +46,16 @@ describe("python end-to-end", function()
     assert.are.same({ "d = { **base, 'a': 2, 'b': 1 }" }, lines_of(bufnr))
   end)
 
+  it("fences a *rest unpack in a list so elements don't cross it", function()
+    if not has_py then
+      return pending("python treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "x = [2, 1, *rest]" })
+    set_cursor(0, 5)
+    vim.cmd("SortKeys")
+    assert.are.same({ "x = [1, 2, *rest]" }, lines_of(bufnr))
+  end)
+
   it("sorts a list and carries comments with :DeepSortKeys", function()
     if not has_py then
       return pending("python treesitter parser not available")

@@ -24,5 +24,10 @@
    (_) @sortkeys.entry)
  (#set! sortkeys.entry_kind "element"))
 
+;; A `*rest` unpacks at its position, so its order relative to siblings is
+;; meaningful: fence it. (It is also captured as an element above; the fence
+;; flag is keyed by node id and applies regardless.)
+((list_splat) @sortkeys.fence)
+
 ;; ─── comments ───
 ((comment) @sortkeys.comment)
