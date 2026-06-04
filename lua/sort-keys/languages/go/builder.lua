@@ -47,29 +47,6 @@ local function literal_value_has_keyed_child(node)
   return false
 end
 
--- The value subtree of a `keyed_element` is its second `literal_element`
--- child; the actual node is one level further down. A nested composite
--- literal can appear directly as `literal_value` (implicit type) or wrapped
--- inside a `composite_literal` (explicit type). Walk one level of children
--- to reach the captured inner container — same pattern as the Rust builder
--- uses for `struct_expression`.
-local function find_inner_container_within(containers_by_key, node)
-  if not node then
-    return nil
-  end
-  local direct = containers_by_key[h.node_id_key(node)]
-  if direct then
-    return direct
-  end
-  for child in node:iter_children() do
-    local c = containers_by_key[h.node_id_key(child)]
-    if c then
-      return c
-    end
-  end
-  return nil
-end
-
 -- ─── Go entry classification ──────────────────────────────────────────────────
 
 -- Reads the first import path encountered inside an `import_spec`. The
@@ -154,7 +131,7 @@ local function inner_container_for(entry, containers_by_key)
     return nil
   end
   local value_node = value_wrapper:named_child(0)
-  return find_inner_container_within(containers_by_key, value_node)
+  return h.find_inner_container_within(containers_by_key, value_node)
 end
 
 -- ─── build_outline ────────────────────────────────────────────────────────────

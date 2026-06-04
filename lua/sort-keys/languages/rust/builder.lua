@@ -29,32 +29,6 @@ local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
 
--- Look up an inner captured container reachable from `node`. Two cases the
--- Rust grammar imposes a one-level wrapper for:
---   field_initializer.value = struct_expression(field_initializer_list)
---   use_list child         = scoped_use_list(<scope>, use_list)
--- The walk is **one level deep**: it matches the documented wrappers and
--- nothing more. Wrapping a struct literal in a call (`Some(Foo { ... })`),
--- a parenthesized expression, or a box (`Box::new(Foo { ... })`) is v1
--- out-of-scope — matching the Python builder's `inner_container_of` which
--- also refuses to unwrap parenthesized_expression / generator-like wrappers.
-local function find_inner_container_within(containers_by_key, node)
-  if not node then
-    return nil
-  end
-  local direct = containers_by_key[h.node_id_key(node)]
-  if direct then
-    return direct
-  end
-  for child in node:iter_children() do
-    local c = containers_by_key[h.node_id_key(child)]
-    if c then
-      return c
-    end
-  end
-  return nil
-end
-
 -- ─── Rust-specific entry classification ──────────────────────────────────────
 
 local function classify_entry(entry, bufnr, normalize)
@@ -115,7 +89,7 @@ local function build_outline(container, ctx)
     -- For use_list members that are themselves scoped_use_list, walk into
     -- the wrapper to find the inner use_list.
     local probe = e.value_node or e.node
-    local inner = find_inner_container_within(ctx.containers_by_key, probe)
+    local inner = h.find_inner_container_within(ctx.containers_by_key, probe)
     if inner and inner.node_key ~= container.node_key then
       entry.child = build_outline(inner, ctx)
     end

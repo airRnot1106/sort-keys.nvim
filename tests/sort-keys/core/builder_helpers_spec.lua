@@ -187,6 +187,58 @@ describe("sort-keys.core.builder_helpers", function()
     end)
   end)
 
+  describe("find_inner_container_within", function()
+    -- Duck-typed nodes (type / range / iter_children) so the spec stays
+    -- pure-Lua; node_id_key keys on type + range.
+    local function node(type_name, range, children)
+      local n = { _type = type_name, _range = range, _children = children or {} }
+      function n:type()
+        return self._type
+      end
+      function n:range()
+        return self._range[1], self._range[2], self._range[3], self._range[4]
+      end
+      function n:iter_children()
+        local i = 0
+        return function()
+          i = i + 1
+          return self._children[i]
+        end
+      end
+      return n
+    end
+
+    it("returns nil for a nil subtree", function()
+      assert.is_nil(h.find_inner_container_within({}, nil))
+    end)
+
+    it("returns the node itself when it is a captured container", function()
+      local c = node("arguments", { 0, 0, 0, 5 })
+      assert.equals(c, h.find_inner_container_within({ [h.node_id_key(c)] = c }, c))
+    end)
+
+    it("returns a captured container one level down inside a wrapper", function()
+      local inner = node("arguments", { 0, 4, 0, 9 })
+      local wrapper = node(
+        "record",
+        { 0, 0, 0, 10 },
+        { node("constructor_name", { 0, 0, 0, 3 }), inner }
+      )
+      assert.equals(
+        inner,
+        h.find_inner_container_within({ [h.node_id_key(inner)] = inner }, wrapper)
+      )
+    end)
+
+    it("returns nil when neither the node nor its direct children are captured", function()
+      -- Two levels deep is out of scope: the walk is one level only.
+      local deep = node("arguments", { 0, 8, 0, 12 })
+      local mid = node("record", { 0, 4, 0, 13 }, { deep })
+      local outer = node("call", { 0, 0, 0, 14 }, { mid })
+      assert.is_nil(h.find_inner_container_within({ [h.node_id_key(deep)] = deep }, outer))
+    end)
+  end)
+
   describe("capability_allows", function()
     it("permits object containers when can_sort_object is true", function()
       assert.is_true(h.capability_allows("object", { can_sort_object = true }))

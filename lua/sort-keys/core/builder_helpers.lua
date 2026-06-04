@@ -50,6 +50,31 @@ function M.first_child_of_type(node, type_name)
   return nil
 end
 
+---Resolve the captured container nested inside an entry's value subtree, for
+---:DeepSortKeys. A nested container may be the value node itself (implicit
+---form) or one level down inside it (a wrapper such as a constructor / call /
+---struct-expression around the inner container). Walks the value node and one
+---level of its children, returning the first node present in containers_by_key.
+---@param containers_by_key table  -- node_id_key → container record
+---@param node userdata|nil       -- the entry's value / pattern subtree
+---@return table|nil
+function M.find_inner_container_within(containers_by_key, node)
+  if not node then
+    return nil
+  end
+  local direct = containers_by_key[M.node_id_key(node)]
+  if direct then
+    return direct
+  end
+  for child in node:iter_children() do
+    local c = containers_by_key[M.node_id_key(child)]
+    if c then
+      return c
+    end
+  end
+  return nil
+end
+
 -- ─── range geometry ───────────────────────────────────────────────────────────
 
 ---Half-open range overlap: true iff the two ranges share any column. Mirrors
