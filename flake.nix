@@ -63,6 +63,7 @@
             nix
             pkl
             python
+            ruby
             rust
             toml
             typescript

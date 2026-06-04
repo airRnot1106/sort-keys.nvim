@@ -17,6 +17,7 @@ local NORMALIZER_DIRS = {
   kdl = "kdl",
   elixir = "elixir",
   gleam = "gleam",
+  ruby = "ruby",
 }
 
 describe("sort-keys key normalizers", function()
@@ -639,6 +640,47 @@ describe("sort-keys key normalizers", function()
       -- Gleam labels carry no quoting or escapes, so the label text is the key.
       assert.equals("name", key_normalize.gleam("name"))
       assert.equals("cuteness_level", key_normalize.gleam("cuteness_level"))
+    end)
+  end)
+
+  describe("ruby(text)", function()
+    it("returns a symbol-shorthand key verbatim (`name`)", function()
+      assert.equals("name", key_normalize.ruby("name"))
+    end)
+
+    it("strips the leading colon of a symbol key (`:name` → `name`)", function()
+      assert.equals("name", key_normalize.ruby(":name"))
+    end)
+
+    it('unquotes a quoted symbol key (`:"with space"` → `with space`)', function()
+      assert.equals("with space", key_normalize.ruby(':"with space"'))
+    end)
+
+    it('strips double quotes off a string key and unescapes (`"a\\nb"`)', function()
+      assert.equals("a", key_normalize.ruby('"a"'))
+      assert.equals("a\nb", key_normalize.ruby([["a\nb"]]))
+    end)
+
+    it("strips single quotes off a string key verbatim", function()
+      assert.equals("a", key_normalize.ruby("'a'"))
+    end)
+
+    it("returns an integer key as its surface text", function()
+      assert.equals("2", key_normalize.ruby("2"))
+    end)
+
+    it("decodes `\\s` (a Ruby-only escape) to a space", function()
+      assert.equals("a b", key_normalize.ruby([["a\sb"]]))
+    end)
+
+    it("keeps a hex / brace-unicode / octal escape verbatim instead of raising", function()
+      -- Ruby's double-quoted escape set is broader than JSON. The numeric
+      -- forms (`\xHH`, `\u{...}` brace, octal) are left as their literal
+      -- characters rather than decoded — the normalizer must never raise on a
+      -- real key, only produce a stable sort_key.
+      assert.equals("\\x41", key_normalize.ruby([["\x41"]]))
+      assert.equals("\\u{1F600}", key_normalize.ruby([["\u{1F600}"]]))
+      assert.equals("\\101", key_normalize.ruby([["\101"]]))
     end)
   end)
 end)
