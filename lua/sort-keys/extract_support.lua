@@ -25,6 +25,28 @@ function M.node_id_key(node)
   return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
 end
 
+-- Pull a range back inside the buffer. Some grammars (YAML block nodes) give a
+-- node a range that ends at the start of the line *after* its content, i.e.
+-- past the last buffer line, which would make nvim_buf_get_text error.
+function M.clamp_range(bufnr, r)
+  local last = vim.api.nvim_buf_line_count(bufnr) - 1
+  local function len(row)
+    return #(vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or "")
+  end
+  local sr, sc, er, ec
+  if r[1] > last then
+    sr, sc = last, len(last)
+  else
+    sr, sc = r[1], math.min(r[2], len(r[1]))
+  end
+  if r[3] > last then
+    er, ec = last, len(last)
+  else
+    er, ec = r[3], math.min(r[4], len(r[3]))
+  end
+  return { sr, sc, er, ec }
+end
+
 local function range_area(r)
   return (r[3] - r[1]) * 1000000 + (r[4] - r[2])
 end
@@ -69,6 +91,26 @@ function M.pick_container(containers, target)
   return best
 end
 
+-- The container nested under an entry's subject, for deep recursion: the
+-- subject node itself when it IS a captured container (JSON pairs, Lua fields),
+-- else one level down when the value wraps it (a YAML block_node around a
+-- block_mapping, a Rust struct_expression around a field_initializer_list).
+local function find_inner_container(node, containers_by_id)
+  local direct = containers_by_id[M.node_id_key(node)]
+  if direct then
+    return direct
+  end
+  for child in node:iter_children() do
+    if child:named() then
+      local c = containers_by_id[M.node_id_key(child)]
+      if c then
+        return c
+      end
+    end
+  end
+  return nil
+end
+
 local function capability_allows(kind, options)
   if kind == "object" then
     return options.can_sort_object == true
@@ -99,6 +141,11 @@ function M.build_container(container, ctx)
   end)
   if #raw == 0 then
     return nil
+  end
+  -- Pull entry ranges inside the buffer before any text slicing (a YAML pair's
+  -- range can end past the last line).
+  for _, e in ipairs(raw) do
+    e.range = M.clamp_range(ctx.bufnr, e.range)
   end
 
   local container_comments = {}
@@ -175,11 +222,11 @@ function M.build_container(container, ctx)
     -- itself (JSON array elements, which ARE the value).
     local subject_node = e.value_node or e.node
 
-    local inner = subject_node and ctx.containers_by_id[node_id_key(subject_node)]
+    local inner = subject_node and find_inner_container(subject_node, ctx.containers_by_id)
     if ctx.deep and inner then
       local child = M.build_container(inner, ctx)
       if child then
-        local vr = { subject_node:range() }
+        local vr = M.clamp_range(ctx.bufnr, { subject_node:range() })
         entry.child = child
         entry.pre = get_text(ctx.bufnr, dr[1], dr[2], vr[1], vr[2])
         entry.post = get_text(ctx.bufnr, vr[3], vr[4], dr[3], dr[4])
@@ -192,7 +239,7 @@ function M.build_container(container, ctx)
     entries[i] = entry
   end
 
-  local cr = container.range
+  local cr = M.clamp_range(ctx.bufnr, container.range)
   local b1, bl = blocks[1], blocks[#blocks]
   local prefix = get_text(ctx.bufnr, cr[1], cr[2], b1.start[1], b1.start[2])
 
