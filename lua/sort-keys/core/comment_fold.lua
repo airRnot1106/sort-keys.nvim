@@ -83,10 +83,12 @@ function M.fold(entries, comments)
       end
       if lead_idx then
         extend_start(lead_idx, c_srow, c_scol)
-      else
-        -- no following entry: an own-line comment after the last entry.
-        extend_finish(#entries, c_erow, c_ecol)
       end
+      -- An own-line comment after the LAST entry is left unattached: it stays in
+      -- the container's suffix (positional) rather than being dragged along when
+      -- the last entry moves. Attaching it would, for a container whose node
+      -- spans to the next sibling (a TOML [table] section, a YAML document),
+      -- corrupt the file by pulling a section/EOF comment into the middle.
     end
   end
 

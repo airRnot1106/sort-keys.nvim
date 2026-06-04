@@ -46,6 +46,16 @@ describe("toml end-to-end", function()
     assert.are.same({ "[s]", "a = 2", "b = 1" }, lines_of(bufnr))
   end)
 
+  it("does not drag a between-section comment into the middle on sort", function()
+    if not has_toml then
+      return pending("toml treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "[a]", "x = 1", "w = 2", "# next section", "[b]", "z = 3" })
+    set_cursor(1, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ "[a]", "w = 2", "x = 1", "# next section", "[b]", "z = 3" }, lines_of(bufnr))
+  end)
+
   it("sorts an array and carries a comment with its key", function()
     if not has_toml then
       return pending("toml treesitter parser not available")

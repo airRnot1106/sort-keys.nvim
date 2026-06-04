@@ -48,9 +48,11 @@ describe("core.comment_fold", function()
     assert.are.same({ 1, 2 }, blocks[2].start)
   end)
 
-  it("attaches an own-line comment after the last entry to the last entry's block end", function()
+  it("leaves an own-line comment after the last entry unattached (stays in the suffix)", function()
+    -- Attaching it would drag a section/EOF comment into the middle when the
+    -- last entry moves; instead it stays positional in the container suffix.
     local entries = { entry(1, 2, 1, 8) }
     local blocks = comment_fold.fold(entries, { comment(2, 2, 2, 16) })
-    assert.are.same({ 2, 16 }, blocks[1].finish)
+    assert.are.same({ 1, 8 }, blocks[1].finish)
   end)
 end)
