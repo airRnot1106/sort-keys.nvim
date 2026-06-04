@@ -10,6 +10,11 @@ return function(text)
   if kw then
     return kw
   end
+  -- A quoted keyword key node's text is like `"weird key": `.
+  local quoted_kw = text:match('^%s*"(.*)"%s*:%s*$')
+  if quoted_kw then
+    return escapes.unescape_json(quoted_kw)
+  end
   if #text >= 2 and text:sub(1, 1) == '"' and text:sub(-1) == '"' then
     return escapes.unescape_json(text:sub(2, -2))
   end

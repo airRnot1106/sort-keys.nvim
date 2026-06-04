@@ -9,4 +9,8 @@ describe("languages.elixir.normalize", function()
     assert.are.equal("name", normalize(":name"))
     assert.are.equal("a-b", normalize('"a-b"'))
   end)
+
+  it("unwraps a quoted keyword key", function()
+    assert.are.equal("weird key", normalize('"weird key": '))
+  end)
 end)
