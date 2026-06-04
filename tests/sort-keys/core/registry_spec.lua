@@ -419,6 +419,22 @@ describe("sort-keys.core.registry", function()
         assert.is_true(fake.captured.options.can_sort_object)
       end)
 
+      it("injects a user-supplied key_normalizer into the builder config", function()
+        -- key_normalization is a swappable strategy: the builder consumes it
+        -- through `config.key_normalizer` (dependency injection) rather than
+        -- requiring a concrete module, so a user can override how keys are
+        -- normalized without replacing the builder.
+        local fake = make_fake_builder()
+        local custom = function(text)
+          return "X" .. text
+        end
+        registry.set_user_handlers({
+          json = { builder = fake, key_normalizer = custom },
+        })
+        registry.get("json").outline(0, { kind = "cursor", pos = { 0, 0 } })
+        assert.equals(custom, fake.captured.key_normalizer)
+      end)
+
       it("isolates the options handed to a builder from the shared built-in cache", function()
         -- A partial-override builder receives `config.options`. If that table
         -- aliased the cached built-in spec, a builder mutating it would

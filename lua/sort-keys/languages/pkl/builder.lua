@@ -17,7 +17,7 @@
 -- structural separator is empty and the buffer gaps carry the spacing.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.pkl.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -129,14 +129,14 @@ end
 --   objectEntry                    — `[key] = valueExpr`; key/value are fields.
 --   objectElement                  — a bare listing value; the element itself
 --                                     is the value, sorted by surface text.
-local function classify_entry(node, bufnr)
+local function classify_entry(node, bufnr, normalize)
   local t = node:type()
 
   if t == "classProperty" or t == "objectProperty" then
     local id = node:named_child(0)
     local key_text = id and vim.treesitter.get_node_text(id, bufnr) or ""
     return {
-      sort_key = key_normalize.pkl(key_text),
+      sort_key = normalize(key_text),
       movable = true,
       kind_vote = "object",
       value_node = last_named_child(node),
@@ -147,7 +147,7 @@ local function classify_entry(node, bufnr)
     local key = first_field(node, "key")
     local key_text = key and vim.treesitter.get_node_text(key, bufnr) or ""
     return {
-      sort_key = key_normalize.pkl(key_text),
+      sort_key = normalize(key_text),
       movable = true,
       kind_vote = "object",
       value_node = first_field(node, "valueExpr"),
@@ -176,7 +176,7 @@ local function build_outline(container, ctx)
   local votes_object = 0
   local classifications = {}
   for i, e in ipairs(sorted_raw) do
-    local cls = classify_entry(e.node, ctx.bufnr)
+    local cls = classify_entry(e.node, ctx.bufnr, ctx.key_normalizer)
     classifications[i] = cls
     if cls.kind_vote == "object" then
       votes_object = votes_object + 1
@@ -259,6 +259,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -270,5 +271,9 @@ end
 M.filetypes = {
   pkl = "pkl",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

@@ -198,7 +198,7 @@ composes them; only the language-specific parts stay local.
 >lua
     local h = require("sort-keys.core.builder_helpers")
     local comment_attach = require("sort-keys.core.comment_attach")
-    local key_normalize  = require("sort-keys.strategies.key_normalize")
+    local key_normalize  = require("sort-keys.languages.<lang>.key_normalize")
 
     function M.build(bufnr, target, config)
       -- 1. Validate options. Pass `extras` if the language needs more.
@@ -349,9 +349,12 @@ Built-in helpers ~
   deep-sort recursion, comment_attach) goes through this so a new Outline
   field is never silently dropped.
 
-`require("sort-keys.strategies.key_normalize")`
-  Per-language sort-key normalization. One M.<lang> function per
-  supported language.
+`require("sort-keys.languages.<lang>.key_normalize")`
+  Per-language sort-key normalization: one `fun(text):string` per
+  language, colocated with that language's builder. Shared escape
+  decoders live in `require("sort-keys.core.key_escapes")`. Builders
+  consume the injected `config.key_normalizer` rather than requiring a
+  concrete module directly.
 
 The built-in handlers in `lua/sort-keys/languages/*/builder.lua` are the
 canonical reference implementations.

@@ -24,7 +24,7 @@
 -- isn't a container but might wrap one.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.rust.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -57,7 +57,7 @@ end
 
 -- ─── Rust-specific entry classification ──────────────────────────────────────
 
-local function classify_entry(entry, bufnr)
+local function classify_entry(entry, bufnr, normalize)
   local node = entry.node
   local t = node:type()
 
@@ -72,7 +72,7 @@ local function classify_entry(entry, bufnr)
   -- accessor / inner identifier), so entry.key_node is always present here.
   if t == "field_declaration" or t == "field_initializer" or t == "shorthand_field_initializer" then
     local key_text = vim.treesitter.get_node_text(entry.key_node, bufnr)
-    return { sort_key = key_normalize.rust(key_text), movable = true }
+    return { sort_key = normalize(key_text), movable = true }
   end
 
   -- use_list element: identifier / self / scoped_identifier / scoped_use_list
@@ -84,7 +84,7 @@ local function classify_entry(entry, bufnr)
   text = text:gsub("/%*.-%*/", " ")
   text = text:gsub("//[^\n]*", " ")
   text = text:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
-  return { sort_key = key_normalize.rust(text), movable = true }
+  return { sort_key = normalize(text), movable = true }
 end
 
 -- ─── build_outline ────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ local function build_outline(container, ctx)
 
   local outline_entries = {}
   for i, e in ipairs(sorted_raw) do
-    local cls = classify_entry(e, ctx.bufnr)
+    local cls = classify_entry(e, ctx.bufnr, ctx.key_normalizer)
     local entry = {
       kind = e.entry_kind,
       range = e.range,
@@ -169,6 +169,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -180,5 +181,9 @@ end
 M.filetypes = {
   rust = "rust",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

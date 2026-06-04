@@ -10,7 +10,7 @@
 -- `separator_for_container` below.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.toml.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -91,13 +91,13 @@ end
 -- arrive as a single `dotted_key` node whose text contains the dots; we let
 -- key_normalize.toml emit "a.b.c" verbatim so the whole path becomes the
 -- sort_key.
-local function key_sort_for_pair(pair_node, bufnr)
+local function key_sort_for_pair(pair_node, bufnr, normalize)
   local key_node = pair_node:named_child(0)
   if not key_node then
     return "", false
   end
   local key_text = vim.treesitter.get_node_text(key_node, bufnr)
-  return key_normalize.toml(key_text), true
+  return normalize(key_text), true
 end
 
 -- ─── per-container separator policy ───────────────────────────────────────────
@@ -146,7 +146,7 @@ local function build_outline(container, ctx)
     }
 
     if e.entry_kind == "pair" then
-      local sort_key, ok = key_sort_for_pair(e.node, ctx.bufnr)
+      local sort_key, ok = key_sort_for_pair(e.node, ctx.bufnr, ctx.key_normalizer)
       entry.sort_key = sort_key
       entry.movable = ok
       local value_node = e.node:named_child(1)
@@ -239,6 +239,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = entries_by_parent,
     comments_by_parent = comments_by_parent,
@@ -250,5 +251,9 @@ end
 M.filetypes = {
   toml = "toml",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

@@ -14,7 +14,7 @@
 -- ancestor, which lands them under the same key for comment_attach.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.elixir.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -61,7 +61,7 @@ local function build_outline(container, ctx)
     -- the defensive branch keeps a malformed match from crashing the sort.
     local sort_key, movable = "", false
     if e.key_node then
-      sort_key = key_normalize.elixir(vim.treesitter.get_node_text(e.key_node, ctx.bufnr))
+      sort_key = ctx.key_normalizer(vim.treesitter.get_node_text(e.key_node, ctx.bufnr))
       movable = true
     end
 
@@ -129,6 +129,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_container = index_by_container_ancestor(entries, containers_by_key),
     comments_by_container = index_by_container_ancestor(comments, containers_by_key),
@@ -140,5 +141,9 @@ end
 M.filetypes = {
   elixir = "elixir",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

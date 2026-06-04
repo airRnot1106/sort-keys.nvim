@@ -1,9 +1,33 @@
-describe("sort-keys.strategies.key_normalize", function()
+-- Per-language key normalizers live one-per-file alongside their builder
+-- (`languages/<lang>/key_normalize.lua`). This spec exercises them as one
+-- pure-policy suite via a local catalog so every escape edge case stays in
+-- one heavyweight place. The normalizer name maps to its language directory
+-- (the `js` normalizer is shared by the javascript builder).
+local NORMALIZER_DIRS = {
+  json = "json",
+  yaml = "yaml",
+  js = "javascript",
+  lua = "lua",
+  toml = "toml",
+  nix = "nix",
+  pkl = "pkl",
+  python = "python",
+  go = "go",
+  rust = "rust",
+  kdl = "kdl",
+  elixir = "elixir",
+}
+
+describe("sort-keys key normalizers", function()
   local key_normalize
 
   before_each(function()
-    package.loaded["sort-keys.strategies.key_normalize"] = nil
-    key_normalize = require("sort-keys.strategies.key_normalize")
+    key_normalize = {}
+    for name, dir in pairs(NORMALIZER_DIRS) do
+      local mod = "sort-keys.languages." .. dir .. ".key_normalize"
+      package.loaded[mod] = nil
+      key_normalize[name] = require(mod)
+    end
   end)
 
   describe("json(text)", function()

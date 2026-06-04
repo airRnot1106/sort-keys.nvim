@@ -131,6 +131,10 @@ local function spec_to_handler(spec, config_name)
         -- writes to config.options must not be able to corrupt the shared
         -- base for every later :SortKeys.
         options = vim.deepcopy(spec.options),
+        -- Key normalization is a swappable strategy injected here. nil means
+        -- "use the builder's self-declared default" (builder.key_normalizer);
+        -- a user spec can override it without replacing the builder.
+        key_normalizer = spec.key_normalizer,
       })
     end,
   }

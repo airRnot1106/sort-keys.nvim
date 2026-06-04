@@ -20,7 +20,7 @@
 -- the convention the policy layer assumes.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.kdl.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -113,12 +113,12 @@ end
 -- A node's sort_key is its name: the first direct `identifier` child (after an
 -- optional `node_comment` `/-` and an optional `(type)` annotation, neither of
 -- which is an `identifier` node, so the node name is unambiguous).
-local function node_sort_key(node, bufnr)
+local function node_sort_key(node, bufnr, normalize)
   local name = h.first_child_of_type(node, "identifier")
   if not name then
     return ""
   end
-  return key_normalize.kdl(vim.treesitter.get_node_text(name, bufnr))
+  return normalize(vim.treesitter.get_node_text(name, bufnr))
 end
 
 -- ─── build_outline ────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ local function build_outline(container, ctx)
     local entry = {
       kind = "pair",
       range = trim_trailing_newline(ctx.bufnr, e.range),
-      sort_key = node_sort_key(e.node, ctx.bufnr),
+      sort_key = node_sort_key(e.node, ctx.bufnr, ctx.key_normalizer),
       movable = true,
       anchor = i,
       attached = {},
@@ -202,6 +202,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -213,5 +214,9 @@ end
 M.filetypes = {
   kdl = "kdl",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

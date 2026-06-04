@@ -8,7 +8,7 @@
 -- indices); all-positional → kind = "array".
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.lua.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -96,7 +96,7 @@ end
 -- whose value happens to be an identifier (e.g., `plenary_dir,`) is the
 -- *named child count*: keyed forms always have two named children (key +
 -- value); positional has exactly one (the value itself).
-local function classify_entry(field_node, bufnr)
+local function classify_entry(field_node, bufnr, normalize)
   if field_node:named_child_count() <= 1 then
     return {
       sort_key = h.normalize_element_text(vim.treesitter.get_node_text(field_node, bufnr)),
@@ -111,7 +111,7 @@ local function classify_entry(field_node, bufnr)
     local c1 = field_node:child(1)
     if c1 and c1:type() == "string" then
       return {
-        sort_key = key_normalize.lua(vim.treesitter.get_node_text(c1, bufnr)),
+        sort_key = normalize(vim.treesitter.get_node_text(c1, bufnr)),
         movable = true,
         kind_vote = "object",
         key_node = c1,
@@ -122,7 +122,7 @@ local function classify_entry(field_node, bufnr)
 
   if c0 and c0:type() == "identifier" then
     return {
-      sort_key = key_normalize.lua(vim.treesitter.get_node_text(c0, bufnr)),
+      sort_key = normalize(vim.treesitter.get_node_text(c0, bufnr)),
       movable = true,
       kind_vote = "object",
       key_node = c0,
@@ -154,7 +154,7 @@ local function build_outline(container, ctx)
   local votes_object = 0
   local classifications = {}
   for i, e in ipairs(sorted_raw) do
-    local cls = classify_entry(e.node, ctx.bufnr)
+    local cls = classify_entry(e.node, ctx.bufnr, ctx.key_normalizer)
     classifications[i] = cls
     if cls.kind_vote == "object" then
       votes_object = votes_object + 1
@@ -241,6 +241,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -252,5 +253,9 @@ end
 M.filetypes = {
   lua = "lua",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

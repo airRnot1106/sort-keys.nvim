@@ -43,7 +43,7 @@ lua/sort-keys/core/registry.lua filetype → { capabilities, outline } lookup.
         ▼
 lua/sort-keys/languages/        runs the per-language treesitter query, collects
   <lang>/builder.lua            entries + comments, normalizes each sort_key via
-        │                       strategies/key_normalize.<lang>, optionally delegates
+        │                       languages/<lang>/key_normalize, optionally delegates
         │                       comment attachment to core/comment_attach.
         ▼ Outline
 core/walker.lua                 :DeepSortKeys → post-order recursion into entry.child
@@ -79,10 +79,11 @@ core/policy.lua          ──require──────────►   core/u
 core/comment_attach.lua  ──require──────────►   core/entry
 core/builder_helpers.lua ──require──────────►   core/container_pick
 languages/<lang>/builder ──require──────────►   core/builder_helpers, core/comment_attach,
-                                                  strategies/key_normalize
+                                                  languages/<lang>/key_normalize
+languages/<lang>/key_normalize ─require────►    core/key_escapes (shared escape decoders)
 
 (no incoming requires)                          core/{comment_attach, separator_normalize,
-                                                     container_pick, unicode, entry}
+                                                     container_pick, unicode, entry, key_escapes}
 ```
 
 So `comment_attach` / `separator_normalize` / `container_pick` / `policy`
@@ -104,7 +105,7 @@ Two known places where the inversion is only partial:
 
 ### Policy layer (pure Lua, no `vim.*` / no treesitter / no buffer)
 
-Lives in `lua/sort-keys/core/` and `lua/sort-keys/strategies/`. Operates entirely on Outline literals and plain Lua tables. Each file's job:
+The language-agnostic engine lives in `lua/sort-keys/core/` and operates entirely on Outline literals and plain Lua tables. (The one policy concern that is genuinely per-language — key normalization — is colocated with each builder at `languages/<lang>/key_normalize.lua`: still pure Lua, still nvim-free to test, but organized feature-first rather than under a separate policy directory. See "key normalization" below.) Each core file's job:
 
 - `target.lua` — `cursor` / `selection` Target constructors.
 - `policy.lua` — stable sort, anchor-aware movable slots, `:sort`-compat flags (`!`/`i`/`n`/`r/pat/`/`u`), custom `comparator`, `apply_selection_overlay` for Visual partial sort.
@@ -114,7 +115,9 @@ Lives in `lua/sort-keys/core/` and `lua/sort-keys/strategies/`. Operates entirel
 - `container_pick.lua` — cursor → innermost container resolution with a 3-tier fallback (strict containment → same-row leftmost start → row-span innermost area), shared by builders.
 - `entry.lua` — single forward-compatible Outline-entry copy helper (`copy(e, overrides?)` via `pairs`), used by every rebuild site (`comment_attach.copy_entry`, `policy.apply_selection_overlay`, `walker.rebuild_entry_with_child`) so a new Outline field is never silently dropped.
 - `unicode.lua`, `toml_loader.lua` — pure helpers.
-- `strategies/key_normalize.lua` — one `M.<lang>` function per supported language, each turns a raw key node text into the canonical sort_key (quote stripping + per-language escape decoding).
+- `key_escapes.lua` — shared escape-decoding primitives (`unescape_json`, `utf8_encode`, `strip_double_quotes`) reused by the per-language key normalizers whose escape set overlaps JSON.
+
+**Key normalization (pure, but colocated per-language):** each language's `languages/<lang>/key_normalize.lua` returns a pure `fun(text:string):string` that turns a raw key node's text into the canonical sort_key (quote stripping + per-language escape decoding). It lives next to that language's builder — feature-first — rather than under a shared policy directory; it stays pure (`require`s only `core/key_escapes`, never `vim.*`), so it is tested as pure policy. A builder `require`s its sibling normalizer once to declare its `M.key_normalizer` default, but `build` consumes the injected `config.key_normalizer` (dependency injection), so it is never coupled to a concrete normalizer and a user can override it via the handler spec.
 
 ### Detail layer (treesitter / buffer / runtime lookup)
 
@@ -173,8 +176,8 @@ Every entry rebuild (overlay, deep-sort recursion, comment_attach copy) goes thr
 
 Drive every behavioral change through the Red → Green → Refactor cycle, and **anchor the cycle on the policy layer**, not on e2e:
 
-1. **Red** — write a failing spec in `tests/sort-keys/core/*_spec.lua` (or `tests/sort-keys/strategies/*_spec.lua`) that expresses the new rule as an assertion on an Outline literal / pure-Lua input. The test name encodes the WHY of the rule. Run `nix flake check` and confirm it fails for the expected reason — not on a typo or a missing require.
-2. **Green** — make it pass with the smallest possible change to a policy module (`core/*.lua` or `strategies/*.lua`). Do not touch `vim.*`, treesitter, or the buffer to satisfy a policy test; if you feel the need to, the test is in the wrong layer.
+1. **Red** — write a failing spec in `tests/sort-keys/core/*_spec.lua` (or, for a key normalizer, `tests/sort-keys/languages/key_normalize_spec.lua`) that expresses the new rule as an assertion on an Outline literal / pure-Lua input. The test name encodes the WHY of the rule. Run `nix flake check` and confirm it fails for the expected reason — not on a typo or a missing require.
+2. **Green** — make it pass with the smallest possible change to a policy module (`core/*.lua` or a `languages/<lang>/key_normalize.lua`). Do not touch `vim.*`, treesitter, or the buffer to satisfy a policy test; if you feel the need to, the test is in the wrong layer.
 3. **Refactor** — only with green tests. Policy modules must stay free of `vim.*` / treesitter / buffer dependencies, so refactoring is bounded by the layering rule above.
 
 **Triangulate inside the policy layer**: prefer adding a second failing policy spec that forces the generalization over jumping straight to e2e. Detail and e2e specs (`languages/<lang>/builder_spec.lua`, `<lang>_e2e_spec.lua`) come **after** the policy is green, and only to pin the delegation contract or smoke-check the wiring — they are not where new behavior is designed.
@@ -183,7 +186,7 @@ If a policy spec doesn't feel like the right way to express the rule, the rule p
 
 ## Test policy
 
-`tests/sort-keys/core/*_spec.lua` and `tests/sort-keys/strategies/*_spec.lua` are the **emphasized layer** — they exercise pure policy on plain-Lua fixtures and should stay heavyweight (every rule of `comment_attach`, every separator edge case, every `:sort` flag, every key normalization escape, etc.).
+`tests/sort-keys/core/*_spec.lua` and `tests/sort-keys/languages/key_normalize_spec.lua` are the **emphasized layer** — they exercise pure policy on plain-Lua fixtures and should stay heavyweight (every rule of `comment_attach`, every separator edge case, every `:sort` flag, every key normalization escape, etc.). The key-normalizer spec loads each `languages/<lang>/key_normalize.lua` directly (no nvim), so colocating the normalizers with their builders does not move them out of the pure-policy test tier.
 
 Detail and e2e tests are intentionally thinner:
 
@@ -203,12 +206,13 @@ require("sort-keys").setup({
 })
 ```
 
-A handler spec is `{ filetypes, builder, options, query_text }`:
+A handler spec is `{ filetypes, builder, options, query_text, key_normalizer }`:
 
 - `filetypes` — list of `vim.bo.filetype` values this spec applies to
-- `builder` — Lua module exposing `build(bufnr, target, config) → outline | nil`. `config = { filetype, query_text, options }`
+- `builder` — Lua module exposing `build(bufnr, target, config) → outline | nil`. `config = { filetype, query_text, options, key_normalizer }`
 - `options` — capability flags + per-container hints. Same shape as `lua/sort-keys/languages/<lang>/config.toml` (`can_sort_object` / `can_sort_array` / `can_deep` / `comment_aware` / `key_quoting` / `structural_separator` / `trailing_separator_allowed` / `mixed_key_types` / `parser_lang`)
 - `query_text` — tree-sitter query string with `sortkeys.*` captures
+- `key_normalizer` — optional `fun(text:string):string` injected into `config.key_normalizer`. Omit to use the builder's self-declared default (`builder.key_normalizer`); supply it to override how raw key text becomes the sort_key without replacing the builder.
 
 Override rules (registry decides based on whether the user `handlers` key matches a built-in `config_name`):
 
@@ -248,9 +252,9 @@ Working example: `languages/javascript/builder.lua` declares `M.filetypes = { ja
 
 ### Case C — key syntax differs from JSON (e.g. Lua bare identifiers, YAML bare keys, Nix dotted attrpath)
 
-Add an `M.<lang>(text)` function to `lua/sort-keys/strategies/key_normalize.lua` that takes the raw key node text and returns the canonical sort_key (quote stripping, escape decoding, dotted-key flattening if applicable). Have the builder call `key_normalize.<lang>` instead of `key_normalize.json`.
+Create `lua/sort-keys/languages/<lang>/key_normalize.lua` (next to that language's builder) returning a single `fun(text:string):string` that takes the raw key node text and returns the canonical sort_key (quote stripping, escape decoding, dotted-key flattening if applicable); reuse the shared decoders in `core/key_escapes.lua` where the escape set overlaps JSON. The builder `require`s its sibling once as its self-declared `M.key_normalizer` default and calls the injected `config.key_normalizer` (not the concrete module) inside `build`, so a user can override normalization via the handler spec.
 
-Working examples: `strategies/key_normalize.{yaml,lua,toml,nix}` — each handles that language's specific escape set and dotted-key shape.
+Working examples: `languages/{yaml,lua,toml,nix}/key_normalize.lua` — each handles that language's specific escape set and dotted-key shape.
 
 ### Case D — entirely different AST shape (Lua tables `{ a = 1, b = 2 }`, Nix attrset / formals / inherit, TOML inline_table + standard table + root-level pseudo-container)
 
@@ -266,10 +270,11 @@ Working examples (in increasing complexity):
 
 ## Writing a builder
 
-A builder is a Lua module at `lua/sort-keys/languages/<lang>/builder.lua` that exports two things:
+A builder is a Lua module at `lua/sort-keys/languages/<lang>/builder.lua` that exports three things:
 
 - `M.build(bufnr, target, config) → outline | nil` — the entry point called by `registry`
 - `M.filetypes = { [filetype] = config_name, ... }` — self-declared filetype routing
+- `M.key_normalizer = fun(text:string):string` — self-declared default key normalizer (the sibling `languages/<lang>/key_normalize`). The registry injects this — or a user override — as `config.key_normalizer`, which `build` consumes; `build` never calls a concrete normalizer directly.
 
 ### `config` argument
 
@@ -288,7 +293,9 @@ The shared helpers cover steps 1, 3-5, and 6's gate. A builder typically looks l
 ```lua
 local h = require("sort-keys.core.builder_helpers")
 local comment_attach = require("sort-keys.core.comment_attach")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+-- The concrete normalizer is required only to declare the builder's default
+-- (M.key_normalizer below); build() calls the injected config.key_normalizer.
+local key_normalize = require("sort-keys.languages.<lang>.key_normalize")
 
 function M.build(bufnr, target, config)
   -- 1. Validate. h.validate_options checks the baseline capability flags;
@@ -360,7 +367,8 @@ for i, e in ipairs(sorted_raw) do
   local entry = {
     kind     = e.entry_kind,            -- "pair" | "element"
     range    = e.range,                 -- comment_attach may expand later
-    sort_key = key_normalize.<lang>(...),
+    sort_key = ctx.key_normalizer(...), -- injected; threaded as ctx.key_normalizer
+                                        --   = config.key_normalizer or M.key_normalizer
     movable  = true,                    -- false for pinned entries (positional, spread,
                                         --   inherit, computed keys)
     anchor   = i,                       -- 1-based source-order index

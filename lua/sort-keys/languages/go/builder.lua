@@ -20,7 +20,7 @@
 -- with no inline separator.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.go.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -110,7 +110,7 @@ local PINNED_KEY_TYPES = {
   type_assertion_expression = true,
 }
 
-local function classify_entry(entry, bufnr)
+local function classify_entry(entry, bufnr, normalize)
   local node = entry.node
   local t = node:type()
 
@@ -119,7 +119,7 @@ local function classify_entry(entry, bufnr)
       return { sort_key = "", movable = false }
     end
     local key_text = vim.treesitter.get_node_text(entry.key_node, bufnr)
-    return { sort_key = key_normalize.go(key_text), movable = true }
+    return { sort_key = normalize(key_text), movable = true }
   end
 
   if t == "keyed_element" then
@@ -132,12 +132,12 @@ local function classify_entry(entry, bufnr)
       return { sort_key = "", movable = false }
     end
     local key_text = vim.treesitter.get_node_text(key_node, bufnr)
-    return { sort_key = key_normalize.go(key_text), movable = true }
+    return { sort_key = normalize(key_text), movable = true }
   end
 
   if t == "import_spec" then
     local path_text = import_path_text(node, bufnr)
-    return { sort_key = key_normalize.go(path_text), movable = true }
+    return { sort_key = normalize(path_text), movable = true }
   end
 
   return { sort_key = "", movable = false }
@@ -169,7 +169,7 @@ local function build_outline(container, ctx)
 
   local outline_entries = {}
   for i, e in ipairs(sorted_raw) do
-    local cls = classify_entry(e, ctx.bufnr)
+    local cls = classify_entry(e, ctx.bufnr, ctx.key_normalizer)
     local entry = {
       kind = e.entry_kind,
       range = e.range,
@@ -257,6 +257,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -268,5 +269,9 @@ end
 M.filetypes = {
   go = "go",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

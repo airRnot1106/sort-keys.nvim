@@ -17,7 +17,7 @@
 -- isn't predictable from source.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.python.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -59,12 +59,12 @@ local PINNED_KEY_TYPES = {
   parenthesized_expression = true,
 }
 
-local function classify_pair_key(key_node, bufnr)
+local function classify_pair_key(key_node, bufnr, normalize)
   local t = key_node:type()
   local text = vim.treesitter.get_node_text(key_node, bufnr)
 
   if t == "string" or t == "concatenated_string" then
-    return { sort_key = key_normalize.python(text), movable = true }
+    return { sort_key = normalize(text), movable = true }
   end
   if t == "integer" or t == "float" or t == "identifier" then
     return { sort_key = text, movable = true }
@@ -80,7 +80,7 @@ local function classify_pair_key(key_node, bufnr)
   return { sort_key = h.normalize_element_text(text), movable = false }
 end
 
-local function classify_entry(entry_node, bufnr)
+local function classify_entry(entry_node, bufnr, normalize)
   local t = entry_node:type()
 
   if t == "dictionary_splat" then
@@ -98,7 +98,7 @@ local function classify_entry(entry_node, bufnr)
     if not key_node then
       return { sort_key = "", movable = false }
     end
-    return classify_pair_key(key_node, bufnr)
+    return classify_pair_key(key_node, bufnr, normalize)
   end
 
   -- Falls through for list/set element classification (handled at call-site).
@@ -127,7 +127,7 @@ local function build_outline(container, ctx)
     }
 
     if e.entry_kind == "pair" then
-      local cls = classify_entry(e.node, ctx.bufnr)
+      local cls = classify_entry(e.node, ctx.bufnr, ctx.key_normalizer)
       if cls then
         entry.sort_key = cls.sort_key
         entry.movable = cls.movable
@@ -208,6 +208,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -219,5 +220,9 @@ end
 M.filetypes = {
   python = "python",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

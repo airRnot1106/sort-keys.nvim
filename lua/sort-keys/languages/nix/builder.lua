@@ -14,7 +14,7 @@
 --      order inside `inherit a c b;` can still sort.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.nix.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -105,7 +105,7 @@ local function first_inherited_identifier_text(inherit_node, bufnr)
   return vim.treesitter.get_node_text(first_id, bufnr)
 end
 
-local function classify_entry(entry_node, bufnr)
+local function classify_entry(entry_node, bufnr, normalize)
   local t = entry_node:type()
 
   if t == "binding" then
@@ -115,7 +115,7 @@ local function classify_entry(entry_node, bufnr)
     end
     local key_text = vim.treesitter.get_node_text(attrpath, bufnr)
     return {
-      sort_key = key_normalize.nix(key_text),
+      sort_key = normalize(key_text),
       movable = true,
       -- The value subtree may itself contain a sortable container.
       value_node = entry_node:named_child(entry_node:named_child_count() - 1),
@@ -142,7 +142,7 @@ local function classify_entry(entry_node, bufnr)
       return { sort_key = "", movable = false, value_node = nil }
     end
     return {
-      sort_key = key_normalize.nix(vim.treesitter.get_node_text(id, bufnr)),
+      sort_key = normalize(vim.treesitter.get_node_text(id, bufnr)),
       movable = true,
       value_node = nil,
     }
@@ -156,7 +156,7 @@ local function classify_entry(entry_node, bufnr)
 
   if t == "identifier" then
     return {
-      sort_key = key_normalize.nix(vim.treesitter.get_node_text(entry_node, bufnr)),
+      sort_key = normalize(vim.treesitter.get_node_text(entry_node, bufnr)),
       movable = true,
       value_node = nil,
     }
@@ -182,7 +182,7 @@ local function build_outline(container, ctx)
 
   local outline_entries = {}
   for i, e in ipairs(sorted_raw) do
-    local cls = classify_entry(e.node, ctx.bufnr)
+    local cls = classify_entry(e.node, ctx.bufnr, ctx.key_normalizer)
     local entry = {
       kind = e.entry_kind,
       range = e.range,
@@ -251,6 +251,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_container = index_by_container_ancestor(entries, containers_by_key),
     comments_by_container = index_comments_by_container_ancestor(comments, containers_by_key),
@@ -262,5 +263,9 @@ end
 M.filetypes = {
   nix = "nix",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

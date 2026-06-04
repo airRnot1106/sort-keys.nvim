@@ -1,5 +1,5 @@
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.json.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -34,7 +34,7 @@ local function build_outline(container, ctx)
         return nil
       end
       local key_text = vim.treesitter.get_node_text(e.key_node, ctx.bufnr)
-      entry.sort_key = key_normalize.json(key_text)
+      entry.sort_key = ctx.key_normalizer(key_text)
       if e.value_node then
         local inner = find_container_for_node(ctx.containers_by_key, e.value_node)
         if inner then
@@ -109,6 +109,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -124,5 +125,9 @@ M.filetypes = {
   json = "json",
   jsonc = "jsonc",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

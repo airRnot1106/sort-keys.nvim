@@ -7,7 +7,7 @@
 
 local h = require("sort-keys.core.builder_helpers")
 local container_pick = require("sort-keys.core.container_pick")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.yaml.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -185,7 +185,7 @@ local function build_outline(container, ctx)
         return nil
       end
       local key_text = vim.treesitter.get_node_text(key_node, ctx.bufnr)
-      entry.sort_key = key_normalize.yaml(key_text)
+      entry.sort_key = ctx.key_normalizer(key_text)
       local value_node = e.node:named_child(1)
       if value_node then
         local inner = descend_to_container(ctx.containers_by_key, value_node)
@@ -269,6 +269,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = index_comments_by_container(comments, containers),
@@ -284,5 +285,9 @@ M.filetypes = {
   yaml = "yaml",
   yml = "yaml",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M

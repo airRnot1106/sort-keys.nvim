@@ -7,7 +7,7 @@
 -- its AST shape.
 
 local h = require("sort-keys.core.builder_helpers")
-local key_normalize = require("sort-keys.strategies.key_normalize")
+local key_normalize = require("sort-keys.languages.javascript.key_normalize")
 local comment_attach = require("sort-keys.core.comment_attach")
 
 local M = {}
@@ -25,7 +25,7 @@ end
 --   spread_element                → movable=false (spread order is semantically significant)
 -- A pair whose key is a computed_property_name is also pinned (the key is a
 -- runtime expression; reordering it past sibling pairs may change semantics).
-local function classify_entry(entry_node, bufnr)
+local function classify_entry(entry_node, bufnr, normalize)
   local t = entry_node:type()
 
   if t == "shorthand_property_identifier" then
@@ -59,7 +59,7 @@ local function classify_entry(entry_node, bufnr)
     end
     if key_type == "string" then
       return {
-        sort_key = key_normalize.js(vim.treesitter.get_node_text(key_node, bufnr)),
+        sort_key = normalize(vim.treesitter.get_node_text(key_node, bufnr)),
         movable = true,
       }
     end
@@ -92,7 +92,7 @@ local function build_outline(container, ctx)
     }
 
     if e.entry_kind == "pair" then
-      local cls = classify_entry(e.node, ctx.bufnr)
+      local cls = classify_entry(e.node, ctx.bufnr, ctx.key_normalizer)
       if cls then
         entry.sort_key = cls.sort_key
         entry.movable = cls.movable
@@ -168,6 +168,7 @@ function M.build(bufnr, target, config)
   local ctx = {
     bufnr = bufnr,
     options = config.options,
+    key_normalizer = config.key_normalizer or key_normalize,
     containers_by_key = containers_by_key,
     entries_by_parent = h.index_by_parent(entries),
     comments_by_parent = h.index_by_parent(comments),
@@ -185,5 +186,9 @@ M.filetypes = {
   javascript = "javascript",
   typescript = "typescript",
 }
+
+-- Self-declared default normalizer; the registry injects this (or a
+-- user override) as config.key_normalizer.
+M.key_normalizer = key_normalize
 
 return M
