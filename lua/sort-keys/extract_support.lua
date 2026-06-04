@@ -162,8 +162,12 @@ function M.build_container(container, ctx)
   -- language (","  ";"  or none); match exactly one non-whitespace char so a
   -- malformed gap with two (a JS array elision `,,`) doesn't get swallowed
   -- whole into the separator and re-emitted between every entry.
-  local separator = ""
-  if #raw >= 2 then
+  -- A pack may pin the separator (options.separator) when the gap can't be
+  -- probed reliably — e.g. KDL is space-separated but a `\` line continuation
+  -- in the gap would otherwise be misread as a delimiter. Otherwise observe it.
+  local separator = ctx.options.separator
+  if separator == nil and #raw >= 2 then
+    separator = ""
     -- Stop the probe at any comment sitting in the gap: a comment's "#"/"//" is
     -- not a delimiter, so for a whitespace-separated language (block YAML) the
     -- probe must see only the whitespace before it, not the comment.
@@ -180,6 +184,7 @@ function M.build_container(container, ctx)
     local probe = get_text(ctx.bufnr, raw[1].range[3], raw[1].range[4], pe_row, pe_col)
     separator = probe:match("^%s*(%S)") or ""
   end
+  separator = separator or ""
   -- Peel one separator off s -> (rest, had_separator). The separator is
   -- slot-bound, so it is stripped from tails / inter-block gaps here and
   -- re-emitted by render. Peels only a LEADING separator (the usual

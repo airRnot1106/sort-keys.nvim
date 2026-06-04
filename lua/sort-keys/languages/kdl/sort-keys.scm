@@ -1,12 +1,9 @@
-;; KDL nodes: sort a node's properties (key=value). Properties are node_fields
-;; wrapping a prop; the node's name, positional args, and children block sit
-;; outside the property run (in the container prefix/suffix). Separator is " ".
+;; KDL node fields are collected by the custom extractor: a field may be a
+;; property (key=value) or a positional argument / slashdash, which the generic
+;; query can't distinguish, so these captures feed the extractor's own logic.
 
-((node) @sortkeys.container
- (#set! sortkeys.kind "object"))
-
-((node_field (prop (identifier) @sortkeys.key)) @sortkeys.entry
- (#set! sortkeys.entry_kind "pair"))
+((node) @sortkeys.node)
+((node_field) @sortkeys.field)
 
 ((single_line_comment) @sortkeys.comment)
 ((multi_line_comment) @sortkeys.comment)
