@@ -104,12 +104,17 @@ local function deduplicate(entries, flags, normalize_keys)
   return out, dropped
 end
 
--- ─── stable sort over movable slots only ─────────────────────────────────
--- Non-movable entries keep their relative position among the surviving
--- entries (post-dedup); movable entries are reordered among the remaining
--- slots in sorted order. We re-number slots to the dense post-dedup range
--- 1..#entries by declared (anchor) order so that `u`-removed gaps never
--- drop non-movable entries whose original anchor exceeds #entries.
+-- ─── stable sort over movable slots, fence-aware ─────────────────────────
+-- Two kinds of non-movable entry, distinguished by `fence`:
+--   * a plain pin (`movable=false`) holds its slot but is permeable — movable
+--     entries may sort across it. Used where the pin's position relative to
+--     keyed entries carries no meaning (Lua positional fields, Nix inherit).
+--   * a fence (`movable=false, fence=true`) additionally blocks crossing:
+--     movable entries sort only within the segment between fences, never past
+--     one. Used for order-sensitive pins whose meaning depends on what sits
+--     before vs. after them (JS spread, Ruby `**splat`).
+-- Anchor order is the dense post-dedup range 1..#entries, so a `u`-removed gap
+-- never drops a pin whose original anchor exceeded #entries.
 local function sort_with_anchors(entries, less_fn)
   local by_anchor = {}
   for _, e in ipairs(entries) do
@@ -119,22 +124,7 @@ local function sort_with_anchors(entries, less_fn)
     return a.anchor < b.anchor
   end)
 
-  local dense_slot_of = {}
-  for i, e in ipairs(by_anchor) do
-    dense_slot_of[e] = i
-  end
-
-  local movable_list = {}
-  local fixed = {}
-  for _, e in ipairs(entries) do
-    if e.movable then
-      movable_list[#movable_list + 1] = e
-    else
-      fixed[dense_slot_of[e]] = e
-    end
-  end
-
-  table.sort(movable_list, function(a, b)
+  local less = function(a, b)
     if less_fn(a, b) then
       return true
     end
@@ -142,18 +132,48 @@ local function sort_with_anchors(entries, less_fn)
       return false
     end
     return a.anchor < b.anchor
-  end)
+  end
 
-  local total = #entries
   local out = {}
-  local mi = 1
-  for slot = 1, total do
-    if fixed[slot] then
-      out[slot] = fixed[slot]
-    else
-      out[slot] = movable_list[mi]
-      mi = mi + 1
+
+  -- Fill one fence-delimited segment of dense slots [lo, hi]: plain pins hold
+  -- their slot, movable entries sort into the remaining slots of the segment.
+  local function fill_segment(lo, hi)
+    local movable = {}
+    local fixed = {}
+    for s = lo, hi do
+      local e = by_anchor[s]
+      if e.movable then
+        movable[#movable + 1] = e
+      else
+        fixed[s] = e
+      end
     end
+    table.sort(movable, less)
+    local mi = 1
+    for s = lo, hi do
+      if fixed[s] then
+        out[s] = fixed[s]
+      else
+        out[s] = movable[mi]
+        mi = mi + 1
+      end
+    end
+  end
+
+  local n = #by_anchor
+  local seg_lo = 1
+  for s = 1, n do
+    if by_anchor[s].fence then
+      if s > seg_lo then
+        fill_segment(seg_lo, s - 1)
+      end
+      out[s] = by_anchor[s]
+      seg_lo = s + 1
+    end
+  end
+  if seg_lo <= n then
+    fill_segment(seg_lo, n)
   end
   return out
 end

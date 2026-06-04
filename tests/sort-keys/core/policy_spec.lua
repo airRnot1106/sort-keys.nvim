@@ -8,6 +8,7 @@ local function make_entry(key, anchor, opts)
     sort_key = key,
     range = opts.range or { 0, 0, 0, 0 },
     movable = opts.movable ~= false,
+    fence = opts.fence,
     anchor = anchor,
     attached = {},
     child = nil,
@@ -260,6 +261,49 @@ describe("sort-keys.core.policy", function()
       local sorted = policy.sort(o, { flags = { unique = true }, normalize_keys = true })
       assert.equals(3, #sorted.entries)
       assert.equals(0, #sorted.dropped)
+    end)
+
+    -- A `fence` pin blocks crossing: movable entries sort only within the
+    -- segment between fences, never past one. This protects order-sensitive
+    -- pins (JS spread, Ruby `**splat`) whose meaning depends on what sits
+    -- before vs. after them.
+    it("fences movable entries between fence pins — they never cross one", function()
+      local o = make_outline("object", {
+        make_entry("z", 1, { movable = true }),
+        make_entry("", 2, { movable = false, fence = true }), -- e.g. `**opts`
+        make_entry("a", 3, { movable = true }),
+      })
+      local sorted = policy.sort(o, { flags = {}, normalize_keys = true })
+      -- `z` is before the fence, `a` after; each is alone in its segment, so
+      -- the order is unchanged rather than `a, fence, z`.
+      assert.same({ "z", "", "a" }, keys(sorted))
+    end)
+
+    it("sorts each fence-delimited segment independently", function()
+      local o = make_outline("object", {
+        make_entry("c", 1, { movable = true }),
+        make_entry("b", 2, { movable = true }),
+        make_entry("", 3, { movable = false, fence = true }),
+        make_entry("e", 4, { movable = true }),
+        make_entry("d", 5, { movable = true }),
+      })
+      local sorted = policy.sort(o, { flags = {}, normalize_keys = true })
+      -- Left segment {c,b} → {b,c}; right segment {e,d} → {d,e}; fence fixed.
+      assert.same({ "b", "c", "", "d", "e" }, keys(sorted))
+    end)
+
+    -- A plain pin (no `fence`) holds its slot but is permeable: movable
+    -- entries may sort across it, because its position relative to keyed
+    -- entries carries no meaning (Lua positional fields, Nix inherit).
+    it("lets movable entries sort across a plain (non-fence) pin", function()
+      local o = make_outline("object", {
+        make_entry("b", 1, { movable = true }),
+        make_entry("", 2, { movable = false }), -- plain pin, e.g. Lua `42`
+        make_entry("a", 3, { movable = true }),
+      })
+      local sorted = policy.sort(o, { flags = {}, normalize_keys = true })
+      -- `a` and `b` reorder across the pin; the pin stays at slot 2.
+      assert.same({ "a", "", "b" }, keys(sorted))
     end)
   end)
 

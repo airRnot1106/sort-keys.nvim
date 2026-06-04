@@ -33,7 +33,9 @@ local function classify_entry(entry_node, bufnr, normalize)
   end
 
   if t == "spread_element" then
-    return { sort_key = "", movable = false }
+    -- A spread is order-sensitive: a later key overrides an earlier one, so it
+    -- fences the sort — surrounding pairs may not reorder across it.
+    return { sort_key = "", movable = false, fence = true }
   end
 
   if t == "method_definition" then
@@ -52,7 +54,9 @@ local function classify_entry(entry_node, bufnr, normalize)
     end
     local key_type = key_node:type()
     if key_type == "computed_property_name" then
-      return { sort_key = "", movable = false }
+      -- A computed key is a runtime expression; its evaluation order relative
+      -- to siblings can matter, so it fences the sort like a spread.
+      return { sort_key = "", movable = false, fence = true }
     end
     if key_type == "property_identifier" or key_type == "number" then
       return { sort_key = vim.treesitter.get_node_text(key_node, bufnr), movable = true }
@@ -96,6 +100,7 @@ local function build_outline(container, ctx)
       if cls then
         entry.sort_key = cls.sort_key
         entry.movable = cls.movable
+        entry.fence = cls.fence
       else
         entry.sort_key = ""
         entry.movable = false

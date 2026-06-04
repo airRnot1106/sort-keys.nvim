@@ -76,7 +76,7 @@ describe("ruby end-to-end via :SortKeys", function()
     end)
   end)
 
-  describe("double-splat pin", function()
+  describe("double-splat fences the sort", function()
     it("keeps `**defaults` first and sorts the remaining pairs", function()
       if not has_ruby then
         pending("ruby treesitter parser not available")
@@ -86,6 +86,20 @@ describe("ruby end-to-end via :SortKeys", function()
       set_cursor(bufnr, 0, 20)
       vim.cmd("SortKeys")
       assert.same({ "h = { **defaults, apple: 2, zed: 1 }" }, lines_of(bufnr))
+    end)
+
+    it("does not let a pair cross a mid-hash `**` splat (override order)", function()
+      if not has_ruby then
+        pending("ruby treesitter parser not available")
+        return
+      end
+      -- `z: 3` is before the splat (the splat may override it); `a: 1` is after
+      -- (it overrides the splat). Sorting must not swap which side they're on,
+      -- so each single-element segment stays put.
+      local bufnr = setup_buf({ "h = { z: 3, **opts, a: 1 }" })
+      set_cursor(bufnr, 0, 8)
+      vim.cmd("SortKeys")
+      assert.same({ "h = { z: 3, **opts, a: 1 }" }, lines_of(bufnr))
     end)
   end)
 

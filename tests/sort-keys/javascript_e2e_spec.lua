@@ -108,22 +108,20 @@ describe("javascript end-to-end via :SortKeys", function()
     end)
   end)
 
-  describe("spread element pinned", function()
-    it("keeps a spread at its declared slot while the surrounding pairs reorder", function()
+  describe("spread element fences the sort", function()
+    it("sorts each side of a spread independently, never across it", function()
       if not has_js then
         pending("javascript treesitter parser not available")
         return
       end
-      -- Original layout: c, a, ...rest, b
-      -- After sort:      a, c, ...rest, b
-      -- The spread is pinned at slot 3 (movable=false). The surviving
-      -- movable slots are 1, 2, 4. Their sort_keys: a, c, b → a, b, c
-      -- → slot 1=a, slot 2=b, slot 4=c. But because the spread sits BETWEEN
-      -- slot 2 and slot 4, the user-visible order is a, b, ...rest, c.
+      -- A spread is order-sensitive (a later key overrides an earlier one), so
+      -- it fences: the pairs before it {c, a} sort among themselves → a, c, and
+      -- the pair after it {b} stays after. `b` must NOT jump ahead of `...rest`
+      -- and `c` must NOT fall behind it — that would change which key wins.
       local bufnr = setup_buf({ "const o = { c: 3, a: 1, ...rest, b: 2 };" })
       set_cursor(bufnr, 0, 12)
       vim.cmd("SortKeys")
-      assert.equals("const o = { a: 1, b: 2, ...rest, c: 3 };", lines_of(bufnr)[1])
+      assert.equals("const o = { a: 1, c: 3, ...rest, b: 2 };", lines_of(bufnr)[1])
     end)
   end)
 end)

@@ -45,6 +45,11 @@ local function build_outline(container, ctx)
       range = e.range,
       sort_key = sort_key,
       movable = movable,
+      -- A `**splat` is order-sensitive (a later key overrides an earlier one),
+      -- so it fences the sort: pairs may not reorder across it. A positional
+      -- arg is a plain pin — it sits before all keywords, so it never needs to
+      -- block crossing.
+      fence = e.node:type() == "hash_splat_argument",
       anchor = i,
       attached = {},
       child = nil,

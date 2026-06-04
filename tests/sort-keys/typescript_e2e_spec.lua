@@ -135,16 +135,18 @@ describe("typescript end-to-end via :SortKeys", function()
     end)
   end)
 
-  describe("spread element pinned", function()
-    it("keeps a spread at its declared slot while the surrounding pairs reorder", function()
+  describe("spread element fences the sort", function()
+    it("sorts each side of a spread independently, never across it", function()
       if not has_ts then
         pending("typescript treesitter parser not available")
         return
       end
+      -- A spread is order-sensitive, so it fences: {c, a} before it sort to
+      -- a, c and {b} after it stays put — no pair crosses `...rest`.
       local bufnr = setup_buf({ "const o = { c: 3, a: 1, ...rest, b: 2 };" })
       set_cursor(bufnr, 0, 12)
       vim.cmd("SortKeys")
-      assert.equals("const o = { a: 1, b: 2, ...rest, c: 3 };", lines_of(bufnr)[1])
+      assert.equals("const o = { a: 1, c: 3, ...rest, b: 2 };", lines_of(bufnr)[1])
     end)
   end)
 end)

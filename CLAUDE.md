@@ -156,6 +156,11 @@ outline = {
                                               --   splice inter-entry separators BEFORE
                                               --   the comment.
       movable  = true,                        -- false = pinned at its anchor slot
+      fence    = nil,                         -- true (only meaningful when movable=false)
+                                              --   = an order-sensitive pin that BLOCKS
+                                              --   crossing; movable entries sort only
+                                              --   within the segment between fences. A
+                                              --   plain pin (no fence) is permeable.
       anchor   = 1,                           -- 1-based source-order index; policy uses
                                               --   this to keep non-movable entries put
       attached = {},                          -- reserved
@@ -171,6 +176,8 @@ outline = {
 Every entry rebuild (overlay, deep-sort recursion, comment_attach copy) goes through `core/entry.copy`, which forwards all keys via `pairs` so additions like `data_range` survive without per-site enumeration.
 
 `movable = false` entries stay at their `anchor` index after sorting; the movable entries fill the remaining slots in sort_key order. This is what powers (a) language-specific pins (Lua positional fields, JS spread, Nix `inherit`, `...` ellipses), (b) the visual-range overlay (entries outside the selection get `movable = false` so only the selected ones reorder).
+
+A pin can additionally be a **fence** (`movable = false, fence = true`): movable entries sort only within the segment between fences and never cross one. Plain pins are permeable — movable entries may reorder across them — because their position relative to keyed entries is meaningless (Lua positional fields, Nix `inherit`). Fences are for _order-sensitive_ pins whose meaning depends on what sits before vs. after them: a JS spread / Ruby `**splat` (a later key overrides an earlier one) and JS computed keys. Builders set `fence = true` on exactly those entries; `policy.sort_with_anchors` honors it.
 
 ## Development workflow: TDD (t-wada style)
 
