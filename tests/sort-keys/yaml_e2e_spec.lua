@@ -46,6 +46,18 @@ describe("yaml end-to-end", function()
     assert.are.same({ "x: {a: 2, b: 1}" }, lines_of(bufnr))
   end)
 
+  it("does not misread an own-line comment as the separator", function()
+    if not has_yaml then
+      return pending("yaml treesitter parser not available")
+    end
+    -- The comment documents the key below it (a), so it travels with a; no
+    -- stray "#" is spliced as a separator.
+    local bufnr = setup_buf({ "b: 1", "# c", "a: 2" })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ "# c", "a: 2", "b: 1" }, lines_of(bufnr))
+  end)
+
   it(":DeepSortKeys recurses into a nested block mapping", function()
     if not has_yaml then
       return pending("yaml treesitter parser not available")

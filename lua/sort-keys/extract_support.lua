@@ -164,8 +164,20 @@ function M.build_container(container, ctx)
   -- whole into the separator and re-emitted between every entry.
   local separator = ""
   if #raw >= 2 then
-    local probe =
-      get_text(ctx.bufnr, raw[1].range[3], raw[1].range[4], raw[2].range[1], raw[2].range[2])
+    -- Stop the probe at any comment sitting in the gap: a comment's "#"/"//" is
+    -- not a delimiter, so for a whitespace-separated language (block YAML) the
+    -- probe must see only the whitespace before it, not the comment.
+    local pe_row, pe_col = raw[2].range[1], raw[2].range[2]
+    for _, c in ipairs(container_comments) do
+      local cr0 = c.range
+      if
+        pos.lt(raw[1].range[3], raw[1].range[4], cr0[1], cr0[2])
+        and pos.lt(cr0[1], cr0[2], pe_row, pe_col)
+      then
+        pe_row, pe_col = cr0[1], cr0[2]
+      end
+    end
+    local probe = get_text(ctx.bufnr, raw[1].range[3], raw[1].range[4], pe_row, pe_col)
     separator = probe:match("^%s*(%S)") or ""
   end
   -- Peel one separator off s -> (rest, had_separator). The separator is
