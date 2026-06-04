@@ -137,6 +137,23 @@ describe("sort-keys.core.policy", function()
       assert.same({ "item-2", "item-10", "item-30" }, keys(sorted))
     end)
 
+    it("flag `r /pat/` with a non-Lua pattern degrades to no-match instead of aborting", function()
+      -- :sort's r/.../ takes a Vim regex; pasted verbatim it is frequently an
+      -- invalid Lua pattern. string.match would raise and abort the entire
+      -- sort, so the regex transform must be guarded and fall back to the full
+      -- sort_key — a sortable buffer must never crash the command.
+      local o = make_outline("object", {
+        make_entry("b", 1),
+        make_entry("a", 2),
+        make_entry("c", 3),
+      })
+      local sorted = policy.sort(o, {
+        flags = { regex = "[a-z" }, -- unclosed class: malformed Lua pattern
+        normalize_keys = true,
+      })
+      assert.same({ "a", "b", "c" }, keys(sorted))
+    end)
+
     it("flag `u` keeps only the first occurrence per key", function()
       local o = make_outline("object", {
         make_entry("a", 1),

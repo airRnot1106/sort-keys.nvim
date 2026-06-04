@@ -27,10 +27,12 @@ local function unescape_kdl(body)
         local close = body:find("}", i + 3, true)
         local hex = close and body:sub(i + 3, close - 1) or nil
         local cp = hex and tonumber(hex, 16) or nil
-        if cp then
-          out[#out + 1] = escapes.utf8_encode(cp)
+        local encoded = cp and escapes.utf8_encode(cp)
+        if encoded then
+          out[#out + 1] = encoded
           i = close + 1
         else
+          -- malformed or out-of-range `\u{...}`: keep verbatim, never raise
           out[#out + 1] = c
           i = i + 1
         end

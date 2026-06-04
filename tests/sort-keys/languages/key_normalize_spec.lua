@@ -728,5 +728,17 @@ describe("sort-keys key normalizers", function()
       assert.equals("\\U0001F600", key_normalize.toml([["\U0001F600"]]))
       assert.equals("a\\x41b", key_normalize.go([["a\x41b"]]))
     end)
+
+    it("kdl: a `\\u{...}` code point above U+10FFFF is kept verbatim, not raised", function()
+      -- An over-range code point would make utf8_encode's string.char raise.
+      assert.equals("\\u{110000}", key_normalize.kdl([["\u{110000}"]]))
+      assert.equals("\\u{FFFFFFFF}", key_normalize.kdl([["\u{FFFFFFFF}"]]))
+    end)
+
+    it("python: a `\\U` code point above U+10FFFF is kept verbatim, not raised", function()
+      assert.equals("\\UFFFFFFFF", key_normalize.python([["\UFFFFFFFF"]]))
+      -- An in-range astral code point still decodes (U+1F600 = F0 9F 98 80).
+      assert.equals("\240\159\152\128", key_normalize.python([["\U0001F600"]]))
+    end)
   end)
 end)

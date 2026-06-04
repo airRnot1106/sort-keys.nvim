@@ -22,8 +22,12 @@ local function logical_key(sort_key, flags, normalize_keys)
     k = unicode.nfc(k)
   end
   if flags.regex then
-    local m = string.match(k, flags.regex)
-    if m ~= nil then
+    -- `r/pat/` mirrors `:sort`, whose pattern is a Vim regex; pasted verbatim
+    -- it is often invalid as a Lua pattern and string.match would raise,
+    -- aborting the whole sort. Guard it and fall back to the full key on a bad
+    -- pattern (equivalent to "no match"), so a sortable buffer never crashes.
+    local ok, m = pcall(string.match, k, flags.regex)
+    if ok and m ~= nil then
       k = m
     end
   end

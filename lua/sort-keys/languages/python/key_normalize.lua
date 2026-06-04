@@ -42,8 +42,9 @@ local function unescape_python(body)
         i = i + 2
       elseif nxt == "x" then
         local cp = read_hex(body, i + 2, 2)
-        if cp then
-          out[#out + 1] = escapes.utf8_encode(cp)
+        local encoded = cp and escapes.utf8_encode(cp)
+        if encoded then
+          out[#out + 1] = encoded
           i = i + 4
         else
           -- Malformed: keep verbatim so the sort_key still round-trips.
@@ -53,8 +54,9 @@ local function unescape_python(body)
         end
       elseif nxt == "u" then
         local cp = read_hex(body, i + 2, 4)
-        if cp then
-          out[#out + 1] = escapes.utf8_encode(cp)
+        local encoded = cp and escapes.utf8_encode(cp)
+        if encoded then
+          out[#out + 1] = encoded
           i = i + 6
         else
           out[#out + 1] = c
@@ -63,8 +65,11 @@ local function unescape_python(body)
         end
       elseif nxt == "U" then
         local cp = read_hex(body, i + 2, 8)
-        if cp then
-          out[#out + 1] = escapes.utf8_encode(cp)
+        -- `\U` is 8 hex digits and can name a value above U+10FFFF; utf8_encode
+        -- returns nil there, so fall through to keeping the escape verbatim.
+        local encoded = cp and escapes.utf8_encode(cp)
+        if encoded then
+          out[#out + 1] = encoded
           i = i + 10
         else
           out[#out + 1] = c

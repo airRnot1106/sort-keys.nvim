@@ -18,9 +18,17 @@ local SIMPLE_ESCAPES = {
   t = "\t",
 }
 
+-- Returns the UTF-8 bytes for a Unicode scalar value, or nil when the code
+-- point is out of range (negative or above U+10FFFF). Returning nil instead of
+-- letting string.char raise lets every caller (JS `\u{...}`, KDL `\u{...}`,
+-- Python `\U`) fall back to keeping the escape verbatim — a key must never
+-- crash sorting, whatever the language.
 ---@param cp integer
----@return string
+---@return string?
 local function utf8_encode(cp)
+  if cp < 0 or cp > 0x10FFFF then
+    return nil
+  end
   if cp < 0x80 then
     return string.char(cp)
   elseif cp < 0x800 then
@@ -152,12 +160,12 @@ function M.unescape_js(body)
       elseif nxt == "u" and body:sub(i + 2, i + 2) == "{" then
         local close = body:find("}", i + 3, true)
         local cp = close and tonumber(body:sub(i + 3, close - 1), 16)
-        if cp and cp <= 0x10FFFF then
-          out[#out + 1] = utf8_encode(cp)
+        local encoded = cp and utf8_encode(cp)
+        if encoded then
+          out[#out + 1] = encoded
           i = close + 1
         else
           -- malformed or out-of-range `\u{...}` — keep the `u` leniently
-          -- (utf8_encode would raise on a code point above U+10FFFF)
           out[#out + 1] = nxt
           i = i + 2
         end
