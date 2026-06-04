@@ -161,6 +161,23 @@ describe("sort-keys key normalizers", function()
       assert.equals("", key_normalize.js('""'))
       assert.equals("", key_normalize.js("''"))
     end)
+
+    it("drops the backslash of a JS-legal escape that JSON forbids", function()
+      -- JS strings accept escapes JSON does not (`\s`, `\q`, ...); an unknown
+      -- escape is just the character itself. The JSON decoder errors on these,
+      -- which would crash :SortKeys on perfectly valid JS source — so the JS
+      -- normalizer must decode leniently for BOTH quote styles.
+      assert.equals("asb", key_normalize.js([["a\sb"]]))
+      assert.equals("asb", key_normalize.js("'a\\sb'"))
+    end)
+
+    it("decodes a `\\xNN` hex escape (JS-only, absent from JSON)", function()
+      assert.equals("aAb", key_normalize.js([["a\x41b"]]))
+    end)
+
+    it("decodes a `\\u{...}` code-point escape (ES6, absent from JSON)", function()
+      assert.equals("A", key_normalize.js([["\u{41}"]]))
+    end)
   end)
 
   describe("lua(text)", function()

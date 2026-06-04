@@ -98,6 +98,76 @@ function M.unescape_json(body)
   return table.concat(out)
 end
 
+-- JS string escapes are a superset of JSON's: the simple set adds `\'`, `\v`,
+-- `\0`, plus `\xNN` byte escapes and `\u{...}` code-point escapes, and — unlike
+-- JSON — an *unrecognized* escape (`\s`, `\q`, ...) is legal and denotes the
+-- bare character. A strict JSON decoder errors on all of these, which would
+-- crash sorting on perfectly valid JS source, so JS keys decode through here.
+local JS_SIMPLE_ESCAPES = {
+  ["'"] = "'",
+  ['"'] = '"',
+  ["\\"] = "\\",
+  ["/"] = "/",
+  b = "\b",
+  f = "\f",
+  n = "\n",
+  r = "\r",
+  t = "\t",
+  v = "\v",
+  ["0"] = "\0",
+}
+
+---@param body string
+---@return string
+function M.unescape_js(body)
+  local out = {}
+  local i = 1
+  local n = #body
+  while i <= n do
+    local c = body:sub(i, i)
+    if c == "\\" and i + 1 <= n then
+      local nxt = body:sub(i + 1, i + 1)
+      local simple = JS_SIMPLE_ESCAPES[nxt]
+      if simple then
+        out[#out + 1] = simple
+        i = i + 2
+      elseif nxt == "u" and body:sub(i + 2, i + 2) == "{" then
+        local close = body:find("}", i + 3, true)
+        local cp = close and tonumber(body:sub(i + 3, close - 1), 16)
+        if cp then
+          out[#out + 1] = utf8_encode(cp)
+          i = close + 1
+        else
+          -- malformed `\u{` — keep the `u` leniently rather than raising
+          out[#out + 1] = nxt
+          i = i + 2
+        end
+      elseif nxt == "u" then
+        local decoded, consumed = decode_unicode_escape(body, i)
+        out[#out + 1] = decoded
+        i = i + consumed
+      elseif nxt == "x" then
+        local cp = tonumber(body:sub(i + 2, i + 3), 16)
+        if cp then
+          out[#out + 1] = utf8_encode(cp)
+          i = i + 4
+        else
+          out[#out + 1] = nxt
+          i = i + 2
+        end
+      else
+        -- Unrecognized escape: JS drops the backslash and keeps the character.
+        out[#out + 1] = nxt
+        i = i + 2
+      end
+    else
+      out[#out + 1] = c
+      i = i + 1
+    end
+  end
+  return table.concat(out)
+end
+
 ---@param s string
 ---@return string
 function M.strip_double_quotes(s)
