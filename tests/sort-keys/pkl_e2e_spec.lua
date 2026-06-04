@@ -36,6 +36,30 @@ describe("pkl end-to-end", function()
     assert.are.same({ "x {", "  a = 2", "  b = 1", "}" }, lines_of(bufnr))
   end)
 
+  it("keeps a positional element and fences keys around it (no data loss)", function()
+    if not has_pkl then
+      return pending("pkl treesitter parser not available")
+    end
+    local bufnr = setup_buf({
+      "x = new Mapping {",
+      "  z = 1",
+      "  a = 2",
+      "  3",
+      "  m = 4",
+      "}",
+    })
+    set_cursor(1, 2)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "x = new Mapping {",
+      "  a = 2",
+      "  z = 1",
+      "  3",
+      "  m = 4",
+      "}",
+    }, lines_of(bufnr))
+  end)
+
   it(":DeepSortKeys recurses into a nested object body", function()
     if not has_pkl then
       return pending("pkl treesitter parser not available")
