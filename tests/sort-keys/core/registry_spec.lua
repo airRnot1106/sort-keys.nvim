@@ -396,6 +396,36 @@ describe("sort-keys.core.registry", function()
         assert.is_string(fake.captured.query_text)
         assert.is_true(fake.captured.options.can_sort_object)
       end)
+
+      it("isolates the options handed to a builder from the shared built-in cache", function()
+        -- A partial-override builder receives `config.options`. If that table
+        -- aliased the cached built-in spec, a builder mutating it would
+        -- permanently corrupt the built-in handler — even after the user
+        -- handlers are cleared.
+        local mutating = {
+          build = function(_bufnr, _target, config)
+            config.options.comment_aware = true
+            config.options.structural_separator = ";;;"
+            return nil
+          end,
+        }
+        registry.set_user_handlers({ json = { builder = mutating } })
+        registry.get("json").outline(0, { kind = "cursor", pos = { 0, 0 } })
+        registry.set_user_handlers(nil)
+
+        local restored = registry.get("json")
+        assert.is_false(restored.capabilities.comment_aware)
+        local captured
+        local builtin = require("sort-keys.languages.json.builder")
+        local orig = builtin.build
+        builtin.build = function(_bufnr, _target, config)
+          captured = config.options.structural_separator
+          return nil
+        end
+        restored.outline(0, { kind = "cursor", pos = { 0, 0 } })
+        builtin.build = orig
+        assert.equals(",", captured)
+      end)
     end)
 
     describe("conflicting filetype with a different config_name", function()

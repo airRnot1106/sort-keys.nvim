@@ -124,7 +124,11 @@ local function spec_to_handler(spec, config_name)
       return spec.builder.build(bufnr, target, {
         filetype = config_name,
         query_text = spec.query_text,
-        options = spec.options,
+        -- Hand the builder its own copy: the built-in spec is memoized and
+        -- the partial-override merge aliases that cache, so a builder that
+        -- writes to config.options must not be able to corrupt the shared
+        -- base for every later :SortKeys.
+        options = vim.deepcopy(spec.options),
       })
     end,
   }
