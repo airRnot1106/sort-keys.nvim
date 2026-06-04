@@ -73,7 +73,14 @@ function M.run(opts, deep)
     notify("ignoring invalid sort pattern /" .. request.order.pattern .. "/", vim.log.levels.WARN)
   end
 
-  local outline = extract.extract(bufnr, target_of(opts), pack, request.deep)
+  -- A custom extractor is third-party-ish code; isolate a throw so a buggy one
+  -- (or any extract-stage error) surfaces as a warning instead of an uncaught
+  -- stack trace, the same graceful path as "nothing sortable here".
+  local ok, outline = pcall(extract.extract, bufnr, target_of(opts), pack, request.deep)
+  if not ok then
+    notify("extract failed: " .. tostring(outline), vim.log.levels.ERROR)
+    return
+  end
   if not outline then
     notify("no sortable container here", vim.log.levels.WARN)
     return

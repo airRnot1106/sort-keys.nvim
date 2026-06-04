@@ -230,4 +230,14 @@ describe("json end-to-end", function()
       "}",
     }, lines_of(bufnr))
   end)
+
+  it("keeps a pair whose key is the empty string", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({ '{ "b": 1, "": 2, "a": 3 }' })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ '{ "": 2, "a": 3, "b": 1 }' }, lines_of(bufnr))
+  end)
 end)

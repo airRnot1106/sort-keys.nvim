@@ -111,29 +111,41 @@ function M.build_container(container, ctx)
   -- leading-whitespace skip means a delimiter that is not byte-adjacent (e.g. a
   -- comma at the start of the next line) is still observed; probing from the
   -- data end means a trailing comment after the data does not hide it.
+  -- The delimiter is a single punctuation character in every supported
+  -- language (","  ";"  or none); match exactly one non-whitespace char so a
+  -- malformed gap with two (a JS array elision `,,`) doesn't get swallowed
+  -- whole into the separator and re-emitted between every entry.
   local separator = ""
   if #raw >= 2 then
     local probe =
       get_text(ctx.bufnr, raw[1].range[3], raw[1].range[4], raw[2].range[1], raw[2].range[2])
-    separator = probe:match("^%s*(%S*)") or ""
+    separator = probe:match("^%s*(%S)") or ""
   end
   -- Peel one separator off s -> (rest, had_separator). The separator is
   -- slot-bound, so it is stripped from tails / inter-block gaps here and
-  -- re-emitted by render; trailing detection reuses the same peel. It is peeled
-  -- from whichever end carries it: the front for the usual trailing-delimiter
-  -- style ("a": 1,\n) and the back for a leading-delimiter style (\n  ,"b"),
-  -- which render then normalizes to the trailing style.
+  -- re-emitted by render. Peels only a LEADING separator (the usual
+  -- trailing-delimiter style "a": 1,\n). Used for tails, trailing detection,
+  -- and the inter-block gap. It must NOT strip a trailing byte that merely
+  -- equals the separator — a comment ending in "," is content, not a delimiter.
   local function peel_separator(s)
-    if separator == "" then
-      return s, false
-    end
-    if s:sub(1, #separator) == separator then
+    if separator ~= "" and s:sub(1, #separator) == separator then
       return s:sub(#separator + 1), true
     end
-    if #s >= #separator and s:sub(-#separator) == separator then
-      return s:sub(1, -#separator - 1), true
-    end
     return s, false
+  end
+
+  -- The inter-entry gap (joint) may instead carry the delimiter at its BACK in
+  -- a leading-delimiter layout (\n  ,"b"); strip whichever end has it so the
+  -- joint is pure whitespace and render normalizes to the trailing style.
+  local function peel_joint(s)
+    local rest, had = peel_separator(s)
+    if had then
+      return rest
+    end
+    if separator ~= "" and #s >= #separator and s:sub(-#separator) == separator then
+      return s:sub(1, -#separator - 1)
+    end
+    return s
   end
 
   local entries = {}
@@ -186,11 +198,16 @@ function M.build_container(container, ctx)
 
   local joint = " "
   if #raw >= 2 then
-    joint = (
-      peel_separator(
-        get_text(ctx.bufnr, b1.finish[1], b1.finish[2], blocks[2].start[1], blocks[2].start[2])
-      )
+    joint = peel_joint(
+      get_text(ctx.bufnr, b1.finish[1], b1.finish[2], blocks[2].start[1], blocks[2].start[2])
     )
+    -- A joint that still carries the delimiter means the inter-entry gap held an
+    -- extra one with no node behind it (a JS array elision `[a,,b]`). Re-emitting
+    -- the observed joint would duplicate it, so leave the container untouched
+    -- rather than corrupt it.
+    if separator ~= "" and joint:find(separator, 1, true) then
+      return nil
+    end
   end
 
   -- A trailing separator on the last entry can sit in two places: in the bytes

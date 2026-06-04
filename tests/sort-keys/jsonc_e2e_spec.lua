@@ -129,4 +129,26 @@ describe("jsonc end-to-end", function()
     vim.cmd("SortKeys")
     assert.are.same({ '{ "a": 1, "b": 2 }' }, lines_of(bufnr))
   end)
+
+  it("does not strip a trailing comment whose text ends in the separator", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    -- "b" stays last (a < b); its `// note,` must survive verbatim — the comma
+    -- inside the comment is content, not a slot delimiter.
+    local bufnr = setup_buf({
+      "{",
+      '  "a": 1,',
+      '  "b": 2 // note,',
+      "}",
+    })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({
+      "{",
+      '  "a": 1,',
+      '  "b": 2 // note,',
+      "}",
+    }, lines_of(bufnr))
+  end)
 end)

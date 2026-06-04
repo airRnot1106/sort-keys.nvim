@@ -10,9 +10,12 @@
  (#set! sortkeys.kind "array"))
 
 ;; ─── entries (object) ───
+;; Capture the whole string node (not its string_content) so an empty-string
+;; key "" — which has no string_content child — is still captured; the
+;; normalizer strips the quotes.
 ((pair
-   key:   (string (string_content) @sortkeys.key)
-   value: (_)                       @sortkeys.value
+   key:   (string) @sortkeys.key
+   value: (_)      @sortkeys.value
  ) @sortkeys.entry
  (#set! sortkeys.entry_kind "pair"))
 

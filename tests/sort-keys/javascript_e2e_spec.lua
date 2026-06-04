@@ -108,4 +108,16 @@ describe("javascript end-to-end", function()
       "};",
     }, lines_of(bufnr))
   end)
+
+  it("leaves an array with an elision hole untouched instead of corrupting it", function()
+    if not has_js then
+      return pending("javascript treesitter parser not available")
+    end
+    -- A hole has no node, so the gap carries an extra comma; sorting would
+    -- duplicate it. The container is left as-is rather than mangled.
+    local bufnr = setup_buf({ "const a = [3, , 1];" })
+    set_cursor(0, 11)
+    vim.cmd("SortKeys")
+    assert.are.same({ "const a = [3, , 1];" }, lines_of(bufnr))
+  end)
 end)
