@@ -1,4 +1,5 @@
 local elixir_builder = require("sort-keys.languages.elixir.builder")
+local gleam_builder = require("sort-keys.languages.gleam.builder")
 local go_builder = require("sort-keys.languages.go.builder")
 local javascript_builder = require("sort-keys.languages.javascript.builder")
 local json_builder = require("sort-keys.languages.json.builder")
@@ -18,6 +19,7 @@ local M = {}
 -- canonical config name each filetype maps to (see `builder.filetypes`).
 local BUILT_IN_BUILDERS = {
   elixir_builder,
+  gleam_builder,
   go_builder,
   javascript_builder,
   json_builder,

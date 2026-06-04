@@ -304,6 +304,27 @@ describe("sort-keys.core.registry", function()
       assert.is_true(handler.capabilities.comment_aware)
     end)
 
+    it("returns a handler that exposes `capabilities` and `outline` for gleam", function()
+      local handler = registry.get("gleam")
+      assert.is_not_nil(handler)
+      assert.is_table(handler.capabilities)
+      assert.is_function(handler.outline)
+    end)
+
+    it("the gleam handler declares can_sort_object / can_deep (and no array shape)", function()
+      -- Gleam sorts labelled arguments / constructor fields (object shape);
+      -- positional calls / tuples / lists are never captured, so no array.
+      local handler = registry.get("gleam")
+      assert.is_true(handler.capabilities.can_sort_object)
+      assert.is_false(handler.capabilities.can_sort_array)
+      assert.is_true(handler.capabilities.can_deep)
+    end)
+
+    it("the gleam handler declares comment_aware = true", function()
+      local handler = registry.get("gleam")
+      assert.is_true(handler.capabilities.comment_aware)
+    end)
+
     it(
       "does not let a built-in spec drift between calls (built-in spec is reused, not mutated)",
       function()

@@ -1,0 +1,31 @@
+description = "Gleam handler"
+
+# Four sortable container shapes reach this layer, all label-keyed:
+#   arguments                  (a `record` or `function_call` argument list)
+#   data_constructor_arguments (a custom-type constructor's field list)
+#   record_update_arguments    (a record-update field list `Pet(..base, x: 1)`)
+#   record_pattern_arguments   (a `case` record pattern `Foo(a: x, b: y)`)
+#
+# Gleam labelled arguments may be given in any order, so sorting them by label
+# is safe. Positional members carry no `label` field; the builder pins them
+# (movable=false) so they keep their slot. A list with no labelled member is
+# never captured by the query, so a purely positional call / tuple / list
+# falls through to "no sortable structure under cursor".
+can_sort_object = true
+can_sort_array = false
+can_deep = true
+key_quoting = "logical"
+
+# `//` line comments hang off the argument list as siblings of the arguments;
+# the standard comment_attach path carries them with the next entry.
+comment_aware = true
+
+# Labels are always bare snake_case identifiers — one key shape per container.
+mixed_key_types = false
+
+# Argument lists are `,`-separated; gleam format keeps a trailing comma on the
+# multi-line form, so it is preserved when present.
+structural_separator = ","
+trailing_separator_allowed = true
+
+query_file = "sort-keys.scm"

@@ -54,6 +54,7 @@
         pkgs.vimPlugins.nvim-treesitter.withPlugins (
           parsers: with parsers; [
             elixir
+            gleam
             go
             javascript
             json

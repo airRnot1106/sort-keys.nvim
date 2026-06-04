@@ -16,6 +16,7 @@ local NORMALIZER_DIRS = {
   rust = "rust",
   kdl = "kdl",
   elixir = "elixir",
+  gleam = "gleam",
 }
 
 describe("sort-keys key normalizers", function()
@@ -630,6 +631,14 @@ describe("sort-keys key normalizers", function()
 
     it("returns a bare identifier verbatim", function()
       assert.equals("snake_case_1", key_normalize.elixir("snake_case_1"))
+    end)
+  end)
+
+  describe("gleam(text)", function()
+    it("returns an argument label verbatim (bare snake_case identifier)", function()
+      -- Gleam labels carry no quoting or escapes, so the label text is the key.
+      assert.equals("name", key_normalize.gleam("name"))
+      assert.equals("cuteness_level", key_normalize.gleam("cuteness_level"))
     end)
   end)
 end)
