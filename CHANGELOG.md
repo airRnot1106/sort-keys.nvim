@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.4.0](https://github.com/airRnot1106/sort-keys.nvim/compare/v0.3.0...v0.4.0) (2026-06-04)
+
+
+### Features
+
+* **filetype:** add Elixir support ([d5630e7](https://github.com/airRnot1106/sort-keys.nvim/commit/d5630e7e68ee233077f5b3518ed5b51b50cd0b8f))
+* **filetype:** add Gleam support ([a4fa0fc](https://github.com/airRnot1106/sort-keys.nvim/commit/a4fa0fc70f51f374f14398c3e7a95834f35d7831))
+* **filetype:** add Go support ([001a232](https://github.com/airRnot1106/sort-keys.nvim/commit/001a2329b110126c1530e8a716e393159f8b72a4))
+* **filetype:** add KDL support ([a70338e](https://github.com/airRnot1106/sort-keys.nvim/commit/a70338e37af978b8b0140d2d1ab9abeeec913f6e))
+* **filetype:** add Pkl support ([d89a472](https://github.com/airRnot1106/sort-keys.nvim/commit/d89a47237866cf0d03ee0f41bd831a571c3dff76))
+* **filetype:** add Python support ([6da8c8c](https://github.com/airRnot1106/sort-keys.nvim/commit/6da8c8c15aa1e3da64a2b0264f1933c1a8a2c360))
+* **filetype:** add Ruby support ([de51040](https://github.com/airRnot1106/sort-keys.nvim/commit/de510408f8c4e69b4080729fcd748c6159ca08a0))
+* **filetype:** add Rust support ([e430b0d](https://github.com/airRnot1106/sort-keys.nvim/commit/e430b0d65e713715ef7636b21aef43feae8cba7d))
+
+
+### Bug Fixes
+
+* **core:** close remaining sort crash paths (regex flag, over-range code points) ([9c5bbc5](https://github.com/airRnot1106/sort-keys.nvim/commit/9c5bbc56ffacfdbb9fa6873ff1695eeb256011c3))
+* **core:** forward data_range through apply_selection_overlay ([130726f](https://github.com/airRnot1106/sort-keys.nvim/commit/130726f279b12e85ea9971c79ea9e9a6513863f4))
+* **core:** honor the u flag's deduplication through the applier ([face696](https://github.com/airRnot1106/sort-keys.nvim/commit/face696f3e4bc7edf48121d361b2e1c3e8940125))
+* **core:** place inter-entry separator across absorbed trailing comments ([4fb60fc](https://github.com/airRnot1106/sort-keys.nvim/commit/4fb60fc844e606f7927d20df181b7ac2a924f156))
+* **core:** stop dropping duplicate-keyed and multi-match entries ([48953f0](https://github.com/airRnot1106/sort-keys.nvim/commit/48953f0d39e469b71080e6aac4f75d1f3b431121))
+* **handlers:** drop comment-captured nodes from sortable entries ([9a0df6d](https://github.com/airRnot1106/sort-keys.nvim/commit/9a0df6d5b35470a113014bb975b5df0000bf6411))
+* **javascript:** decode JS key escapes leniently so non-JSON escapes can't crash sorting ([c1e6fe2](https://github.com/airRnot1106/sort-keys.nvim/commit/c1e6fe28911fba7ccf685ab92dab08654c71cb2d))
+* **key_escapes:** decode key escapes leniently so no language can crash sorting ([b54ffb5](https://github.com/airRnot1106/sort-keys.nvim/commit/b54ffb57e460d2f6010cd0b77585d7001a63485e))
+* **policy:** fence order-sensitive pins so sorting can't cross them ([f65a7df](https://github.com/airRnot1106/sort-keys.nvim/commit/f65a7df5de064d1023883a6a335732febd50f7ae))
+* **registry:** isolate builder options from the shared built-in cache ([47fadbc](https://github.com/airRnot1106/sort-keys.nvim/commit/47fadbca4db3ac7c511efe54703005811c62fb9b))
+* **toml:** tolerate inline comments after scalar values ([5d43c17](https://github.com/airRnot1106/sort-keys.nvim/commit/5d43c178e954b2a021362ed4c028d52b031ff817))
+
+
+### Performance Improvements
+
+* **registry:** memoize built-in spec disk reads ([e927845](https://github.com/airRnot1106/sort-keys.nvim/commit/e927845548ef811eda2c0b6bd87c03db10b3579c))
+
+
+### Documentation
+
+* **claude:** align architecture and builder guide with current code ([afac295](https://github.com/airRnot1106/sort-keys.nvim/commit/afac2958dcac7ae0dcb6e649b4463a05be6f1641))
+* **comments:** strip historical narrative from WHY comments ([98b93f0](https://github.com/airRnot1106/sort-keys.nvim/commit/98b93f0c5bd1ad9012e4562615b64f5395267fdc))
+* **vimdoc:** align builder reference with the shared-helpers layout ([ef84f8e](https://github.com/airRnot1106/sort-keys.nvim/commit/ef84f8e8ff21772e81b7635c2e6fde72c0137433))
+
 ## [0.3.0](https://github.com/airRnot1106/sort-keys.nvim/compare/v0.2.3...v0.3.0) (2026-05-25)
 
 
