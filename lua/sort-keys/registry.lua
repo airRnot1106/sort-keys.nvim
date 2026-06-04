@@ -20,6 +20,7 @@ local BUILT_IN_FILETYPES = {
   javascript = "javascript",
   typescript = "typescript",
   python = "python",
+  ruby = "ruby",
 }
 
 local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"
