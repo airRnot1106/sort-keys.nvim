@@ -9,6 +9,12 @@
 ((flow_mapping) @sortkeys.container
  (#set! sortkeys.kind "object"))
 
+((block_sequence) @sortkeys.container
+ (#set! sortkeys.kind "array"))
+
+((flow_sequence) @sortkeys.container
+ (#set! sortkeys.kind "array"))
+
 ;; ─── mapping pairs ───
 ((block_mapping_pair
    key:   (_)  @sortkeys.key
@@ -21,6 +27,15 @@
    value: (_)? @sortkeys.value
  ) @sortkeys.entry
  (#set! sortkeys.entry_kind "pair"))
+
+;; ─── sequence items (the `- ` block item and bare flow elements) ───
+((block_sequence
+   (block_sequence_item) @sortkeys.entry)
+ (#set! sortkeys.entry_kind "element"))
+
+((flow_sequence
+   (_) @sortkeys.entry)
+ (#set! sortkeys.entry_kind "element"))
 
 ;; ─── comments ───
 ((comment) @sortkeys.comment)

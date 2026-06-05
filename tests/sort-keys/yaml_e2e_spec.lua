@@ -46,6 +46,26 @@ describe("yaml end-to-end", function()
     assert.are.same({ "x: {a: 2, b: 1}" }, lines_of(bufnr))
   end)
 
+  it("sorts a block sequence (the `- ` items)", function()
+    if not has_yaml then
+      return pending("yaml treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "- b", "- a", "- c" })
+    set_cursor(0, 2)
+    vim.cmd("SortKeys")
+    assert.are.same({ "- a", "- b", "- c" }, lines_of(bufnr))
+  end)
+
+  it("sorts a flow sequence", function()
+    if not has_yaml then
+      return pending("yaml treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "x: [3, 1, 2]" })
+    set_cursor(0, 5)
+    vim.cmd("SortKeys")
+    assert.are.same({ "x: [1, 2, 3]" }, lines_of(bufnr))
+  end)
+
   it("does not misread an own-line comment as the separator", function()
     if not has_yaml then
       return pending("yaml treesitter parser not available")

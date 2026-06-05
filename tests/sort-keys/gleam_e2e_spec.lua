@@ -66,6 +66,20 @@ describe("gleam end-to-end", function()
     assert.are.same({ "pub fn x() { Foo(..base, a: 2, c: 1) }" }, lines_of(bufnr))
   end)
 
+  it("sorts a case-clause record pattern's labelled fields", function()
+    if not has_gleam then
+      return pending("gleam treesitter parser not available")
+    end
+    local bufnr =
+      setup_buf({ "pub fn x(v) {", "  case v {", "    Foo(b: 1, a: 2) -> 0", "  }", "}" })
+    set_cursor(2, 9)
+    vim.cmd("SortKeys")
+    assert.are.same(
+      { "pub fn x(v) {", "  case v {", "    Foo(a: 2, b: 1) -> 0", "  }", "}" },
+      lines_of(bufnr)
+    )
+  end)
+
   it(":DeepSortKeys recurses into a record passed positionally", function()
     if not has_gleam then
       return pending("gleam treesitter parser not available")

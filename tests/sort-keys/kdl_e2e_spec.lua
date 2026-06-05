@@ -61,8 +61,54 @@ describe("kdl end-to-end", function()
       return pending("kdl treesitter parser not available")
     end
     local bufnr = setup_buf({ "node \\", "  b=2 \\", "  a=1" })
-    set_cursor(0, 0)
+    -- The cursor must sit on a property to pick the property level; on the node
+    -- name it would sort sibling nodes instead.
+    set_cursor(1, 2)
     vim.cmd("SortKeys")
     assert.are.same({ "node \\", "  a=1 \\", "  b=2" }, lines_of(bufnr))
+  end)
+
+  -- Like JSON, the cursor picks the "key" level: on a node name it sorts the
+  -- sibling nodes by name; on a property it sorts that node's properties.
+  it("sorts sibling nodes by name when the cursor is on a node", function()
+    if not has_kdl then
+      return pending("kdl treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "zebra 1", "apple 2", "mango 3" })
+    set_cursor(0, 1)
+    vim.cmd("SortKeys")
+    assert.are.same({ "apple 2", "mango 3", "zebra 1" }, lines_of(bufnr))
+  end)
+
+  it("sorts sibling nodes inside a children block", function()
+    if not has_kdl then
+      return pending("kdl treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "pkg {", "  zebra 1", "  apple 2", "}" })
+    set_cursor(1, 3)
+    vim.cmd("SortKeys")
+    assert.are.same({ "pkg {", "  apple 2", "  zebra 1", "}" }, lines_of(bufnr))
+  end)
+
+  it("keeps `;` node terminators slot-bound when reordering nodes", function()
+    if not has_kdl then
+      return pending("kdl treesitter parser not available")
+    end
+    -- The `;` lives inside each node's range; without slot-binding it, sorting
+    -- would merge `c 1; a 2` into one node `a 2 c 1;`.
+    local bufnr = setup_buf({ "c 1; a 2; b 3" })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ "a 2; b 3; c 1" }, lines_of(bufnr))
+  end)
+
+  it("sorts the outer nodes while leaving a nested block untouched", function()
+    if not has_kdl then
+      return pending("kdl treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "c 1", "a 2", "b {", "  y 1", "  x 2", "}" })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ "a 2", "b {", "  y 1", "  x 2", "}", "c 1" }, lines_of(bufnr))
   end)
 end)

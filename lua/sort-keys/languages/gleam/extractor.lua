@@ -1,9 +1,11 @@
 -- Custom extractor for Gleam labelled arguments. A record/function call
--- (`arguments`) or a record definition (`data_constructor_arguments`) mixes
--- labelled args (`label: value`) with positional ones; only the labelled ones
--- have a key and may reorder, and a positional argument must keep its slot (it
--- binds by position), so positional args are pinned. A container is sortable
--- only when it has at least one labelled argument.
+-- (`arguments`), a record definition (`data_constructor_arguments`), a record
+-- update (`record_update_arguments`), or a `case`-clause record pattern
+-- (`record_pattern_arguments`) mixes labelled args (`label: value`) with
+-- positional ones; only the labelled ones have a key and may reorder, and a
+-- positional argument must keep its slot (it binds by position), so positional
+-- args are pinned. A container is sortable only when it has at least one
+-- labelled argument.
 local support = require("sort-keys.extract_support")
 
 local M = {}
@@ -41,12 +43,14 @@ local function collect(bufnr, root, query)
     local args = first(match, cap_id, "sortkeys.args")
       or first(match, cap_id, "sortkeys.def_args")
       or first(match, cap_id, "sortkeys.update_args")
+      or first(match, cap_id, "sortkeys.pat_args")
     if args then
       container_nodes[node_id_key(args)] = args
     end
     local arg = first(match, cap_id, "sortkeys.arg")
       or first(match, cap_id, "sortkeys.def_arg")
       or first(match, cap_id, "sortkeys.update_arg")
+      or first(match, cap_id, "sortkeys.pat_arg")
     if arg then
       push(arg:parent(), arg)
     end
@@ -67,6 +71,9 @@ local function collect(bufnr, root, query)
     local entries, has_label = {}, false
     for _, arg in ipairs(args) do
       local label = arg:field("label")[1]
+      -- A call/definition/update argument carries its subtree in the `value`
+      -- field; a record-pattern argument carries it in the `pattern` field.
+      local subtree = arg:field("value")[1] or arg:field("pattern")[1]
       if label then
         has_label = true
         entries[#entries + 1] = {
@@ -74,7 +81,7 @@ local function collect(bufnr, root, query)
           range = { arg:range() },
           entry_kind = "pair",
           key_node = label,
-          value_node = arg:field("value")[1],
+          value_node = subtree,
           movable = true,
         }
       else
@@ -85,7 +92,7 @@ local function collect(bufnr, root, query)
           node = arg,
           range = { arg:range() },
           entry_kind = "element",
-          value_node = arg:field("value")[1],
+          value_node = subtree,
           movable = false,
         }
       end

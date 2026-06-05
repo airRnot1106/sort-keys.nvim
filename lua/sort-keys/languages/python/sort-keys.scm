@@ -8,6 +8,11 @@
 ((list) @sortkeys.container
  (#set! sortkeys.kind "array"))
 
+;; A set literal `{1, 2, 3}` is array-like; the empty `{}` parses as a
+;; `dictionary`, not a `set`, so it is not captured here.
+((set) @sortkeys.container
+ (#set! sortkeys.kind "array"))
+
 ;; ─── dict pairs (key is any expression: string / number / name) ───
 ((pair
    key:   (_) @sortkeys.key
@@ -21,6 +26,11 @@
 
 ;; ─── list elements ───
 ((list
+   (_) @sortkeys.entry)
+ (#set! sortkeys.entry_kind "element"))
+
+;; ─── set elements ───
+((set
    (_) @sortkeys.entry)
  (#set! sortkeys.entry_kind "element"))
 

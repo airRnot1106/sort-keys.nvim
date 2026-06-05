@@ -36,6 +36,16 @@ describe("toml end-to-end", function()
     assert.are.same({ "x = { a = 2, b = 1 }" }, lines_of(bufnr))
   end)
 
+  it("sorts top-level keys above any [table] section", function()
+    if not has_toml then
+      return pending("toml treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "zebra = 1", "apple = 2", "", "[s]", "y = 1" })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ "apple = 2", "zebra = 1", "", "[s]", "y = 1" }, lines_of(bufnr))
+  end)
+
   it("sorts the keys of a [table] section, keeping the header", function()
     if not has_toml then
       return pending("toml treesitter parser not available")

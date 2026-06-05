@@ -56,6 +56,26 @@ describe("ruby end-to-end", function()
     assert.are.same({ "x = [1, 2, 3]" }, lines_of(bufnr))
   end)
 
+  it("sorts a method call's keyword arguments, keeping positional args first", function()
+    if not has_rb then
+      return pending("ruby treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "foo(x, b: 1, a: 2)" })
+    set_cursor(0, 7)
+    vim.cmd("SortKeys")
+    assert.are.same({ "foo(x, a: 2, b: 1)" }, lines_of(bufnr))
+  end)
+
+  it("sorts a case/in hash pattern's members", function()
+    if not has_rb then
+      return pending("ruby treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "case x", "in {b:, a:}", "  nil", "end" })
+    set_cursor(1, 5)
+    vim.cmd("SortKeys")
+    assert.are.same({ "case x", "in {a:, b:}", "  nil", "end" }, lines_of(bufnr))
+  end)
+
   it("fences a *splat in an array so elements don't cross it", function()
     if not has_rb then
       return pending("ruby treesitter parser not available")

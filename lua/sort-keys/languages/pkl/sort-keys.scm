@@ -6,7 +6,17 @@
 ((objectBody) @sortkeys.container
  (#set! sortkeys.kind "object"))
 
+;; The module is an object whose entries are its top-level `classProperty`s
+;; (`name = value` / `bird { ... }`). Other module members (amends, imports,
+;; class/typealias decls) are not classProperties, so they are not entries and
+;; ride along in the container prefix/suffix.
+((module) @sortkeys.container
+ (#set! sortkeys.kind "object"))
+
 ;; ─── members ───
+((classProperty (identifier) @sortkeys.key) @sortkeys.entry
+ (#set! sortkeys.entry_kind "pair"))
+
 ((objectProperty (identifier) @sortkeys.key) @sortkeys.entry
  (#set! sortkeys.entry_kind "pair"))
 
@@ -26,6 +36,7 @@
 ((whenGenerator) @sortkeys.entry @sortkeys.fence
  (#set! sortkeys.entry_kind "element"))
 
-;; ─── comments ───
+;; ─── comments (`//`, `/* */`, and `///` doc comments) ───
 ((lineComment) @sortkeys.comment)
 ((blockComment) @sortkeys.comment)
+((docComment) @sortkeys.comment)

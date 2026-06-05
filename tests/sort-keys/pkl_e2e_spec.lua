@@ -60,6 +60,16 @@ describe("pkl end-to-end", function()
     }, lines_of(bufnr))
   end)
 
+  it("sorts module-level (top-level) properties", function()
+    if not has_pkl then
+      return pending("pkl treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "zebra = 1", "apple = 2" })
+    set_cursor(0, 0)
+    vim.cmd("SortKeys")
+    assert.are.same({ "apple = 2", "zebra = 1" }, lines_of(bufnr))
+  end)
+
   it(":DeepSortKeys recurses into a nested object body", function()
     if not has_pkl then
       return pending("pkl treesitter parser not available")

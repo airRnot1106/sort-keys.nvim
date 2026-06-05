@@ -56,6 +56,36 @@ describe("nix end-to-end", function()
     assert.are.same({ "x = { a = 1; b = 2; inherit (pkgs) hello; c = 3; }" }, lines_of(bufnr))
   end)
 
+  it("sorts a list", function()
+    if not has_nix then
+      return pending("nix treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "{ x = [ c b a ]; }" })
+    set_cursor(0, 9)
+    vim.cmd("SortKeys")
+    assert.are.same({ "{ x = [ a b c ]; }" }, lines_of(bufnr))
+  end)
+
+  it("sorts function formal args, keeping the trailing ellipsis", function()
+    if not has_nix then
+      return pending("nix treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "{ b, a, ... }: b" })
+    set_cursor(0, 5)
+    vim.cmd("SortKeys")
+    assert.are.same({ "{ a, b, ... }: b" }, lines_of(bufnr))
+  end)
+
+  it("sorts the identifier list of an inherit when the cursor is on a name", function()
+    if not has_nix then
+      return pending("nix treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "{ inherit c b a; }" })
+    set_cursor(0, 12)
+    vim.cmd("SortKeys")
+    assert.are.same({ "{ inherit a b c; }" }, lines_of(bufnr))
+  end)
+
   it(":DeepSortKeys recurses into a nested attrset", function()
     if not has_nix then
       return pending("nix treesitter parser not available")
