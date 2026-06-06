@@ -24,9 +24,9 @@ describe("registry.resolve", function()
     function()
       -- The whole point of a partial override: supply only options. The
       -- built-in's filetypes are inherited so the override actually binds.
-      registry.set_user_handlers({ json = { options = { can_deep = false } } })
+      registry.set_user_handlers({ json = { options = { can_sort_array = false } } })
       local pack = registry.resolve("json")
-      assert.is_false(pack.options.can_deep) -- overridden
+      assert.is_false(pack.options.can_sort_array) -- overridden
       assert.is_true(pack.options.can_sort_object) -- inherited from the built-in
       assert.is_truthy(pack.query_text) -- query inherited, not dropped
     end

@@ -361,7 +361,7 @@ function M.run(bufnr, target, pack, deep, collect)
   local outline = M.build_container(chosen, {
     bufnr = bufnr,
     options = options,
-    deep = deep and options.can_deep == true,
+    deep = deep,
     key_normalizer = pack.key_normalizer or function(t)
       return t
     end,

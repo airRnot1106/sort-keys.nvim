@@ -2,7 +2,6 @@ description = "JSONC handler"
 
 can_sort_object = true
 can_sort_array = true
-can_deep = true
 
 # JSONC carries line/block comments; extract folds them into entry lead/tail
 # via core.comment_fold so they travel with the pair they document.

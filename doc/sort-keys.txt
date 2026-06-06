@@ -102,7 +102,7 @@ supply are overlaid; everything else is inherited.
     -- Tweak the built-in JSON options.
     require("sort-keys").setup({
       handlers = {
-        json = { options = { can_deep = false } },
+        json = { options = { can_sort_array = false } },
       },
     })
 <
@@ -122,7 +122,6 @@ and `query_text` are required; `key_normalizer` is optional.
           options   = {
             can_sort_object = true,
             can_sort_array  = true,
-            can_deep        = true,
             comment_aware   = true,
             parser_lang     = "my_lang",  -- defaults to the filetype name
           },
@@ -179,7 +178,6 @@ Options ~
 
   can_sort_object (boolean)   allow sorting object/map containers
   can_sort_array  (boolean)   allow sorting array/list containers
-  can_deep        (boolean)   allow |:DeepSortKeys| recursion
   comment_aware   (boolean)   fold comments onto adjacent entries so they
                               travel with the entry they document
   parser_lang     (string)    tree-sitter language to parse with; defaults to

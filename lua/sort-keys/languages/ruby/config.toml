@@ -2,7 +2,6 @@ description = "Ruby handler"
 
 can_sort_object = true
 can_sort_array = true
-can_deep = true
 
 comment_aware = true
 

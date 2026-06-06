@@ -2,7 +2,6 @@ description = "JSON handler"
 
 can_sort_object = true
 can_sort_array = true
-can_deep = true
 
 # JSON has no comments; the extractor skips comment folding when false.
 comment_aware = false

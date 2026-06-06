@@ -227,7 +227,7 @@ wholesale; built-in packs are never mutated.
 A language-pack spec is `{ filetypes, options, query_text, key_normalizer, extractor }`:
 
 - `filetypes` — list of `vim.bo.filetype` values this spec serves.
-- `options` — same shape as `languages/<config_name>/config.toml`: `can_sort_object` / `can_sort_array` / `can_deep` / `comment_aware` / `parser_lang` (+ `query_file` for built-ins). **No separator fields** — those are observed.
+- `options` — same shape as `languages/<config_name>/config.toml`: `can_sort_object` / `can_sort_array` / `comment_aware` / `parser_lang` (+ `query_file` for built-ins). **No separator fields** — those are observed.
 - `query_text` — tree-sitter query string with the `sortkeys.*` captures.
 - `key_normalizer` — optional `fun(text:string):string`. Omit to fall back to the built-in `normalize.lua` for that config name (if any) or identity.
 - `extractor` — optional custom extractor module (`{ extract(bufnr, target, pack, deep) }`) for an irregular AST. Omit to use the generic, query-driven extractor (the common case).
@@ -246,7 +246,7 @@ Override rules (registry decides by whether the user `handlers` key matches a bu
 
 1. `config.toml` — capabilities + parser:
    - `parser_lang = "json"` (override; defaults to the filetype name — set it when reusing another grammar, e.g. jsonc on the json parser)
-   - `can_sort_object` / `can_sort_array` / `can_deep`
+   - `can_sort_object` / `can_sort_array`
    - `comment_aware = true|false` (gates `core/comment_fold`)
    - `query_file = "sort-keys.scm"`
    - (no separator/quoting fields — observed)
