@@ -11,7 +11,6 @@ describe("registry.resolve", function()
   it("resolves a built-in filetype to its declarative pack", function()
     local pack = registry.resolve("json")
     assert.are.equal("json", pack.config_name)
-    assert.is_true(pack.options.can_sort_object)
     assert.is_truthy(pack.query_text)
   end)
 
@@ -24,10 +23,10 @@ describe("registry.resolve", function()
     function()
       -- The whole point of a partial override: supply only options. The
       -- built-in's filetypes are inherited so the override actually binds.
-      registry.set_user_handlers({ json = { options = { can_sort_array = false } } })
-      local pack = registry.resolve("json")
-      assert.is_false(pack.options.can_sort_array) -- overridden
-      assert.is_true(pack.options.can_sort_object) -- inherited from the built-in
+      registry.set_user_handlers({ lua = { options = { comment_aware = false } } })
+      local pack = registry.resolve("lua")
+      assert.is_false(pack.options.comment_aware) -- overridden
+      assert.are.equal("sort-keys.scm", pack.options.query_file) -- built-in option inherited
       assert.is_truthy(pack.query_text) -- query inherited, not dropped
     end
   )
@@ -40,7 +39,7 @@ describe("registry.resolve", function()
   end)
 
   it("does not register a brand-new config_name that omits filetypes", function()
-    registry.set_user_handlers({ mylang = { options = { can_sort_object = true } } })
+    registry.set_user_handlers({ mylang = { options = {} } })
     assert.is_nil(registry.resolve("mylang"))
   end)
 

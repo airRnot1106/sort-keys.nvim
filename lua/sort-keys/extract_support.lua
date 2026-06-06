@@ -111,24 +111,10 @@ local function find_inner_container(node, containers_by_id)
   return nil
 end
 
-local function capability_allows(kind, options)
-  if kind == "object" then
-    return options.can_sort_object == true
-  end
-  if kind == "array" then
-    return options.can_sort_array == true
-  end
-  return false
-end
-
 -- Build the IR for one container. `ctx` carries bufnr, options, deep,
 -- key_normalizer, and the collect output (containers_by_id, entries_by_parent,
 -- comments_by_parent). Recurses through containers_by_id for deep sort.
 function M.build_container(container, ctx)
-  if not capability_allows(container.kind, ctx.options) then
-    return nil
-  end
-
   local node_id_key = M.node_id_key
   local get_text = M.get_text
 

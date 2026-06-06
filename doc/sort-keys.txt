@@ -99,10 +99,10 @@ When the handlers key matches a built-in config name, only the fields you
 supply are overlaid; everything else is inherited.
 
 >lua
-    -- Tweak the built-in JSON options.
+    -- Tweak the built-in Lua options.
     require("sort-keys").setup({
       handlers = {
-        json = { options = { can_sort_array = false } },
+        lua = { options = { comment_aware = false } },
       },
     })
 <
@@ -120,8 +120,6 @@ and `query_text` are required; `key_normalizer` is optional.
         my_lang = {
           filetypes = { "my_lang", "ml" },
           options   = {
-            can_sort_object = true,
-            can_sort_array  = true,
             comment_aware   = true,
             parser_lang     = "my_lang",  -- defaults to the filetype name
           },
@@ -161,8 +159,9 @@ Different key + new filetype:
 Notes ~
 - Calling setup() again replaces the user-handler map wholesale. Built-in
   packs are never mutated.
-- There is no `builder` field. Languages whose AST the `sortkeys.*` query
-  cannot express (irregular shapes) are not yet supported.
+- Languages whose AST the `sortkeys.*` query cannot express (irregular
+  shapes) can supply a custom `extractor` field in their handler spec —
+  see |sort-keys-handlers-new-lang|.
 
 ==============================================================================
 5. LANGUAGE PACKS                                   *sort-keys-language-packs*
@@ -176,8 +175,6 @@ the single generic extractor.
                                               *sort-keys-language-packs-options*
 Options ~
 
-  can_sort_object (boolean)   allow sorting object/map containers
-  can_sort_array  (boolean)   allow sorting array/list containers
   comment_aware   (boolean)   fold comments onto adjacent entries so they
                               travel with the entry they document
   parser_lang     (string)    tree-sitter language to parse with; defaults to

@@ -26,7 +26,7 @@ describe("command extract isolation", function()
       handlers = {
         boom = {
           filetypes = { "boomft" },
-          options = { can_sort_object = true },
+          options = {},
           query_text = "",
           extractor = {
             extract = function()

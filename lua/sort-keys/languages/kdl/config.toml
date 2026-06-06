@@ -1,8 +1,3 @@
-description = "KDL handler"
-
-can_sort_object = true
-can_sort_array = false
-
 comment_aware = true
 
 # KDL fields are space-separated, and a `\` line continuation in the gap would
