@@ -29,6 +29,9 @@
 --     child    = nil | Container, -- nested container for deep sort
 --     pre      = "\"a\": ",   -- text before child (used only when child ~= nil)
 --     post     = "",          -- text after child  (used only when child ~= nil)
+--     value_keyed = nil,      -- true = sort_key is the entry's OWN content (an
+--                             --   array element), so deep sort re-derives it
+--                             --   from the sorted child; a pair's key is stable.
 --   }
 --
 -- The copy helpers forward every field via `pairs`, so adding a new IR field

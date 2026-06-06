@@ -45,6 +45,49 @@ describe("core.traverse", function()
     assert.are.same({ "y", "x" }, keys(out.entries[2].child))
   end)
 
+  it("deep recomputes a value_keyed entry's sort_key from its SORTED child", function()
+    -- An array element's ordering key is its own content. Deep sort rewrites
+    -- that content, so the key must be re-derived from the sorted child;
+    -- otherwise a second pass (re-extracting the key from the now-reordered
+    -- text) would order the array differently — i.e. deep sort is not idempotent.
+    local child = {
+      prefix = "{",
+      suffix = "}",
+      separator = ",",
+      joint = " ",
+      trailing = false,
+      entries = { { sort_key = "z", text = "z" }, { sort_key = "a", text = "a" } },
+    }
+    local c = {
+      entries = {
+        { sort_key = "{z, a}", value_keyed = true, pre = "", post = "", child = child },
+      },
+    }
+    local out = traverse.deep(c, reverse_entries)
+    -- reverse_entries flips the child to [a, z]; the key reflects that order.
+    assert.are.equal("{a, z}", out.entries[1].sort_key)
+  end)
+
+  it("deep leaves a pair entry's sort_key (its key) untouched when recursing", function()
+    -- A pair entry sorts by its KEY, not its value text, so recursion into the
+    -- value container must never overwrite the key.
+    local child = {
+      prefix = "{",
+      suffix = "}",
+      separator = ",",
+      joint = " ",
+      trailing = false,
+      entries = { { sort_key = "z", text = "z" }, { sort_key = "a", text = "a" } },
+    }
+    local c = {
+      entries = {
+        { sort_key = "b", pre = '"b": ', post = "", child = child },
+      },
+    }
+    local out = traverse.deep(c, reverse_entries)
+    assert.are.equal("b", out.entries[1].sort_key)
+  end)
+
   it("deep does not mutate the input container or its child", function()
     local child = { entries = { { sort_key = "x" }, { sort_key = "y" } } }
     local c = { entries = { { sort_key = "a", child = child } } }

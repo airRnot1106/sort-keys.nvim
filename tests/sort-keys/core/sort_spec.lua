@@ -41,6 +41,56 @@ describe("core.sort", function()
     assert.are.equal(",", out.separator)
   end)
 
+  it(
+    "deep-sorts an array of containers by their SORTED form (idempotent across re-extraction)",
+    function()
+      -- sort_keys here mirror what extract produces: the element's ORIGINAL
+      -- (unsorted) text. Element A's child sorts to "{a, z}", B's stays "{m}".
+      -- Ordering must follow the sorted form ("{a, z}" < "{m}" -> A first), not
+      -- the original text ("{m}" < "{z, a}" -> B first), so a re-extracted second
+      -- pass produces the same order.
+      local function obj(entries)
+        return {
+          prefix = "{",
+          suffix = "}",
+          separator = ",",
+          joint = " ",
+          trailing = false,
+          entries = entries,
+        }
+      end
+      local childA = obj({ leaf("z"), leaf("a") })
+      local childB = obj({ leaf("m") })
+      local c = {
+        prefix = "[",
+        suffix = "]",
+        separator = ",",
+        joint = " ",
+        trailing = false,
+        entries = {
+          {
+            sort_key = "{z, a}",
+            value_keyed = true,
+            pre = "",
+            post = "",
+            movable = true,
+            child = childA,
+          },
+          {
+            sort_key = "{m}",
+            value_keyed = true,
+            pre = "",
+            post = "",
+            movable = true,
+            child = childB,
+          },
+        },
+      }
+      local out = sort.sort(c, { order = {}, deep = true })
+      assert.are.same({ "{a, z}", "{m}" }, keys(out))
+    end
+  )
+
   it("does not mutate the input container", function()
     local c = { entries = { leaf("c"), leaf("a") } }
     sort.sort(c, { order = {} })

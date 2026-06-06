@@ -232,6 +232,11 @@ function M.build_container(container, ctx)
       entry.sort_key = ctx.key_normalizer(vim.treesitter.get_node_text(e.key_node, ctx.bufnr))
     else
       entry.sort_key = ctx.key_normalizer(vim.treesitter.get_node_text(e.node, ctx.bufnr))
+      -- An array element sorts by its own content, so when deep sort reorders
+      -- that content the ordering key must be re-derived from the sorted child
+      -- (see core/traverse). Mark it so traverse knows not to treat sort_key as
+      -- a stable, separate key the way it does for a pair.
+      entry.value_keyed = true
     end
 
     -- The node carrying a nested container for deep recursion: the value node
