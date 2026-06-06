@@ -111,4 +111,14 @@ describe("kdl end-to-end", function()
     vim.cmd("SortKeys")
     assert.are.same({ "a 2", "b {", "  y 1", "  x 2", "}", "c 1" }, lines_of(bufnr))
   end)
+
+  it("deep-sorts nested children blocks", function()
+    if not has_kdl then
+      return pending("kdl treesitter parser not available")
+    end
+    local bufnr = setup_buf({ "c 1", "a 2", "b {", "  y 1", "  x 2", "}" })
+    set_cursor(0, 0)
+    vim.cmd("DeepSortKeys")
+    assert.are.same({ "a 2", "b {", "  x 2", "  y 1", "}", "c 1" }, lines_of(bufnr))
+  end)
 end)
