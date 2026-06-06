@@ -1,5 +1,3 @@
-comment_aware = true
-
 # TypeScript's grammar inherits JavaScript's object/array/pair shapes, so it
 # reuses the JS query and normalizer; only the parser differs.
 parser_lang = "typescript"

@@ -1,4 +1,3 @@
 # Lua line/block comments are folded onto the field they document.
-comment_aware = true
 
 query_file = "sort-keys.scm"

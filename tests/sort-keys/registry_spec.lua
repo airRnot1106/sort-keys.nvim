@@ -23,9 +23,9 @@ describe("registry.resolve", function()
     function()
       -- The whole point of a partial override: supply only options. The
       -- built-in's filetypes are inherited so the override actually binds.
-      registry.set_user_handlers({ lua = { options = { comment_aware = false } } })
-      local pack = registry.resolve("lua")
-      assert.is_false(pack.options.comment_aware) -- overridden
+      registry.set_user_handlers({ jsonc = { options = { parser_lang = "custom" } } })
+      local pack = registry.resolve("jsonc")
+      assert.are.equal("custom", pack.options.parser_lang) -- overridden
       assert.are.equal("sort-keys.scm", pack.options.query_file) -- built-in option inherited
       assert.is_truthy(pack.query_text) -- query inherited, not dropped
     end

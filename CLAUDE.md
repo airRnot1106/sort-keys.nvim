@@ -227,7 +227,7 @@ wholesale; built-in packs are never mutated.
 A language-pack spec is `{ filetypes, options, query_text, key_normalizer, extractor }`:
 
 - `filetypes` — list of `vim.bo.filetype` values this spec serves.
-- `options` — same shape as `languages/<config_name>/config.toml`: `comment_aware` / `parser_lang` (+ `query_file` for built-ins). **No separator fields** — those are observed.
+- `options` — same shape as `languages/<config_name>/config.toml`: `parser_lang` (+ `query_file` for built-ins). **No separator fields** — those are observed.
 - `query_text` — tree-sitter query string with the `sortkeys.*` captures.
 - `key_normalizer` — optional `fun(text:string):string`. Omit to fall back to the built-in `normalize.lua` for that config name (if any) or identity.
 - `extractor` — optional custom extractor module (`{ extract(bufnr, target, pack, deep) }`) for an irregular AST. Omit to use the generic, query-driven extractor (the common case).
@@ -246,7 +246,6 @@ Override rules (registry decides by whether the user `handlers` key matches a bu
 
 1. `config.toml` — capabilities + parser:
    - `parser_lang = "json"` (override; defaults to the filetype name — set it when reusing another grammar, e.g. jsonc on the json parser)
-   - `comment_aware = true|false` (gates `core/comment_fold`)
    - `query_file = "sort-keys.scm"`
    - (no separator/quoting fields — observed)
 2. `sort-keys.scm` — the tree-sitter query using the `sortkeys.*` captures:
@@ -257,7 +256,7 @@ Override rules (registry decides by whether the user `handlers` key matches a bu
    | `@sortkeys.entry`     | `#set! sortkeys.entry_kind "pair"\|"element"` | one item inside the container                               |
    | `@sortkeys.key`       | —                                             | key node of a `"pair"` entry                                |
    | `@sortkeys.value`     | —                                             | value node of a `"pair"` (for deep recursion)               |
-   | `@sortkeys.comment`   | —                                             | comment node (only when `comment_aware`)                    |
+   | `@sortkeys.comment`   | —                                             | comment node                                                |
    | `@sortkeys.pin`       | —                                             | mark the entry `movable=false` (holds its slot; permeable)  |
    | `@sortkeys.fence`     | —                                             | mark the entry an impermeable pin (movables can't cross it) |
 
@@ -267,7 +266,7 @@ Override rules (registry decides by whether the user `handlers` key matches a bu
 4. Register the filetype: add `<filetype> = "<config_name>"` to `BUILT_IN_FILETYPES` in `registry.lua`.
 5. `tests/sort-keys/<config_name>_e2e_spec.lua` — a minimal e2e (comment-free smoke + a comment/separator case if applicable). Gate on `tests/support/treesitter.has_parser` for the _parser_ name, not the filetype.
 
-Working examples: `languages/json/` (config.toml + sort-keys.scm + normalize.lua), `languages/jsonc/` (rides on the json parser via `parser_lang = "json"`, `comment_aware = true`, and `normalize.lua` re-exporting json's), and `languages/javascript/` (declarative, using `@sortkeys.pin` / `@sortkeys.fence` for methods / spreads / computed keys).
+Working examples: `languages/json/` (config.toml + sort-keys.scm + normalize.lua), `languages/jsonc/` (rides on the json parser via `parser_lang = "json"` and `normalize.lua` re-exporting json's), and `languages/javascript/` (declarative, using `@sortkeys.pin` / `@sortkeys.fence` for methods / spreads / computed keys).
 
 This generic path covers any language whose container/entry/key/value shape the
 `sortkeys.*` query can express, including pins and fences. An irregular AST whose

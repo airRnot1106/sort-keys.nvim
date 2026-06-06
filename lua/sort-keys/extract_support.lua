@@ -134,10 +134,7 @@ function M.build_container(container, ctx)
     e.range = M.clamp_range(ctx.bufnr, e.range)
   end
 
-  local container_comments = {}
-  if ctx.options.comment_aware then
-    container_comments = ctx.comments_by_parent[node_id_key(container.node)] or {}
-  end
+  local container_comments = ctx.comments_by_parent[node_id_key(container.node)] or {}
   local blocks = comment_fold.fold(raw, container_comments)
 
   -- Separator: the first non-whitespace run after the first entry's DATA. The

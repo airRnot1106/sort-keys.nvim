@@ -99,10 +99,17 @@ When the handlers key matches a built-in config name, only the fields you
 supply are overlaid; everything else is inherited.
 
 >lua
-    -- Tweak the built-in Lua options.
+    -- Add a filetype alias (JSON5 reuses the JSONC pack).
     require("sort-keys").setup({
       handlers = {
-        lua = { options = { comment_aware = false } },
+        jsonc = { filetypes = { "jsonc", "json5" } },
+      },
+    })
+
+    -- Tweak a built-in option (override the parser language).
+    require("sort-keys").setup({
+      handlers = {
+        jsonc = { options = { parser_lang = "json5" } },
       },
     })
 <
@@ -120,7 +127,6 @@ and `query_text` are required; `key_normalizer` is optional.
         my_lang = {
           filetypes = { "my_lang", "ml" },
           options   = {
-            comment_aware   = true,
             parser_lang     = "my_lang",  -- defaults to the filetype name
           },
           query_text = [[
@@ -175,8 +181,6 @@ the single generic extractor.
                                               *sort-keys-language-packs-options*
 Options ~
 
-  comment_aware   (boolean)   fold comments onto adjacent entries so they
-                              travel with the entry they document
   parser_lang     (string)    tree-sitter language to parse with; defaults to
                               the filetype name. Set it to reuse another
                               grammar (jsonc reuses "json").
@@ -198,8 +202,7 @@ Tree-sitter query captures ~
   @sortkeys.value        —                                value node of a pair
                                                           (used for deep
                                                           recursion)
-  @sortkeys.comment      —                                comment node, only
-                                                          when comment_aware
+  @sortkeys.comment      —                                comment node
   @sortkeys.pin          —                                pin a captured entry
                                                           (holds its slot;
                                                           permeable)

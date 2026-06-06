@@ -1,3 +1,1 @@
-comment_aware = true
-
 query_file = "sort-keys.scm"
