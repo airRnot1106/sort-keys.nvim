@@ -226,10 +226,12 @@ function M.build_container(container, ctx)
     }
 
     if e.entry_kind == "pair" then
-      if not e.key_node then
-        return nil
-      end
-      entry.sort_key = ctx.key_normalizer(vim.treesitter.get_node_text(e.key_node, ctx.bufnr))
+      -- A pair with no key node is a null-key pair (valid YAML `: value`); it
+      -- still must be captured as an entry so its framing/comment round-trip,
+      -- and it sorts as the empty key.
+      entry.sort_key = e.key_node
+          and ctx.key_normalizer(vim.treesitter.get_node_text(e.key_node, ctx.bufnr))
+        or ""
     else
       entry.sort_key = ctx.key_normalizer(vim.treesitter.get_node_text(e.node, ctx.bufnr))
       -- An array element sorts by its own content, so when deep sort reorders

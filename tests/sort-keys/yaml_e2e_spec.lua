@@ -97,4 +97,40 @@ describe("yaml end-to-end", function()
       "z: 3",
     }, lines_of(bufnr))
   end)
+
+  it(
+    "captures a null-key pair so its trailing comment round-trips instead of corrupting",
+    function()
+      if not has_yaml then
+        return pending("yaml treesitter parser not available")
+      end
+      -- `: q1` is a valid YAML pair with a null key. It must be captured as an
+      -- entry (sort_key ""), not leak into the container prefix — otherwise its
+      -- trailing comment is misattributed and the layout is merged/corrupted.
+      local bufnr = setup_buf({
+        ": q1 # tc",
+        "b: q2",
+        "a: q3",
+      })
+      set_cursor(0, 0)
+      vim.cmd("SortKeys")
+      assert.are.same({
+        ": q1 # tc",
+        "a: q3",
+        "b: q2",
+      }, lines_of(bufnr))
+    end
+  )
+
+  it("captures a null-key pair in a flow mapping (comma-framed)", function()
+    if not has_yaml then
+      return pending("yaml treesitter parser not available")
+    end
+    -- The optional-key change applies to flow_pair too; a null key sorts first
+    -- and the comma framing must round-trip.
+    local bufnr = setup_buf({ "x: {b: 2, a: 3, : 1}" })
+    set_cursor(0, 4)
+    vim.cmd("SortKeys")
+    assert.are.same({ "x: {: 1, a: 3, b: 2}" }, lines_of(bufnr))
+  end)
 end)
