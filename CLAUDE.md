@@ -88,8 +88,8 @@ extract.lua          ──require──►  generic_extractor   (custom is reac
 generic_extractor.lua ─require──►  extract_support
 languages/<lang>/extractor.lua ─►  extract_support
 extract_support.lua  ──require──►  core/{comment_fold, pos}
-registry.lua         ──require──►  core/toml_loader (+ dynamically a pack's
-                                   normalize.lua / extractor.lua by config_name)
+registry.lua         ──require──►  (dynamically a pack's normalize.lua /
+                                   extractor.lua by config_name)
 config.lua           ──require──►  registry
 apply.lua            ──require──►  (nothing; command calls render, hands it the string)
 sort.lua             ──require──►  core/{order, placement, traverse, ir}
@@ -98,7 +98,7 @@ comment_fold.lua     ──require──►  core/pos
 languages/<lang>/normalize.lua ─►  core/key_escapes
 
 (pure leaves, no requires)         core/{ir, order, placement, render, pos,
-                                        key_escapes, toml_loader}
+                                        key_escapes}
 ```
 
 A spec can `require("sort-keys.core.sort")` and feed it a literal IR with no
@@ -117,16 +117,15 @@ nvim or treesitter running. That is what keeps the TDD Red step cheap.
 - `comment_fold.lua` — **parse-stage** pure helper (used only by `extract`, never by the transform spine): given data-entry ranges + comment ranges, assigns each comment to an entry and returns an expanded "block" range per entry. Same-line trailing → previous entry; own-line → next entry; trailing after the last entry → last entry.
 - `pos.lua` — pure buffer-position / range primitives (`lt`, `contains`, `rows_cover`, `row_in_span`, `rows_overlap`) shared by `extract` and `comment_fold`.
 - `key_escapes.lua` — escape-decoding primitives (`unescape_json`, `unescape_js`, `utf8_encode`, `strip_double_quotes`) reused by per-language normalizers.
-- `toml_loader.lua` — minimal `key = "string" | true | false` reader for `config.toml`.
 
 ### Shell layer (treesitter / buffer / runtime lookup)
 
 - `extract.lua` — the **parse-stage dispatcher**: runs `pack.extractor` (a custom extractor) when the pack ships one, else the generic extractor. command calls this and stays oblivious to which.
-- `generic_extractor.lua` — the **generic extractor**, driven entirely by a pack's `sort-keys.scm` captures + `config.toml`, so a JSON-shaped language needs no per-language Lua. Supplies only `collect` (query triage by the `sortkeys.*` captures, including the pin/fence capture sets).
+- `generic_extractor.lua` — the **generic extractor**, driven entirely by a pack's `sort-keys.scm` captures, so a JSON-shaped language needs no per-language Lua. Supplies only `collect` (query triage by the `sortkeys.*` captures, including the pin/fence capture sets).
 - `extract_support.lua` — the **shared scaffolding** both extractors compose: target picking (cursor → smallest containing; line-wise selection → smallest container whose rows cover it, falling back to the one whose rows contain the first selected line), `build_container` (frame observation, comment folding, separator peeling, deep recursion), the Visual overlay, and the `run(…, collect)` orchestrator. An extractor supplies only its `collect`.
 - `languages/<lang>/extractor.lua` — a **custom extractor** for an irregular AST whose `collect` the generic query can't express (e.g. `languages/lua/extractor.lua`: a `table_constructor`'s kind is voted from its fields). Supplies only `collect`; composes `extract_support`.
 - `apply.lua` — renders the IR and writes it back with `nvim_buf_set_text`.
-- `registry.lua` — `filetype → config_name` (built-in `BUILT_IN_FILETYPES`), loads `languages/<config_name>/config.toml` + `sort-keys.scm` + optional `normalize.lua` + optional `extractor.lua` off `&runtimepath` (a present `extractor.lua` becomes `pack.extractor`). User packs from `set_user_handlers(specs)` override/extend by config name.
+- `registry.lua` — `filetype → config_name` (built-in `BUILT_IN_FILETYPES`), loads `sort-keys.scm` + optional `normalize.lua` + optional `options.lua` + optional `extractor.lua` off `&runtimepath` (a present `extractor.lua` becomes `pack.extractor`). Each pack carries its own non-default options in `options.lua` (e.g. jsonc pins `parser_lang = "json"`); a custom extractor can also inject options itself (e.g. kdl pins `separator = ""`). User packs from `set_user_handlers(specs)` override/extend by config name.
 - `config.lua` — public `setup`. Idempotent: each call rebuilds from defaults, so options and the user-handler map are replaced wholesale.
 - `command.lua` + `plugin/sort-keys.lua` — flag parsing and `:SortKeys` / `:DeepSortKeys` dispatch.
 
@@ -227,7 +226,7 @@ wholesale; built-in packs are never mutated.
 A language-pack spec is `{ filetypes, options, query_text, key_normalizer, extractor }`:
 
 - `filetypes` — list of `vim.bo.filetype` values this spec serves.
-- `options` — same shape as `languages/<config_name>/config.toml`: `parser_lang` (+ `query_file` for built-ins). **No separator fields** — those are observed.
+- `options` — `parser_lang` (defaults to the filetype name) and `separator` (default nil = probed from source). **No other option fields** — capability flags were removed as redundant.
 - `query_text` — tree-sitter query string with the `sortkeys.*` captures.
 - `key_normalizer` — optional `fun(text:string):string`. Omit to fall back to the built-in `normalize.lua` for that config name (if any) or identity.
 - `extractor` — optional custom extractor module (`{ extract(bufnr, target, pack, deep) }`) for an irregular AST. Omit to use the generic, query-driven extractor (the common case).
@@ -244,11 +243,7 @@ Override rules (registry decides by whether the user `handlers` key matches a bu
 
 `core/` is never touched. Add files under `lua/sort-keys/languages/<config_name>/`:
 
-1. `config.toml` — capabilities + parser:
-   - `parser_lang = "json"` (override; defaults to the filetype name — set it when reusing another grammar, e.g. jsonc on the json parser)
-   - `query_file = "sort-keys.scm"`
-   - (no separator/quoting fields — observed)
-2. `sort-keys.scm` — the tree-sitter query using the `sortkeys.*` captures:
+1. `sort-keys.scm` — the tree-sitter query using the `sortkeys.*` captures:
 
    | Capture               | Metadata                                      | Role                                                        |
    | --------------------- | --------------------------------------------- | ----------------------------------------------------------- |
@@ -262,11 +257,12 @@ Override rules (registry decides by whether the user `handlers` key matches a bu
 
    `@sortkeys.pin` / `@sortkeys.fence` are collected as node-id sets independent of the entry pattern, so a member captured as both an entry and a fence keeps the flag even when a wildcard pattern also captures it. Use a pin for members whose position is meaningless to keyed entries (a method that should stay put); a fence for order-sensitive members (a JS spread / computed key, a Ruby `**splat`) where what sits before vs. after them matters.
 
-3. `normalize.lua` (optional) — `fun(text:string):string` turning a raw key node's text into the sort_key (quote stripping, escape decoding); reuse `core/key_escapes`. Omit to inherit another pack's (e.g. jsonc `require`s json's) or fall back to identity.
+2. `normalize.lua` (optional) — `fun(text:string):string` turning a raw key node's text into the sort_key (quote stripping, escape decoding); reuse `core/key_escapes`. Omit to inherit another pack's (e.g. jsonc `require`s json's) or fall back to identity.
+3. `options.lua` (optional) — `return { parser_lang = "..." }` for a non-default option (e.g. jsonc reuses the json parser). Omit to use defaults (`parser_lang` = the filetype name). A custom extractor can also inject options itself (e.g. kdl pins `separator`).
 4. Register the filetype: add `<filetype> = "<config_name>"` to `BUILT_IN_FILETYPES` in `registry.lua`.
 5. `tests/sort-keys/<config_name>_e2e_spec.lua` — a minimal e2e (comment-free smoke + a comment/separator case if applicable). Gate on `tests/support/treesitter.has_parser` for the _parser_ name, not the filetype.
 
-Working examples: `languages/json/` (config.toml + sort-keys.scm + normalize.lua), `languages/jsonc/` (rides on the json parser via `parser_lang = "json"` and `normalize.lua` re-exporting json's), and `languages/javascript/` (declarative, using `@sortkeys.pin` / `@sortkeys.fence` for methods / spreads / computed keys).
+Working examples: `languages/json/` (sort-keys.scm + normalize.lua), `languages/jsonc/` (rides on the json parser via `options.lua` and `normalize.lua` re-exporting json's), and `languages/javascript/` (declarative, using `@sortkeys.pin` / `@sortkeys.fence` for methods / spreads / computed keys).
 
 This generic path covers any language whose container/entry/key/value shape the
 `sortkeys.*` query can express, including pins and fences. An irregular AST whose

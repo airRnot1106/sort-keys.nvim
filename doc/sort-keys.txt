@@ -173,7 +173,9 @@ Notes ~
 5. LANGUAGE PACKS                                   *sort-keys-language-packs*
 
 A built-in pack is a directory `lua/sort-keys/languages/<config_name>/` with a
-`config.toml`, a `sort-keys.scm` query, and an optional `normalize.lua`. A user
+`sort-keys.scm` query and optional `normalize.lua` / `options.lua`. Non-default
+options (e.g. `parser_lang` for jsonc) ship in the pack's `options.lua`; a
+custom extractor may also inject its own (e.g. KDL pins `separator`). A user
 pack supplies the same data through the handler spec fields. Both are driven by
 the single generic extractor.
 
@@ -184,7 +186,6 @@ Options ~
   parser_lang     (string)    tree-sitter language to parse with; defaults to
                               the filetype name. Set it to reuse another
                               grammar (jsonc reuses "json").
-  query_file      (string)    query filename, default "sort-keys.scm"
 
 The inter-entry separator, trailing-separator policy, and surrounding
 whitespace are NOT configured: they are observed from the source and

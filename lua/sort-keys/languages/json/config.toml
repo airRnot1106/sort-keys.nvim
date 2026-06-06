@@ -1,6 +1,0 @@
-# The separator (",") and trailing-comma policy are NOT configured: extract
-# observes them from the source and render reproduces them. Only the parser
-# lives here.
-parser_lang = "json"
-
-query_file = "sort-keys.scm"

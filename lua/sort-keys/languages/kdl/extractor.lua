@@ -249,7 +249,14 @@ end
 ---@param deep boolean
 ---@return table|nil outline
 function M.extract(bufnr, target, pack, deep)
-  return support.run(bufnr, target, pack, deep, function(b, root, query)
+  -- KDL fields are space-separated, but a `\` line continuation in the
+  -- inter-entry gap would be misread as a delimiter by the generic separator
+  -- probe, so pin it to "" rather than let extract_support observe it. A fresh
+  -- pack is built so the shared (memoized) pack.options is never mutated.
+  local kdl_pack = vim.tbl_extend("force", pack, {
+    options = vim.tbl_extend("force", pack.options, { separator = "" }),
+  })
+  return support.run(bufnr, target, kdl_pack, deep, function(b, root, query)
     return collect(b, root, query, target)
   end)
 end

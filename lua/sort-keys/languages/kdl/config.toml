@@ -1,5 +1,0 @@
-# KDL fields are space-separated, and a `\` line continuation in the gap would
-# be misread as a delimiter, so pin the separator to "" rather than probe it.
-separator = ""
-
-query_file = "sort-keys.scm"

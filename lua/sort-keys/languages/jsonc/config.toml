@@ -1,7 +1,0 @@
-# JSONC carries line/block comments; extract folds them into entry lead/tail
-# via core.comment_fold so they travel with the pair they document.
-
-# Reuse the json tree-sitter parser, which accepts comments.
-parser_lang = "json"
-
-query_file = "sort-keys.scm"

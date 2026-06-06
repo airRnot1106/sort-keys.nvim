@@ -1,5 +1,5 @@
--- The generic extractor: driven entirely by a pack's `sort-keys.scm` captures
--- and `config.toml`, so a JSON-shaped language needs no per-language Lua. It
+-- The generic extractor: driven entirely by a pack's `sort-keys.scm` captures,
+-- so a JSON-shaped language needs no per-language Lua. It
 -- supplies only the `collect` step (query triage by the sortkeys.* captures);
 -- everything else — frame observation, comment folding, deep recursion, target
 -- picking — comes from extract_support, which a custom extractor reuses too.

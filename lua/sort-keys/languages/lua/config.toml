@@ -1,3 +1,0 @@
-# Lua line/block comments are folded onto the field they document.
-
-query_file = "sort-keys.scm"

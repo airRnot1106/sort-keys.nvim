@@ -1,13 +1,11 @@
--- Resolves a buffer's filetype to a language pack. A built-in pack is fully
--- declarative: a `config.toml` (capabilities + parser), a `sort-keys.scm`
--- (tree-sitter query), and an optional `normalize.lua` (key normalization),
--- all located on &runtimepath by config name. There is no per-language Lua
--- builder — the generic extractor drives the IR from the query + config.
+-- Resolves a buffer's filetype to a language pack. A built-in pack is
+-- a `sort-keys.scm` query plus optional `normalize.lua` (key normalization),
+-- `options.lua` (non-default options like parser_lang), and `extractor.lua`
+-- (custom extractor for irregular ASTs), all located on &runtimepath by config
+-- name. The generic extractor drives the IR from the query alone.
 --
 -- User handlers injected via setup({handlers=...}) override or extend the
 -- built-ins by config name.
-
-local toml_loader = require("sort-keys.core.toml_loader")
 
 local M = {}
 
@@ -32,8 +30,8 @@ local BUILT_IN_FILETYPES = {
   gleam = "gleam",
 }
 
-local TOML_PATH_FMT = "lua/sort-keys/languages/%s/config.toml"
-local QUERY_PATH_FMT = "lua/sort-keys/languages/%s/%s"
+local QUERY_PATH_FMT = "lua/sort-keys/languages/%s/sort-keys.scm"
+local OPTIONS_MODULE_FMT = "sort-keys.languages.%s.options"
 local NORMALIZE_MODULE_FMT = "sort-keys.languages.%s.normalize"
 local EXTRACTOR_MODULE_FMT = "sort-keys.languages.%s.extractor"
 
@@ -54,23 +52,24 @@ local function locate_runtime(rel_path)
 end
 
 -- Loads the built-in declarative pack for a config name off &runtimepath.
--- Memoized: the .toml / .scm ship with the plugin and never change at runtime.
+-- Memoized: the .scm files ship with the plugin and never change at runtime.
 local builtin_cache = {}
 local function load_builtin(config_name)
   if builtin_cache[config_name] then
     return builtin_cache[config_name]
   end
 
-  local toml_path = locate_runtime(string.format(TOML_PATH_FMT, config_name))
-  if not toml_path then
-    return nil
-  end
-  local options = toml_loader.parse(read_file(toml_path))
-
-  local query_file = options.query_file or "sort-keys.scm"
-  local query_path = locate_runtime(string.format(QUERY_PATH_FMT, config_name, query_file))
+  local query_path = locate_runtime(string.format(QUERY_PATH_FMT, config_name))
   if not query_path then
     return nil
+  end
+
+  -- Non-default options (e.g. jsonc's parser_lang) ship as an `options.lua` in
+  -- the pack; absent, the defaults apply (parser_lang = the filetype name).
+  local options = {}
+  local ook, omod = pcall(require, string.format(OPTIONS_MODULE_FMT, config_name))
+  if ook and type(omod) == "table" then
+    options = omod
   end
 
   local key_normalizer
