@@ -30,10 +30,10 @@ local BUILT_IN_FILETYPES = {
   gleam = "gleam",
 }
 
-local QUERY_PATH_FMT = "lua/sort-keys/languages/%s/sort-keys.scm"
-local OPTIONS_MODULE_FMT = "sort-keys.languages.%s.options"
-local NORMALIZE_MODULE_FMT = "sort-keys.languages.%s.normalize"
-local EXTRACTOR_MODULE_FMT = "sort-keys.languages.%s.extractor"
+local QUERY_PATH_FMT = "lua/sort-keys/parse/languages/%s/sort-keys.scm"
+local OPTIONS_MODULE_FMT = "sort-keys.parse.languages.%s.options"
+local NORMALIZE_MODULE_FMT = "sort-keys.parse.languages.%s.normalize"
+local EXTRACTOR_MODULE_FMT = "sort-keys.parse.languages.%s.extractor"
 
 local user_handlers = {}
 

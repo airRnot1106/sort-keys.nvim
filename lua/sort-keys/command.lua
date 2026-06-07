@@ -4,11 +4,11 @@
 
 local config = require("sort-keys.config")
 local registry = require("sort-keys.registry")
-local extract = require("sort-keys.extract")
-local sort = require("sort-keys.core.sort")
-local order = require("sort-keys.core.order")
-local render = require("sort-keys.core.render")
-local apply = require("sort-keys.apply")
+local extract = require("sort-keys.parse.extract")
+local sort = require("sort-keys.transform.sort")
+local order = require("sort-keys.transform.order")
+local render = require("sort-keys.print.render")
+local apply = require("sort-keys.print.apply")
 
 local M = {}
 
@@ -63,7 +63,7 @@ function M.run(opts, deep)
   end
 
   local order_spec = M.parse_order(opts.args or "", opts.bang)
-  -- The configured comparator is the ORDER-axis base swap (see core/order).
+  -- The configured comparator is the ORDER-axis base swap (see transform/order).
   order_spec.comparator = config.options.comparator
   local request = {
     order = order_spec,

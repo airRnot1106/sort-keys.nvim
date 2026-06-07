@@ -172,7 +172,7 @@ Notes ~
 ==============================================================================
 5. LANGUAGE PACKS                                   *sort-keys-language-packs*
 
-A built-in pack is a directory `lua/sort-keys/languages/<config_name>/` with a
+A built-in pack is a directory `lua/sort-keys/parse/languages/<config_name>/` with a
 `sort-keys.scm` query and optional `normalize.lua` / `options.lua`. Non-default
 options (e.g. `parser_lang` for jsonc) ship in the pack's `options.lua`; a
 custom extractor may also inject its own (e.g. KDL pins `separator`). A user
@@ -218,11 +218,11 @@ Key normalization ~
 
 `normalize.lua` returns a single `fun(text:string):string` turning a raw key
 node's text into the sort key (quote stripping, escape decoding). Shared escape
-decoders live in `require("sort-keys.core.key_escapes")`. Omit the file to
+decoders live in `require("sort-keys.parse.languages.key_escapes")`. Omit the file to
 inherit another pack's normalizer (jsonc re-exports json's) or fall back to the
 identity function. A user pack overrides it via the `key_normalizer` field.
 
-The built-in packs in `lua/sort-keys/languages/{json,jsonc}/` are the
+The built-in packs in `lua/sort-keys/parse/languages/{json,jsonc}/` are the
 canonical reference.
 
 ==============================================================================

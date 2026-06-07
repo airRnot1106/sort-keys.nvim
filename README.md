@@ -64,7 +64,7 @@ use({
 
 ## Supported languages
 
-See [`languages`](https://github.com/airRnot1106/sort-keys.nvim/tree/main/lua/sort-keys/languages) for the full list of built-in languages.
+See [`languages`](https://github.com/airRnot1106/sort-keys.nvim/tree/main/lua/sort-keys/parse/languages) for the full list of built-in languages.
 
 ## Documentation
 
