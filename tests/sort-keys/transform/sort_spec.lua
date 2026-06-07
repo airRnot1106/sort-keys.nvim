@@ -96,4 +96,17 @@ describe("core.sort", function()
     sort.sort(c, { order = {} })
     assert.are.same({ "c", "a" }, keys(c))
   end)
+
+  it("u (unique) drops duplicate keys after sorting, keeping the first", function()
+    local c = { entries = { leaf("b"), leaf("a"), leaf("b") } }
+    local out = sort.sort(c, { order = { unique = true } })
+    assert.are.same({ "a", "b" }, keys(out))
+  end)
+
+  it("u (unique) collapses keys equal under the active flag (ignore_case)", function()
+    -- "B" and "b" are one key once case is folded, so only the first survives.
+    local c = { entries = { leaf("B"), leaf("a"), leaf("b") } }
+    local out = sort.sort(c, { order = { unique = true, ignore_case = true } })
+    assert.are.same({ "a", "B" }, keys(out))
+  end)
 end)

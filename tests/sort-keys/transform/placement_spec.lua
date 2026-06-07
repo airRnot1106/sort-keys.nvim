@@ -60,3 +60,45 @@ describe("core.placement", function()
     assert.are.same({ "d", "a", "c", "b" }, keys(out))
   end)
 end)
+
+describe("core.placement dedupe", function()
+  it("drops a movable entry equal to the one kept before it (keeps the first)", function()
+    local out = placement.dedupe({ movable("a"), movable("a"), movable("b") }, asc)
+    assert.are.same({ "a", "b" }, keys(out))
+  end)
+
+  it("collapses a run of equal keys to a single entry", function()
+    local out = placement.dedupe({ movable("a"), movable("a"), movable("a") }, asc)
+    assert.are.same({ "a" }, keys(out))
+  end)
+
+  it("keeps the first occurrence of an equal pair, not the later one", function()
+    local first = { sort_key = "a", movable = true, tag = 1 }
+    local second = { sort_key = "a", movable = true, tag = 2 }
+    local out = placement.dedupe({ first, second }, asc)
+    assert.are.equal(1, #out)
+    assert.are.equal(1, out[1].tag)
+  end)
+
+  it("never drops a pin or fence even when it duplicates a neighbor", function()
+    -- Pins/fences are position- and order-meaningful structure, not redundant
+    -- data; dedupe preserves them and only collapses movable duplicates.
+    local out = placement.dedupe({ movable("a"), pin("a"), fence("a") }, asc)
+    assert.are.same({ "a", "a", "a" }, keys(out))
+  end)
+
+  it("dedups equal movables that a permeable pin sits between", function()
+    -- arrange places equal-key movables in the free slots around a pinned slot,
+    -- so they are non-adjacent; the pin is permeable, so they are still one run
+    -- and the later duplicate must drop.
+    local out = placement.dedupe({ movable("a"), pin("x"), movable("a") }, asc)
+    assert.are.same({ "a", "x" }, keys(out))
+  end)
+
+  it("does not dedup equal movables across a fence", function()
+    -- A fence partitions the sort into independent scopes; an equal key on the
+    -- far side belongs to a different group and is kept.
+    local out = placement.dedupe({ movable("a"), fence("x"), movable("a") }, asc)
+    assert.are.same({ "a", "x", "a" }, keys(out))
+  end)
+end)

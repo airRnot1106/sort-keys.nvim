@@ -17,8 +17,8 @@ local function notify(msg, level)
 end
 
 -- Parse `:sort`-compatible flags into an order spec. The bang (`!`) reverses;
--- `i`/`n` fold case / compare numerically; a `/pat/` selects the substring of
--- each key to compare on.
+-- `i`/`n` fold case / compare numerically; `u` keeps only the first of each
+-- equal-key run; a `/pat/` selects the substring of each key to compare on.
 ---@param args string
 ---@param bang boolean
 ---@return table
@@ -34,6 +34,8 @@ function M.parse_order(args, bang)
       spec.ignore_case = true
     elseif c == "n" then
       spec.numeric = true
+    elseif c == "u" then
+      spec.unique = true
     end
   end
   return spec

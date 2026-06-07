@@ -40,6 +40,8 @@ declaratively — see |sort-keys-handlers| and |sort-keys-language-packs|.
                   r/{pat}/  Compare the substring matched by the Lua pattern
                             {pat}. A malformed pattern is ignored (with a
                             warning) rather than raising.
+                  u         Keep only the first entry of each equal-key run
+                            (deduplicate). Pins and fences are never dropped.
 
                                                                 *:DeepSortKeys*
 :[range]DeepSortKeys[!] [flags]

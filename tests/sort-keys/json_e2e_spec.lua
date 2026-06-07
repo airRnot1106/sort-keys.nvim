@@ -231,6 +231,16 @@ describe("json end-to-end", function()
     }, lines_of(bufnr))
   end)
 
+  it(":SortKeys u removes duplicate array elements after sorting", function()
+    if not has_json then
+      return pending("JSON treesitter parser not available")
+    end
+    local bufnr = setup_buf({ '["banana", "apple", "banana"]' })
+    set_cursor(0, 1)
+    vim.cmd("SortKeys u")
+    assert.are.same({ '["apple", "banana"]' }, lines_of(bufnr))
+  end)
+
   it("keeps a pair whose key is the empty string", function()
     if not has_json then
       return pending("JSON treesitter parser not available")

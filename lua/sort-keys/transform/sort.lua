@@ -13,9 +13,15 @@ local M = {}
 ---@param request table  -- { order = spec?, deep = bool? }
 ---@return fun(c: table): table
 local function make_sortfn(request)
-  local compare = order.build(request.order or {})
+  local spec = request.order or {}
+  local compare = order.build(spec)
   return function(container)
     local arranged = placement.arrange(container.entries, compare)
+    -- `:sort u`: drop equal-key duplicates after ordering. Read straight off the
+    -- spec because dedup is a placement concern, not part of the comparator.
+    if spec.unique then
+      arranged = placement.dedupe(arranged, compare)
+    end
     return ir.copy_container(container, { entries = arranged })
   end
 end

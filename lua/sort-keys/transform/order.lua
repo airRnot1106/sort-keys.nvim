@@ -1,7 +1,9 @@
 -- ORDER axis of the Sort abstraction: turn an order spec into a pure 3-way
--- comparator over entries. A flag is one transform layered on top of the base
--- key derivation; adding a `:sort`-compat flag means adding one branch here,
--- never touching placement / traverse / render.
+-- comparator over entries. A flag that changes HOW keys compare is one transform
+-- layered on the base key derivation here, never touching placement / traverse /
+-- render. A flag that changes WHICH entries survive or where they land is a
+-- placement concern instead (e.g. `u`/unique is applied by sort via
+-- placement.dedupe, not by this comparator).
 --
 -- The comparator returns -1 / 0 / 1 (not a bool) so the placement layer can
 -- break ties by source order and keep the sort stable.
@@ -11,6 +13,7 @@
 --     ignore_case = bool,    -- `i`      compare case-insensitively
 --     numeric     = bool,    -- `n`      compare by the first number in the key
 --     pattern     = string?, -- `r/pat/` compare by the first Lua match of pat
+--     unique      = bool,    -- `u`      NOT read here; sort/placement dedupes
 --   }
 
 local M = {}

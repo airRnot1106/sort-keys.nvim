@@ -54,13 +54,13 @@ use({
 
 `:SortKeys` understands the same trailing flags as Vim's built-in `:sort`:
 
-| Flag     | Meaning                                                                   |
-| -------- | ------------------------------------------------------------------------- |
-| `!`      | Reverse the comparison (descending).                                      |
-| `i`      | Case-insensitive comparison.                                              |
-| `n`      | Numeric comparison (`tonumber` both sides; falls back to string).         |
-| `r/pat/` | Compare the substring captured by the Vim regex `pat` (not the full key). |
-| `u`      | Keep only the first occurrence per key (deduplicate).                     |
+| Flag     | Meaning                                                                    |
+| -------- | -------------------------------------------------------------------------- |
+| `!`      | Reverse the comparison (descending).                                       |
+| `i`      | Case-insensitive comparison.                                               |
+| `n`      | Numeric comparison (`tonumber` both sides; falls back to string).          |
+| `r/pat/` | Compare the substring matched by the Lua pattern `pat` (not the full key). |
+| `u`      | Keep only the first occurrence per key (deduplicate).                      |
 
 ## Supported languages
 

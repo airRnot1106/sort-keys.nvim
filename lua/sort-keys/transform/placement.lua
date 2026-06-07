@@ -86,4 +86,32 @@ function M.arrange(entries, compare)
   return dense
 end
 
+---Collapse equal-key duplicates among movable entries, keeping the first of each
+---run (`:sort u`). Equality is the comparator's own (folds in ignore_case /
+---numeric / pattern). Pins and fences (movable == false) are position-/order-
+---meaningful structure, never dropped — but they differ in how they bound a run:
+---a permeable pin lets the movable run continue across it (movables already sort
+---across pins, so equal keys on either side are one run and the later one drops),
+---while a fence partitions the sort into independent scopes, so it resets the run
+---and equal keys are never deduped across it.
+---@param entries table[]
+---@param compare fun(a: table, b: table): integer
+---@return table[]
+function M.dedupe(entries, compare)
+  local result = {}
+  local last_movable
+  for _, entry in ipairs(entries) do
+    if entry.movable == false then
+      result[#result + 1] = entry
+      if entry.fence then
+        last_movable = nil
+      end
+    elseif last_movable == nil or compare(last_movable, entry) ~= 0 then
+      result[#result + 1] = entry
+      last_movable = entry
+    end
+  end
+  return result
+end
+
 return M

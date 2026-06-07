@@ -50,7 +50,7 @@ The top level holds the orchestration that drives the pipeline (`command`, `conf
 plugin/sort-keys.lua     user command registration (range, bang, nargs)
         │
         ▼
-lua/sort-keys/command.lua parses :sort-compat flags (!/i/n + /pat/), builds a
+lua/sort-keys/command.lua parses :sort-compat flags (!/i/n/u + /pat/), builds a
         │                 Target (cursor or line-wise selection), threads the
         │                 configured comparator into the order spec, then drives
         │                 the four stages below.
@@ -114,7 +114,7 @@ Spread across the stage directories, these operate entirely on IR literals and p
 
 - `ir.lua` (top level) — IR types + forward-compatible `copy_entry` / `copy_container` (forward every field via `pairs`, so a new IR field is never silently dropped at a rebuild site). The shared contract; belongs to no single stage.
 - `transform/order.lua` — the ORDER axis: turn an order spec into a 3-way comparator. Flags (`reverse`/`ignore_case`/`numeric`/`pattern`) wrap a base; `spec.comparator` (`fun(a,b,ctx)->bool|nil`) **swaps the base** and falls back to the default when it returns nil. `valid_pattern` rejects malformed Lua patterns so `:SortKeys /pat/` degrades instead of crashing.
-- `transform/placement.lua` — the PLACEMENT axis: map the comparator onto entry slots honoring pins (`movable=false`) and fences (`fence=true`). One pure function powers language pins, fences, and Visual partial sort. Stable (ties keep source order).
+- `transform/placement.lua` — the PLACEMENT axis: map the comparator onto entry slots honoring pins (`movable=false`) and fences (`fence=true`). One pure function powers language pins, fences, and Visual partial sort. Stable (ties keep source order). Also `dedupe` (the `u`/unique flag): collapse equal-key movable duplicates keeping the first, passing pins through but resetting at fences; never drops pins/fences.
 - `transform/traverse.lua` — the TRAVERSAL axis: `shallow` (this container) vs `deep` (post-order recursion into `entry.child`).
 - `transform/sort.lua` — composes order × placement × traverse into one IR→IR function.
 - `print/render.lua` — IR → string by the single separator rule (see "Separators").
