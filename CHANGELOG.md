@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.5.0](https://github.com/airRnot1106/sort-keys.nvim/compare/v0.4.0...v0.5.0) (2026-06-06)
+
+
+### Features
+
+* **elixir:** add Elixir maps and keyword lists (custom extractor) ([24fe172](https://github.com/airRnot1106/sort-keys.nvim/commit/24fe17239dfcf5a3237c6235fc97a46e3ef758fb))
+* **extract:** add the custom-extractor hatch and port Lua ([4f2ff56](https://github.com/airRnot1106/sort-keys.nvim/commit/4f2ff56d2473a01bd7ec53e0f2d052e29a5a186c))
+* **gleam:** add Gleam labelled arguments (custom extractor) ([98bfb02](https://github.com/airRnot1106/sort-keys.nvim/commit/98bfb02964951f90f6a2bdb3468ae67a41857c8c))
+* **go:** add Go via a custom extractor (keyed literals, struct defs, imports) ([95722a8](https://github.com/airRnot1106/sort-keys.nvim/commit/95722a8566842460e55f89cc10b56b97619117d2))
+* **javascript:** add JS via [@sortkeys](https://github.com/sortkeys).pin / [@sortkeys](https://github.com/sortkeys).fence enabler ([90ba58d](https://github.com/airRnot1106/sort-keys.nvim/commit/90ba58d8f517bdb8c52aa167f00fc568f6e1c262))
+* **kdl:** add KDL node property sorting ([8622742](https://github.com/airRnot1106/sort-keys.nvim/commit/8622742f6c8821d5fba6774557198037a810fa71))
+* **kdl:** enable deep sort for nested children blocks ([71d9fc2](https://github.com/airRnot1106/sort-keys.nvim/commit/71d9fc27da206bad53404a3ca82cd52d021462bd))
+* **languages:** restore container shapes lost in the rebuild ([483b182](https://github.com/airRnot1106/sort-keys.nvim/commit/483b1821e4b5fff850a97b802d735e21997c353f))
+* **nix:** add Nix attribute sets (declarative via binding_set) ([e4b2f39](https://github.com/airRnot1106/sort-keys.nvim/commit/e4b2f39ec60d76da01efbd0204d34560bdad3e66))
+* **order:** wire the custom comparator base swap per the architecture ([4523d37](https://github.com/airRnot1106/sort-keys.nvim/commit/4523d3785aa09bbfa0fa3c410534237253e9b051))
+* **pkl:** add Pkl object bodies; slice deep pre/post at the inner container ([c494acf](https://github.com/airRnot1106/sort-keys.nvim/commit/c494acf82499360346f5a5b159309a5c14626bf0))
+* **python:** add Python dicts and lists (declarative pack) ([b582d79](https://github.com/airRnot1106/sort-keys.nvim/commit/b582d79133551d622f2cef07e4fe814101309f7b))
+* **ruby:** add Ruby hashes and arrays (declarative pack) ([34faf34](https://github.com/airRnot1106/sort-keys.nvim/commit/34faf34bd2c0a0df5c2de06f2c7c1744e2f45606))
+* **rust:** add struct literals, struct defs, and use lists ([585a47d](https://github.com/airRnot1106/sort-keys.nvim/commit/585a47dce29584cf95077bb58de7824dcf5861c1))
+* **toml:** add TOML inline tables, [table] sections, and arrays ([da411b1](https://github.com/airRnot1106/sort-keys.nvim/commit/da411b19bfbfa93e72f18779e99716b49aaf4a2e))
+* **typescript:** add TypeScript reusing the JavaScript pack ([1bc6133](https://github.com/airRnot1106/sort-keys.nvim/commit/1bc61337c6035df0ac8b78951b0e7e2a5d7c1d05))
+* **yaml:** add YAML mappings; deep-recurse wrapped values; clamp ranges ([72805d3](https://github.com/airRnot1106/sort-keys.nvim/commit/72805d345b1a854fe788b24c8e29353b76b4db3d))
+
+
+### Bug Fixes
+
+* **comment_fold:** leave a trailing own-line comment in the suffix ([af3f821](https://github.com/airRnot1106/sort-keys.nvim/commit/af3f821fd53c04bf1f73a75f70e36272073bda08))
+* **elixir:** anchor maps at map_content; handle update, mixed, deep, quoted ([6dafcd2](https://github.com/airRnot1106/sort-keys.nvim/commit/6dafcd240c1e1424d5c9f2601608995bea2cc3ba))
+* **extract:** close key-drop, comment-corruption, hole, and crash paths ([b7026d4](https://github.com/airRnot1106/sort-keys.nvim/commit/b7026d41bd9e80092d6ca2a35076f42334dfa749))
+* **extract:** stop the separator probe at a comment in the gap ([3764a78](https://github.com/airRnot1106/sort-keys.nvim/commit/3764a78a44b5fdfd2dde64a7727838e9044b7d3c))
+* **gleam:** deep-recurse positional records and support record update ([274b49e](https://github.com/airRnot1106/sort-keys.nvim/commit/274b49ee1971f05ce20e864c2bed6bdcd19a2c8c))
+* **go:** handle embedded fields and pointer-struct deep recursion ([a4b74b5](https://github.com/airRnot1106/sort-keys.nvim/commit/a4b74b58e8f8c7e045027ad139b8ea9032cee311))
+* **kdl:** rewrite as a custom extractor so args/continuations survive ([f3bf41b](https://github.com/airRnot1106/sort-keys.nvim/commit/f3bf41bf0d4516fb3ae3a523fdcf6300f00070af))
+* **nix:** pin inherit_from so inherit (scope) ...; is never dropped ([782e853](https://github.com/airRnot1106/sort-keys.nvim/commit/782e8532a751a3d6ac8245d17cb7f8d192bf23b2))
+* **pkl:** capture all object-body members so none is dropped on sort ([5bbf59a](https://github.com/airRnot1106/sort-keys.nvim/commit/5bbf59a347eab4ca61a0860eba80c4f75f8ebd54))
+* **python:** fence *rest list unpack and strip triple-quoted keys ([56964ef](https://github.com/airRnot1106/sort-keys.nvim/commit/56964ef3bd4389bdf5ee94843f120b98f206aa53))
+* **registry:** bind a partial override without restating filetypes ([1e0e563](https://github.com/airRnot1106/sort-keys.nvim/commit/1e0e56312594f6204fa1bc455616124f5b050cfa))
+* **ruby:** fence array splat, capture shorthand pairs, fix quote semantics ([d2902f8](https://github.com/airRnot1106/sort-keys.nvim/commit/d2902f8f46789baeeb6578e6361d4339142108dc))
+* **rust:** pin `self` in a use list so it doesn't alphabetize ([abdb584](https://github.com/airRnot1106/sort-keys.nvim/commit/abdb58461132228e4c94f88b62c89443af2ae342))
+* **selection:** resolve the container by row span, and harden separators ([1c07ec3](https://github.com/airRnot1106/sort-keys.nvim/commit/1c07ec351db548c5695dbb0b019e4b55be8ba2f5))
+* **sort:** make deep sort idempotent over an array of containers ([b784872](https://github.com/airRnot1106/sort-keys.nvim/commit/b7848723fd826b91ba3b23a55b617d6dd102fb93))
+* **yaml:** capture null-key pairs so framing and comments round-trip ([2dd8ebe](https://github.com/airRnot1106/sort-keys.nvim/commit/2dd8ebe541fb5450a2c29108bfc6eae2021bdf03))
+
+
+### Documentation
+
+* rewrite CLAUDE.md and vimdoc for the new core architecture ([ab11d83](https://github.com/airRnot1106/sort-keys.nvim/commit/ab11d83d308d1132ca4804d761b37d68b8cf6e67))
+
 ## [0.4.0](https://github.com/airRnot1106/sort-keys.nvim/compare/v0.3.0...v0.4.0) (2026-06-04)
 
 
