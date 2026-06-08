@@ -70,9 +70,24 @@ function M.build(spec)
   local comparator = spec.comparator
   local ctx = {}
 
+  -- placement.stable_sort runs O(n log n) comparisons, so deriving the key
+  -- inside every comparison would redo the same pattern/lower/tonumber work for
+  -- the same key over and over. Cache it per distinct sort_key: `effective` is
+  -- fixed for this build, and key_of never returns nil, so a nil slot
+  -- unambiguously means "not yet derived". n distinct keys cost n derivations.
+  local key_cache = {}
+  local function key_for(sort_key)
+    local k = key_cache[sort_key]
+    if k == nil then
+      k = M.key_of(sort_key, effective)
+      key_cache[sort_key] = k
+    end
+    return k
+  end
+
   local function default_3way(a, b)
-    local ka = M.key_of(a.sort_key, effective)
-    local kb = M.key_of(b.sort_key, effective)
+    local ka = key_for(a.sort_key)
+    local kb = key_for(b.sort_key)
     return (ka < kb and -1) or (ka > kb and 1) or 0
   end
 

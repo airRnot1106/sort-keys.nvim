@@ -80,6 +80,37 @@ describe("core.order", function()
     assert.are.equal(1, cmp(e("a"), e("bbb")))
   end)
 
+  it(
+    "derives each key's comparison value once per distinct key, not once per comparison",
+    function()
+      -- Perf invariant: placement.stable_sort runs O(n log n) comparisons, so
+      -- deriving the key inside every comparison would redo the same
+      -- pattern/lower/tonumber work for the same key over and over. The derived
+      -- value is memoized per distinct sort_key, so n distinct keys cost n
+      -- derivations regardless of how many comparisons the sort performs.
+      local real_key_of = order.key_of
+      local calls = 0
+      order.key_of = function(...)
+        calls = calls + 1
+        return real_key_of(...)
+      end
+      local ok, err = pcall(function()
+        local cmp = order.build({})
+        local keys = { e("a"), e("b"), e("c") }
+        for _ = 1, 5 do
+          for _, x in ipairs(keys) do
+            for _, y in ipairs(keys) do
+              cmp(x, y)
+            end
+          end
+        end
+      end)
+      order.key_of = real_key_of
+      assert.is_true(ok, err)
+      assert.are.equal(3, calls)
+    end
+  )
+
   it("valid_pattern rejects malformed and empty patterns", function()
     assert.is_true(order.valid_pattern("%d+"))
     assert.is_false(order.valid_pattern("("))
