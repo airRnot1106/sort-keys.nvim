@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/airRnot1106/sort-keys.nvim/compare/v0.5.0...v0.6.0) (2026-06-11)
+
+
+### Features
+
+* **sort:** add the u (unique) flag to deduplicate equal keys ([52ee8b9](https://github.com/airRnot1106/sort-keys.nvim/commit/52ee8b96d4a19c1448eb91ac0a2f9f5df1320614))
+
+
+### Performance Improvements
+
+* **order:** memoize key derivation per distinct sort_key ([171f49b](https://github.com/airRnot1106/sort-keys.nvim/commit/171f49b0a5f9fcc3a782c3c1a0911d8d636c2a01))
+* **parse:** make extraction near-linear on large commented containers ([51c1da8](https://github.com/airRnot1106/sort-keys.nvim/commit/51c1da80aded48605d9aed5afdb75fea8bfddf6b))
+
 ## [0.5.0](https://github.com/airRnot1106/sort-keys.nvim/compare/v0.4.0...v0.5.0) (2026-06-06)
 
 
