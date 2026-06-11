@@ -25,6 +25,24 @@ describe("core.comment_fold", function()
     assert.are.same({ 2, 2 }, blocks[2].start)
   end)
 
+  it("attaches a same-line trailing comment to the CLOSEST entry on that row", function()
+    -- Two entries share row 1 (a single-line container); the comment belongs to
+    -- the nearer one so the other entry's block stays untouched.
+    local entries = { entry(1, 2, 1, 8), entry(1, 10, 1, 16) }
+    local blocks = comment_fold.fold(entries, { comment(1, 18, 1, 30) })
+    assert.are.same({ 1, 8 }, blocks[1].finish)
+    assert.are.same({ 1, 30 }, blocks[2].finish)
+  end)
+
+  it("skips same-row entries whose data ends after the comment starts", function()
+    -- A comment between two entries on one row can only trail the entry that
+    -- already ended; the later entry is not a candidate.
+    local entries = { entry(1, 2, 1, 8), entry(1, 12, 1, 18) }
+    local blocks = comment_fold.fold(entries, { comment(1, 9, 1, 11) })
+    assert.are.same({ 1, 11 }, blocks[1].finish)
+    assert.are.same({ 1, 18 }, blocks[2].finish)
+  end)
+
   it("extends the next entry's block start for an own-line leading comment", function()
     -- comment on its own line (row 1) precedes entry "b" (rows 2..).
     local entries = { entry(0, 2, 0, 8), entry(2, 2, 2, 8) }

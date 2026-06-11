@@ -19,20 +19,17 @@ function M.get_text(bufnr, sr, sc, er, ec)
   return table.concat(vim.api.nvim_buf_get_text(bufnr, sr, sc, er, ec, {}), "\n")
 end
 
----String identity for a node, stable across iter_matches calls.
+---String identity for a node, stable across iter_matches calls and child
+---walks: TSNode:id() is stable within a single parse tree, and one extraction
+---parses exactly once.
 function M.node_id_key(node)
-  local sr, sc, er, ec = node:range()
-  return string.format("%s:%d:%d:%d:%d", node:type(), sr, sc, er, ec)
+  return node:id()
 end
 
 -- Pull a range back inside the buffer. Some grammars (YAML block nodes) give a
 -- node a range that ends at the start of the line *after* its content, i.e.
 -- past the last buffer line, which would make nvim_buf_get_text error.
-function M.clamp_range(bufnr, r)
-  local last = vim.api.nvim_buf_line_count(bufnr) - 1
-  local function len(row)
-    return #(vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or "")
-  end
+local function clamp_with(r, last, len)
   local sr, sc, er, ec
   if r[1] > last then
     sr, sc = last, len(last)
@@ -45,6 +42,42 @@ function M.clamp_range(bufnr, r)
     er, ec = r[3], math.min(r[4], len(r[3]))
   end
   return { sr, sc, er, ec }
+end
+
+function M.clamp_range(bufnr, r)
+  local last = vim.api.nvim_buf_line_count(bufnr) - 1
+  return clamp_with(r, last, function(row)
+    return #(vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or "")
+  end)
+end
+
+-- One nvim_buf_get_lines fetch covering the whole target container; every
+-- lead/tail/text/framing slice (and every clamp's line-length lookup) below is
+-- then pure string math on it instead of a per-slice nvim_buf_get_text round
+-- trip, which costs O(entries) API calls on a big container. Positions are
+-- byte columns in both tree-sitter and the nvim API, so string.sub slicing is
+-- exact.
+local function make_text_source(bufnr, srow, erow)
+  local last = vim.api.nvim_buf_line_count(bufnr) - 1
+  local base = math.min(srow, last)
+  local lines = vim.api.nvim_buf_get_lines(bufnr, base, math.min(erow, last) + 1, false)
+  local src = { last = last }
+  function src.len(row)
+    local l = lines[row - base + 1]
+    return l and #l or 0
+  end
+  function src.slice(sr, sc, er, ec)
+    if sr == er then
+      return (lines[sr - base + 1] or ""):sub(sc + 1, ec)
+    end
+    local out = { (lines[sr - base + 1] or ""):sub(sc + 1) }
+    for r = sr + 1, er - 1 do
+      out[#out + 1] = lines[r - base + 1] or ""
+    end
+    out[#out + 1] = (lines[er - base + 1] or ""):sub(1, ec)
+    return table.concat(out, "\n")
+  end
+  return src
 end
 
 local function range_area(r)
@@ -116,7 +149,15 @@ end
 -- comments_by_parent). Recurses through containers_by_id for deep sort.
 function M.build_container(container, ctx)
   local node_id_key = M.node_id_key
-  local get_text = M.get_text
+
+  -- Created lazily on the OUTERMOST container and shared with the deep
+  -- recursion via ctx: children lie inside the outer container's rows, so one
+  -- buffer fetch serves the whole build.
+  local src = ctx.src
+  if not src then
+    src = make_text_source(ctx.bufnr, container.range[1], container.range[3])
+    ctx.src = src
+  end
 
   local raw = ctx.entries_by_parent[node_id_key(container.node)] or {}
   table.sort(raw, function(a, b)
@@ -131,7 +172,7 @@ function M.build_container(container, ctx)
   -- Pull entry ranges inside the buffer before any text slicing (a YAML pair's
   -- range can end past the last line).
   for _, e in ipairs(raw) do
-    e.range = M.clamp_range(ctx.bufnr, e.range)
+    e.range = clamp_with(e.range, src.last, src.len)
   end
 
   local container_comments = ctx.comments_by_parent[node_id_key(container.node)] or {}
@@ -164,7 +205,7 @@ function M.build_container(container, ctx)
         pe_row, pe_col = cr0[1], cr0[2]
       end
     end
-    local probe = get_text(ctx.bufnr, raw[1].range[3], raw[1].range[4], pe_row, pe_col)
+    local probe = src.slice(raw[1].range[3], raw[1].range[4], pe_row, pe_col)
     separator = probe:match("^%s*(%S)") or ""
   end
   separator = separator or ""
@@ -204,8 +245,8 @@ function M.build_container(container, ctx)
       movable = e.movable ~= false,
       fence = e.fence,
       range = { b.start[1], b.start[2], b.finish[1], b.finish[2] },
-      lead = get_text(ctx.bufnr, b.start[1], b.start[2], dr[1], dr[2]),
-      tail = (peel_separator(get_text(ctx.bufnr, dr[3], dr[4], b.finish[1], b.finish[2]))),
+      lead = src.slice(b.start[1], b.start[2], dr[1], dr[2]),
+      tail = (peel_separator(src.slice(dr[3], dr[4], b.finish[1], b.finish[2]))),
     }
 
     if e.entry_kind == "pair" then
@@ -239,26 +280,25 @@ function M.build_container(container, ctx)
         -- block_node indent) must be preserved as `pre`.
         local vr = child.range
         entry.child = child
-        entry.pre = get_text(ctx.bufnr, dr[1], dr[2], vr[1], vr[2])
-        entry.post = get_text(ctx.bufnr, vr[3], vr[4], dr[3], dr[4])
+        entry.pre = src.slice(dr[1], dr[2], vr[1], vr[2])
+        entry.post = src.slice(vr[3], vr[4], dr[3], dr[4])
       end
     end
     if not entry.child then
-      entry.text = get_text(ctx.bufnr, dr[1], dr[2], dr[3], dr[4])
+      entry.text = src.slice(dr[1], dr[2], dr[3], dr[4])
     end
 
     entries[i] = entry
   end
 
-  local cr = M.clamp_range(ctx.bufnr, container.range)
+  local cr = clamp_with(container.range, src.last, src.len)
   local b1, bl = blocks[1], blocks[#blocks]
-  local prefix = get_text(ctx.bufnr, cr[1], cr[2], b1.start[1], b1.start[2])
+  local prefix = src.slice(cr[1], cr[2], b1.start[1], b1.start[2])
 
   local joint = " "
   if #raw >= 2 then
-    joint = peel_joint(
-      get_text(ctx.bufnr, b1.finish[1], b1.finish[2], blocks[2].start[1], blocks[2].start[2])
-    )
+    joint =
+      peel_joint(src.slice(b1.finish[1], b1.finish[2], blocks[2].start[1], blocks[2].start[2]))
     -- A joint that still carries the delimiter means the inter-entry gap held an
     -- extra one with no node behind it (a JS array elision `[a,,b]`). Re-emitting
     -- the observed joint would duplicate it, so leave the container untouched
@@ -272,10 +312,10 @@ function M.build_container(container, ctx)
   -- before the close (no trailing comment), or absorbed before the last entry's
   -- trailing comment (already peeled out of its tail). Either means render must
   -- re-emit a separator after the last entry.
-  local after_last = get_text(ctx.bufnr, bl.finish[1], bl.finish[2], cr[3], cr[4])
+  local after_last = src.slice(bl.finish[1], bl.finish[2], cr[3], cr[4])
   local last_dr = raw[#raw].range
   local _, absorbed_separator =
-    peel_separator(get_text(ctx.bufnr, last_dr[3], last_dr[4], bl.finish[1], bl.finish[2]))
+    peel_separator(src.slice(last_dr[3], last_dr[4], bl.finish[1], bl.finish[2]))
   local trailing = false
   local suffix = after_last
   if absorbed_separator then

@@ -16,19 +16,25 @@ local M = {}
 ---@param list table[]
 ---@param compare fun(a: table, b: table): integer
 local function stable_sort(list, compare)
-  local indexed = {}
-  for i, v in ipairs(list) do
-    indexed[i] = { value = v, index = i }
+  -- Sort a permutation of indices, not {value, index} wrapper tables: same
+  -- stability (the index IS the tiebreaker), no per-item table allocation.
+  local perm = {}
+  for i = 1, #list do
+    perm[i] = i
   end
-  table.sort(indexed, function(x, y)
-    local c = compare(x.value, y.value)
+  table.sort(perm, function(x, y)
+    local c = compare(list[x], list[y])
     if c ~= 0 then
       return c < 0
     end
-    return x.index < y.index
+    return x < y
   end)
-  for i, t in ipairs(indexed) do
-    list[i] = t.value
+  local sorted = {}
+  for i, j in ipairs(perm) do
+    sorted[i] = list[j]
+  end
+  for i = 1, #list do
+    list[i] = sorted[i]
   end
 end
 
