@@ -22,9 +22,10 @@ in
     pinact = rec {
       enable = true;
       package = pkgs.pinact;
-      entry = "${getExe package} run -check";
+      entry = "${getExe package} run -min-age 7 -fix=false -verify";
       files = "^\.github/workflows/.*\.(yml|yaml)$";
       pass_filenames = false;
+      stages = [ "pre-push" ];
     };
     selene.enable = true;
     treefmt = {

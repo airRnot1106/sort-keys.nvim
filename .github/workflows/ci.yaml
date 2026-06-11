@@ -49,3 +49,21 @@ jobs:
 
       - name: Run lint & format check
         run: nix build -L .#checks.x86_64-linux.pre-commit
+
+  pinact:
+    name: Pinact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: suzuki-shunsuke/pinact-action@896d595f299e71d65b9d28349d6956abe144390a # v3.0.0
+        with:
+          fix: "false"
+          verify: "true"
+          skip_push: "true"
+          min_age: "7"
