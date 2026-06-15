@@ -1,7 +1,7 @@
 {
   inputs = {
     agent-skills.url = "github:Kyure-A/agent-skills-nix";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     pproenca-skills = {
       url = "github:pproenca/dot-skills";
       flake = false;

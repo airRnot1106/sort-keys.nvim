@@ -136,16 +136,16 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1781074563,
-        "narHash": "sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4=",
+        "lastModified": 1781359544,
+        "narHash": "sha256-iUuzKQcyXvopYDDzFpMK5eQKP3WIJExYny2kJtbgUcE=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+        "rev": "9f11f828c213641c2369a9f1fa31fe31557e3156",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixos-unstable",
+        "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -153,11 +153,11 @@
     "pproenca-skills": {
       "flake": false,
       "locked": {
-        "lastModified": 1780265331,
-        "narHash": "sha256-Aihfefulnrne5r1wYNwttAy2DtDW3EKcN1e47F7lSw4=",
+        "lastModified": 1781254665,
+        "narHash": "sha256-PO5XoLpv8ivhGWNXhMbTYaTy/Vm3ALRACH4mOfpWkd4=",
         "owner": "pproenca",
         "repo": "dot-skills",
-        "rev": "a86ba91476c0a3df3c7702f176c53023ea2ffe7c",
+        "rev": "9c015c68df33adf461ea9fa7071c119ca0061a0a",
         "type": "github"
       },
       "original": {
