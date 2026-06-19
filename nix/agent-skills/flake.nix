@@ -38,15 +38,14 @@
             };
           };
           catalog = agentLib.discoverCatalog sources;
-          allowlist = agentLib.allowlistFor {
-            inherit catalog sources;
-            enable = [
-              ".experimental/vhs"
-            ];
-          };
           selection = agentLib.selectSkills {
-            inherit catalog allowlist sources;
-            skills = { };
+            inherit catalog sources;
+            skills = {
+              vhs = {
+                from = "pproenca-skills";
+                path = ".experimental/vhs";
+              };
+            };
           };
           bundle = agentLib.mkBundle { inherit pkgs selection; };
           localTargets = {
